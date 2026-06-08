@@ -46,8 +46,8 @@
             <span id="status" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
                 <i class="fa-solid fa-circle-dot mr-1"></i> Chưa kết nối
             </span>
-            <input id="api-url" type="text" value="https://HERMES_TUNNEL_URL_HERE/v1"
-                class="bg-bg border border-border rounded px-3 py-1 text-xs w-64 focus:outline-none focus:border-accent transition-colors font-mono"
+            <input id="api-url" type="text" value="https://rely-attach-continues-perspective.trycloudflare.com/v1"
+                class="bg-bg border border-border rounded px-3 py-1 text-xs w-72 focus:outline-none focus:border-accent transition-colors font-mono"
                 placeholder="Hermes API URL...">
         </div>
     </header>
@@ -55,8 +55,7 @@
     <!-- Chat -->
     <main class="flex-1 flex flex-col overflow-hidden">
         <div id="messages" class="flex-1 p-6 overflow-y-auto space-y-4">
-            <!-- Welcome -->
-            <div class="text-center my-auto">
+            <div id="welcome" class="text-center py-12">
                 <div class="text-4xl text-accent mb-3"><i class="fa-solid fa-terminal animate-pulse"></i></div>
                 <p class="text-sm text-gray-400">Nhấn Ping để kiểm tra kết nối, rồi nhắn gì đó.</p>
                 <button onclick="ping()" class="mt-4 bg-accent hover:bg-sky-400 text-bg font-bold py-2 px-5 rounded text-sm transition-colors">
@@ -113,9 +112,9 @@ function bubble(role, html) {
     } else {
         wrap.className = 'flex justify-start items-start space-x-3';
         wrap.innerHTML = `
-            <div class="bg-accent p-2 rounded-lg text-bg text-xs mt-0.5"><i class="fa-solid fa-robot"></i></div>
+            <div class="bg-accent p-2 rounded-lg text-bg text-xs mt-0.5 shrink-0"><i class="fa-solid fa-robot"></i></div>
             <div class="max-w-[75%] bg-card border border-border rounded-2xl rounded-tl-none px-5 py-4 text-sm leading-relaxed">
-                <div class="content-text">${html}</div>
+                <div class="content-text"></div>
             </div>`;
     }
     $('messages').appendChild(wrap);
@@ -124,7 +123,7 @@ function bubble(role, html) {
 }
 
 function rmWelcome() {
-    const w = $('messages').querySelector('.text-center');
+    const w = $('welcome');
     if (w) w.remove();
 }
 
@@ -150,23 +149,40 @@ async function ping() {
     el.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-1"></i> Đang kết nối...';
     try {
         const r = await fetch(`${baseUrl()}/models`);
-        if (r.ok) { setStatus(true); return true; }
+        // 401 = server sống, chỉ cần auth → coi như connected
+        if (r.ok || r.status === 401) { setStatus(true); return true; }
         throw new Error(`HTTP ${r.status}`);
     } catch (e) {
         setStatus(false);
-        bubble('assistant', `<span class="text-red-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Không kết nối được: ${esc(e.message)}</span>`);
+        const el = bubble('assistant', '');
+        el.innerHTML = `<span class="text-red-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Không kết nối được: ${esc(e.message)}</span>`;
         return false;
     }
 }
 
 function fmt(text) {
-    return text
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-        .replace(/\*(.+?)\*/g, '<i>$1</i>')
-        .replace(/`([^`]+)`/g, '<code class="bg-slate-900 border border-border px-1.5 py-0.5 rounded text-xs text-accent">$1</code>')
-        .replace(/```[\w]*\n([\s\S]*?)```/g, '<pre class="bg-slate-950 border border-border p-3 rounded-lg my-2 text-xs font-mono overflow-x-auto text-sky-400"><code>$1</code></pre>')
-        .replace(/\n/g, '<br>');
+    // Escape HTML first
+    let s = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Code blocks before inline code (prevent double processing)
+    s = s.replace(/```[\w]*\n?([\s\S]*?)```/g,
+        '<pre class="bg-slate-950 border border-border p-3 rounded-lg my-2 text-xs font-mono overflow-x-auto text-sky-400 whitespace-pre"><code>$1</code></pre>');
+
+    // Inline code
+    s = s.replace(/`([^`]+)`/g,
+        '<code class="bg-slate-900 border border-border px-1.5 py-0.5 rounded text-xs text-accent">$1</code>');
+
+    // Bold & italic
+    s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    s = s.replace(/\*(.+?)\*/g, '<i>$1</i>');
+
+    // Newlines (skip inside pre)
+    s = s.replace(/\n(?![\s\S]*<\/pre>)/g, '<br>').replace(/\n/g, '<br>');
+
+    return s;
 }
 
 async function send() {
@@ -177,8 +193,12 @@ async function send() {
     inp.style.height = '44px';
     rmWelcome();
 
+    // User bubble — safe via nl2br (textContent-based esc)
     bubble('user', nl2br(msg));
-    const contentEl = bubble('assistant', '<i class="fa-solid fa-circle-notch animate-spin text-accent"></i>');
+
+    // Assistant bubble with spinner
+    const contentEl = bubble('assistant', '');
+    contentEl.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin text-accent"></i>';
 
     try {
         const r = await fetch(`${baseUrl()}/chat/completions`, {
@@ -196,26 +216,43 @@ async function send() {
         const reader = r.body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
+        let fullText = '';
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             buf += decoder.decode(value, { stream: true });
 
-            // Try to extract complete text from stream
-            // Accumulate all delta content for formatting
-            let text = '';
-            for (const line of buf.split('\n')) {
+            // Parse SSE lines
+            const lines = buf.split('\n');
+            buf = lines.pop(); // keep incomplete last line
+
+            for (const line of lines) {
                 const t = line.trim();
                 if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue;
                 try {
                     const d = JSON.parse(t.slice(6));
-                    text += d.choices[0].delta.content || '';
+                    const delta = d?.choices?.[0]?.delta?.content;
+                    if (delta) fullText += delta;
                 } catch(e) {}
             }
-            contentEl.innerHTML = fmt(text);
+
+            contentEl.innerHTML = fmt(fullText);
             $('messages').scrollTop = $('messages').scrollHeight;
         }
+
+        // Final render with any remaining buffer
+        if (buf.trim() && buf.trim().startsWith('data: ')) {
+            try {
+                const d = JSON.parse(buf.trim().slice(6));
+                const delta = d?.choices?.[0]?.delta?.content;
+                if (delta) fullText += delta;
+                contentEl.innerHTML = fmt(fullText);
+            } catch(e) {}
+        }
+
+        if (!fullText) contentEl.innerHTML = '<span class="text-gray-500 italic">...</span>';
+
     } catch (e) {
         contentEl.innerHTML = `<span class="text-red-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${esc(e.message)}</span>`;
     }
