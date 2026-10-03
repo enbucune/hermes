@@ -75,15 +75,6 @@ $('btnLoad').onclick = function () {
     .then(function () { $('btnLoad').disabled = false; });
 };
 
-$('btnSheet').onclick = function () {
-  if (!CUR) { msg('Tải dữ liệu trước đã', 'err'); return; }
-  $('btnSheet').disabled = true; msg('Đang ghi sheet...');
-  api({ action: 'writeSheet', routeId: CUR.id, label: CUR.code, date: $('date').value })
-    .then(function (r) { msg('✅ ' + r.message, 'ok'); })
-    .catch(function (e) { msg('❌ ' + e.message, 'err'); })
-    .then(function () { $('btnSheet').disabled = false; });
-};
-
 $('q').oninput = $('onlyWarn').onchange = function () { if (DATA) render(); };
 
 // ===== RENDER =====
