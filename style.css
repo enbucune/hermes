@@ -1,0 +1,30 @@
+body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1b2a33; }
+header { background: #305496; color: #fff; padding: 12px 20px; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 20px; background: #fff; border-bottom: 1px solid #dde3e8; }
+select, input[type=date], input[type=text] { padding: 7px 10px; border: 1px solid #c5ced6; border-radius: 6px; font-size: 14px; }
+button { padding: 8px 16px; border: 0; border-radius: 6px; background: #305496; color: #fff; font-weight: 700; cursor: pointer; }
+button.ghost { background: #e8eef5; color: #1b2a33; }
+button.small { padding: 4px 10px; font-size: 12px; }
+button:disabled { opacity: .5; cursor: wait; }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 20px 0; }
+.stat { background: #fff; border: 1px solid #dde3e8; border-radius: 8px; padding: 8px 14px; font-size: 13px; }
+.stat b { font-size: 20px; display: block; }
+.wrap { padding: 12px 20px 40px; overflow-x: auto; }
+table { border-collapse: collapse; background: #fff; font-size: 13px; min-width: 700px; }
+th { background: #305496; color: #fff; padding: 8px 12px; position: sticky; top: 0; }
+td { padding: 6px 12px; border: 1px solid #e3e8ec; text-align: center; }
+tr.bandB td { background: #EAF1FB; }
+td.red { background: #FFB3B3 !important; }
+td.yellow { background: #FFF2A8 !important; }
+td.green { background: #C6EFCE !important; }
+td.purple { background: #E0CFFC !important; outline: 2px solid #E36C09; outline-offset: -2px; }
+h3 { margin: 22px 0 8px; color: #c23b4b; }
+#msg { padding: 10px 20px; font-size: 13px; white-space: pre-wrap; }
+.err { color: #c23b4b; }
+.ok { color: #178a55; }
+.legend { padding: 8px 20px 0; font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; }
+.legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -2px; border: 1px solid #aaa; }
+.l-y::before { background: #FFF2A8; }
+.l-r::before { background: #FFB3B3; }
+.l-g::before { background: #C6EFCE; }
+.l-p::before { background: #E0CFFC; border-color: #E36C09 !important; }
