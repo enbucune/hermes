@@ -1,17 +1,6 @@
-// ===== CẤU HÌNH: có thể để trống, lần đầu mở web sẽ tự hỏi URL Web App (kết thúc /exec) =====
-const API_URL = '';
-
-function getUrl(reset) {
-  let u = (reset ? '' : (API_URL || localStorage.getItem('web_url') || '')).trim();
-  while (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)) {
-    const inp = prompt('Dán URL Web App của Apps Script (dạng https://script.google.com/macros/s/.../exec):', '');
-    if (inp === null) throw new Error('Chưa có URL Web App');
-    u = inp.trim().split('?')[0];
-    if (!/\/exec$/.test(u)) alert('URL phải kết thúc bằng /exec (lấy ở Deploy → Manage deployments)');
-  }
-  localStorage.setItem('web_url', u);
-  return u;
-}
+// ===== CẤU HÌNH: URL Web App của Apps Script (kết thúc /exec) =====
+const API_URL = 'https://script.google.com/macros/s/AKfycbxWzYaiYmEQiVrl4oNgFCBBxOHUnX8_nIZK396IrXbFDx-H0sz-BAhhozyo14wrWLAs/exec';
+function getUrl() { return API_URL; }
 
 let DATA = null, CUR = null;
 const $ = id => document.getElementById(id);
@@ -41,7 +30,7 @@ function api(params, timeoutMs) {
     let done = false, timer;
     const clean = function () { done = true; delete window[cb]; script.remove(); clearTimeout(timer); };
     window[cb] = function (data) { clean(); data && data.ok ? resolve(data) : reject(new Error((data && data.error) || 'Lỗi không xác định')); };
-    script.onerror = function () { if (!done) { clean(); reject(new Error('Không kết nối được API. Kiểm tra: (1) URL đúng và đã Deploy bản mới, (2) Who has access = Anyone, (3) đã bấm Allow quyền trong editor. Bấm "🔑 Đổi mã" để nhập lại URL.')); } };
+    script.onerror = function () { if (!done) { clean(); reject(new Error('Không kết nối được API. Kiểm tra: (1) URL đúng và đã Deploy bản mới, (2) Who has access = Anyone, (3) đã bấm Allow quyền trong editor.')); } };
     timer = setTimeout(function () { if (!done) { clean(); reject(new Error('Hết thời gian chờ')); } }, timeoutMs || 120000);
     script.src = url + '?' + q.toString();
     document.body.appendChild(script);
@@ -64,7 +53,7 @@ loadRoutes();
 
 function sel() { const o = $('route').selectedOptions[0]; return o ? { id: o.value, code: o.dataset.code } : {}; }
 
-$('btnKey').onclick = function () { try { getUrl(true); getKey(true); } catch (e) { msg('❌ ' + e.message, 'err'); return; } loadRoutes(); };
+$('btnKey').onclick = function () { getKey(true); loadRoutes(); };
 
 $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) return;
