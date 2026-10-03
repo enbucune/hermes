@@ -1,1 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bảng tài xe</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>🚌 Bảng tài xe — dữ liệu trực tiếp từ hệ thống <button id="btnKey" class="ghost small">🔑 Đổi mã</button></header>
 
+<div class="bar">
+  <select id="route"><option>Đang tải tuyến...</option></select>
+  <input type="date" id="date">
+  <button id="btnLoad">Tải dữ liệu</button>
+  <input type="text" id="q" placeholder="Lọc theo xe..." style="width:140px">
+  <label><input type="checkbox" id="onlyWarn"> Chỉ xe có cảnh báo</label>
+  <button class="ghost" id="btnSheet">Ghi vào Sheet</button>
+</div>
+<div id="msg"></div>
+<div class="legend">
+  <span class="l-y">Vàng: lệch 5 phút</span><span class="l-r">Đỏ: điều xe trễ / lệch ≥6 phút</span>
+  <span class="l-g">Xanh: giờ đi ≠ lịch chạy</span><span class="l-p">Tím + viền cam: trùng giờ chuyến liền kề</span>
+</div>
+<div class="stats" id="stats"></div>
+<div class="wrap" id="out"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
