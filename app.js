@@ -1,5 +1,17 @@
-// ===== CẤU HÌNH: dán URL Web App của Apps Script (kết thúc bằng /exec) =====
-const API_URL = 'DÁN_URL_WEB_APP_VÀO_ĐÂY';
+// ===== CẤU HÌNH: có thể để trống, lần đầu mở web sẽ tự hỏi URL Web App (kết thúc /exec) =====
+const API_URL = '';
+
+function getUrl(reset) {
+  let u = (reset ? '' : (API_URL || localStorage.getItem('web_url') || '')).trim();
+  while (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)) {
+    const inp = prompt('Dán URL Web App của Apps Script (dạng https://script.google.com/macros/s/.../exec):', '');
+    if (inp === null) throw new Error('Chưa có URL Web App');
+    u = inp.trim().split('?')[0];
+    if (!/\/exec$/.test(u)) alert('URL phải kết thúc bằng /exec (lấy ở Deploy → Manage deployments)');
+  }
+  localStorage.setItem('web_url', u);
+  return u;
+}
 
 let DATA = null, CUR = null;
 const $ = id => document.getElementById(id);
@@ -21,15 +33,17 @@ function getKey(reset) {
 let _n = 0;
 function api(params, timeoutMs) {
   return new Promise(function (resolve, reject) {
+    let url, key;
+    try { url = getUrl(); key = getKey(); } catch (e) { reject(e); return; }
     const cb = '__cb' + (++_n) + '_' + Date.now();
-    const q = new URLSearchParams(Object.assign({ key: getKey(), callback: cb }, params));
+    const q = new URLSearchParams(Object.assign({ key: key, callback: cb }, params));
     const script = document.createElement('script');
     let done = false, timer;
     const clean = function () { done = true; delete window[cb]; script.remove(); clearTimeout(timer); };
     window[cb] = function (data) { clean(); data && data.ok ? resolve(data) : reject(new Error((data && data.error) || 'Lỗi không xác định')); };
-    script.onerror = function () { if (!done) { clean(); reject(new Error('Không kết nối được API (kiểm tra URL / quyền "Anyone")')); } };
+    script.onerror = function () { if (!done) { clean(); reject(new Error('Không kết nối được API. Kiểm tra: (1) URL đúng và đã Deploy bản mới, (2) Who has access = Anyone, (3) đã bấm Allow quyền trong editor. Bấm "🔑 Đổi mã" để nhập lại URL.')); } };
     timer = setTimeout(function () { if (!done) { clean(); reject(new Error('Hết thời gian chờ')); } }, timeoutMs || 120000);
-    script.src = API_URL + '?' + q.toString();
+    script.src = url + '?' + q.toString();
     document.body.appendChild(script);
   });
 }
@@ -50,7 +64,7 @@ loadRoutes();
 
 function sel() { const o = $('route').selectedOptions[0]; return o ? { id: o.value, code: o.dataset.code } : {}; }
 
-$('btnKey').onclick = function () { getKey(true); loadRoutes(); };
+$('btnKey').onclick = function () { try { getUrl(true); getKey(true); } catch (e) { msg('❌ ' + e.message, 'err'); return; } loadRoutes(); };
 
 $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) return;
