@@ -186,3 +186,20 @@ $('btnCopy').onclick = function () {
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done).catch(function (e) { msg('❌ Không copy được: ' + e.message, 'err'); });
   else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { msg('❌ Không copy được', 'err'); } ta.remove(); }
 };
+
+// ===== CHUYỂN NGÀY TRƯỚC / SAU =====
+function shiftDay(n) {
+  const v = $('date').value; if (!v) return;
+  const p = v.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
+  $('date').value = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+$('btnPrev').onclick = function () { shiftDay(-1); };
+$('btnNext').onclick = function () { shiftDay(1); };
+
+// ===== CHÚ THÍCH MÀU: chỉ hiện ở màn Bảng xe =====
+(function () {
+  const lg = document.querySelector('.legend');
+  const sync = function () { lg.style.display = (MODE === 'trips' && $('out').children.length) ? '' : 'none'; };
+  new MutationObserver(sync).observe($('out'), { childList: true });
+  sync();
+})();
