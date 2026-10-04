@@ -28,3 +28,11 @@ h3 { margin: 22px 0 8px; color: #c23b4b; }
 .l-r::before { background: #FFB3B3; }
 .l-g::before { background: #C6EFCE; }
 .l-p::before { background: #E0CFFC; border-color: #E36C09 !important; }
+
+tr.e-ok td { background: #C6EFCE; color: #006100; }
+tr.e-warn td { background: #FFEB9C; color: #9C6500; }
+tr.e-plan td { background: #FFD599; color: #B45F06; }
+tr.e-nopc td { background: #FFC7CE; color: #9C0006; }
+tr.e-noebms td { background: #FFDAB9; color: #B35900; }
+td.notes { text-align: left; white-space: normal; min-width: 240px; }
+.stat.e-ok b { color: #178a55; } .stat.e-warn b { color: #9C6500; } .stat.e-nopc b { color: #9C0006; } .stat.e-noebms b { color: #B35900; }
