@@ -56,7 +56,7 @@ function sel() { const o = $('route').selectedOptions[0]; return o ? { id: o.val
 $('btnKey').onclick = function () { getKey(true); loadRoutes(); };
 
 $('btnLoad').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) return;
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: $('date').value }).then(function (res) {
     DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
@@ -82,9 +82,10 @@ function catOf(loai) {
 }
 
 $('btnEbms').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) return;
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
+    if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
     EB = res; MODE = 'ebms'; $('btnCopy').style.display = 'none';
     msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến)', 'ok');
     renderEbms();
@@ -148,10 +149,11 @@ function render() {
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
 
 $('btnNv').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) return;
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'nv', routeId: s.id, label: s.code, date: $('date').value, nguoiDo: nd }).then(function (res) {
+    if (!res.rows) throw new Error('Server chưa có action "nv". Thêm dòng router vào Web.gs, dán Nv.gs, rồi Deploy lại BẢN MỚI.');
     NV = res; MODE = 'nv'; $('btnCopy').style.display = '';
     msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến, đã bỏ chuyến mất và trùng)', 'ok');
     renderNv();
