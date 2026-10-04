@@ -59,7 +59,7 @@ $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) return;
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: $('date').value }).then(function (res) {
-    DATA = res; CUR = s; MODE = 'trips'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
+    DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnLoad').disabled = false; });
 };
@@ -68,7 +68,8 @@ $('q').oninput = $('onlyWarn').onchange = function () { rerender(); };
 
 // ===== SO SÁNH EBMS =====
 let EB = null, MODE = 'trips';
-function rerender() { if (MODE === 'ebms' && EB) renderEbms(); else if (DATA) render(); }
+let NV = null;
+function rerender() { if (MODE === 'ebms' && EB) renderEbms(); else if (MODE === 'nv' && NV) renderNv(); else if (DATA) render(); }
 
 function catOf(loai) {
   loai = String(loai || '');
@@ -84,7 +85,7 @@ $('btnEbms').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) return;
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
-    EB = res; MODE = 'ebms';
+    EB = res; MODE = 'ebms'; $('btnCopy').style.display = 'none';
     msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến)', 'ok');
     renderEbms();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
@@ -141,3 +142,45 @@ function render() {
   }
   $('out').innerHTML = out;
 }
+
+
+// ===== TRÍCH XUẤT NHÂN VIÊN =====
+(function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
+
+$('btnNv').onclick = function () {
+  const s = sel(); if (!s.id || !$('date').value) return;
+  const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
+  $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  api({ action: 'nv', routeId: s.id, label: s.code, date: $('date').value, nguoiDo: nd }).then(function (res) {
+    NV = res; MODE = 'nv'; $('btnCopy').style.display = '';
+    msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến, đã bỏ chuyến mất và trùng)', 'ok');
+    renderNv();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnNv').disabled = false; });
+};
+
+function nvVisible() {
+  const q = $('q').value.trim().toLowerCase();
+  return NV.rows.filter(r => !q || (r.ten + ' ' + r.chucVu).toLowerCase().indexOf(q) !== -1);
+}
+
+function renderNv() {
+  const st = NV.stats;
+  $('stats').innerHTML = [['Tổng nhân viên', st.total], ['Lái xe', st.drivers], ['Tiếp viên', st.attendants], ['Trùng tên khác SĐT', st.ambiguous]]
+    .map(x => '<div class="stat"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  const body = nvVisible().map(r => '<tr class="' + (r.isAmbiguous ? 'e-amb' : '') + '"><td>' + esc(r.ngay) + '</td><td>' + esc(r.tuyen) + '</td><td>' + esc(r.gioDi) +
+    '</td><td>' + esc(r.gioXuatBen) + '</td><td>' + esc(r.thoiGianDo) + '</td><td class="left">' + esc(r.ten) + '</td><td>' + esc(r.chucVu) +
+    '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
+  $('out').innerHTML = '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
+    .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="10">Không có nhân viên nào</td></tr>') + '</tbody></table>';
+}
+
+$('btnCopy').onclick = function () {
+  if (!NV) return;
+  const clean = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ');
+  const text = nvVisible().map(r => [r.ngay, r.tuyen, r.gioDi, r.gioXuatBen, r.thoiGianDo, r.ten, r.chucVu,
+    r.trangThai ? 'TRUE' : 'FALSE', r.viPham ? 'TRUE' : 'FALSE', r.nguoiDo].map(clean).join('\t')).join('\n');
+  const done = function () { msg('📋 Đã copy ' + nvVisible().length + ' dòng, qua Google Sheet bấm Ctrl+V', 'ok'); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done).catch(function (e) { msg('❌ Không copy được: ' + e.message, 'err'); });
+  else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { msg('❌ Không copy được', 'err'); } ta.remove(); }
+};
