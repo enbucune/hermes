@@ -36,3 +36,6 @@ tr.e-nopc td { background: #FFC7CE; color: #9C0006; }
 tr.e-noebms td { background: #FFDAB9; color: #B35900; }
 td.notes { text-align: left; white-space: normal; min-width: 240px; }
 .stat.e-ok b { color: #178a55; } .stat.e-warn b { color: #9C6500; } .stat.e-nopc b { color: #9C0006; } .stat.e-noebms b { color: #B35900; }
+
+tr.e-amb td { background: #FFF2CC; }
+td.left { text-align: left; }
