@@ -59,12 +59,59 @@ $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) return;
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: $('date').value }).then(function (res) {
-    DATA = res; CUR = s; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
+    DATA = res; CUR = s; MODE = 'trips'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnLoad').disabled = false; });
 };
 
-$('q').oninput = $('onlyWarn').onchange = function () { if (DATA) render(); };
+$('q').oninput = $('onlyWarn').onchange = function () { rerender(); };
+
+// ===== SO SÁNH EBMS =====
+let EB = null, MODE = 'trips';
+function rerender() { if (MODE === 'ebms' && EB) renderEbms(); else if (DATA) render(); }
+
+function catOf(loai) {
+  loai = String(loai || '');
+  if (loai.includes('KHỚP')) return 'ok';
+  if (loai.includes('LỆCH GIỜ KẾ HOẠCH')) return 'plan';
+  if (loai.includes('LỆCH')) return 'warn';
+  if (loai.includes('KHÔNG CÓ PHÂN CÔNG')) return 'nopc';
+  if (loai.includes('THIẾU EBMS')) return 'noebms';
+  return '';
+}
+
+$('btnEbms').onclick = function () {
+  const s = sel(); if (!s.id || !$('date').value) return;
+  $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  api({ action: 'ebms', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
+    EB = res; MODE = 'ebms';
+    msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến)', 'ok');
+    renderEbms();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnEbms').disabled = false; });
+};
+
+function renderEbms() {
+  const cnt = { ok: 0, warn: 0, plan: 0, nopc: 0, noebms: 0 };
+  EB.results.forEach(function (r) { const c = catOf(r.loai); if (cnt[c] != null) cnt[c]++; });
+  $('stats').innerHTML = [['Tổng dòng', EB.results.length, ''], ['Khớp', cnt.ok, 'e-ok'], ['Lệch giờ', cnt.warn + cnt.plan, 'e-warn'],
+    ['Thiếu phân công', cnt.nopc, 'e-nopc'], ['Thiếu EBMS', cnt.noebms, 'e-noebms']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+
+  const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
+  let html = '';
+  EB.results.forEach(function (r) {
+    const c = catOf(r.loai);
+    if (only && c === 'ok') return;
+    const f = [r.loai, r.khDi, r.khDen, r.khXe, r.thXe, r.thDi, r.thDen, r.benDau, r.trangThaiEBMS, r.lichChayPC, r.xePC, r.benXuatPhatPC,
+      r.gioDiPC, r.gioDenPC, r.chenhLechDi, r.chenhLechDen, r.soBen];
+    if (q && (f.join(' ') + ' ' + r.ghi).toLowerCase().indexOf(q) === -1) return;
+    html += '<tr class="e-' + c + '">' + f.map(v => '<td>' + esc(v) + '</td>').join('') + '<td class="notes">' + esc(r.ghi) + '</td></tr>';
+  });
+  const heads = ['Loại', 'KH Đi', 'KH Đến', 'KH Xe', 'TH Xe', 'TH Đi', 'TH Đến', 'Bến đầu', 'TT EBMS', 'Lịch chạy PC', 'Xe PC', 'Bến PC', 'Giờ đi PC', 'Giờ đến PC', 'Lệch Đi', 'Lệch Về', 'So bến', 'Ghi chú'];
+  $('out').innerHTML = '<table><thead><tr>' + heads.map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' +
+    (html || '<tr><td colspan="18">Không có dòng nào</td></tr>') + '</tbody></table>';
+}
 
 // ===== RENDER =====
 function render() {
