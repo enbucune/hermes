@@ -6,71 +6,72 @@
 <title>Bảng tài xe</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
 
-  <aside class="side">
+<header class="hero">
+  <div class="hero-in">
     <div class="brand">
       <span class="brand-mark">🚌</span>
       <div>
-        <div class="brand-name">Bảng tài xe</div>
-        <div class="brand-sub">Dữ liệu trực tiếp từ hệ thống</div>
+        <h1>Bảng tài xe</h1>
+        <p>Dữ liệu chuyến xe trực tiếp từ hệ thống</p>
+      </div>
+    </div>
+    <button id="btnKey" class="ghost-light">🔑 Đổi mã truy cập</button>
+  </div>
+</header>
+
+<main class="page">
+
+  <section class="controls">
+    <div class="fields">
+      <div class="field field-route">
+        <label for="route">Tuyến</label>
+        <select id="route"><option>Đang tải tuyến...</option></select>
+      </div>
+      <div class="field">
+        <label for="date">Ngày</label>
+        <div class="datebox">
+          <button type="button" id="btnPrev" class="day-btn" title="Ngày trước" aria-label="Ngày trước">‹</button>
+          <input type="date" id="date">
+          <button type="button" id="btnNext" class="day-btn" title="Ngày sau" aria-label="Ngày sau">›</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="nguoiDo">Người đo nồng độ cồn</label>
+        <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam">
       </div>
     </div>
 
-    <section class="panel">
-      <h2>Chọn dữ liệu</h2>
-      <label for="route">Tuyến</label>
-      <select id="route"><option>Đang tải tuyến...</option></select>
-      <label for="date">Ngày</label>
-      <input type="date" id="date">
-      <label for="nguoiDo">Người đo nồng độ cồn</label>
-      <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam">
-    </section>
-
-    <section class="panel">
-      <h2>Tác vụ</h2>
-      <button id="btnLoad" class="task">
-        <span class="task-ico">🚐</span>
-        <span><span class="task-title">Tải bảng xe</span><span class="task-desc">Giờ điều xe, giờ đi, cảnh báo, mất chuyến</span></span>
-      </button>
-      <button id="btnEbms" class="task">
-        <span class="task-ico">📊</span>
-        <span><span class="task-title">So sánh EBMS</span><span class="task-desc">Đối chiếu phân công với EBMS</span></span>
-      </button>
-      <button id="btnNv" class="task">
-        <span class="task-ico">👥</span>
-        <span><span class="task-title">Trích xuất nhân viên</span><span class="task-desc">Danh sách tài xế, tiếp viên để đo cồn</span></span>
-      </button>
-    </section>
-
-    <button id="btnKey" class="side-link">🔑 Đổi mã truy cập</button>
-  </aside>
-
-  <main class="main">
-    <div class="toolbar">
-      <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..."></div>
-      <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ hiện dòng cảnh báo hoặc lệch</label>
-      <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy bảng để dán vào Sheet</button>
+    <div class="actions">
+      <button id="btnLoad" class="act act-main">🚐 Tải bảng xe</button>
+      <button id="btnEbms" class="act act-ebms">📊 So sánh EBMS</button>
+      <button id="btnNv" class="act act-nv">👥 Trích xuất nhân viên</button>
     </div>
+  </section>
 
-    <div id="msg"></div>
+  <div id="msg"></div>
+  <div class="stats" id="stats"></div>
 
-    <div class="legend">
-      <span class="lg lg-y">Vàng: lệch 5 phút</span>
-      <span class="lg lg-r">Đỏ: điều xe trễ, hoặc lệch từ 6 phút</span>
-      <span class="lg lg-g">Xanh lá: giờ đi khác lịch chạy</span>
-      <span class="lg lg-p">Tím viền cam: trùng giờ chuyến liền kề</span>
-    </div>
+  <div class="toolbar">
+    <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..."></div>
+    <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ hiện dòng cảnh báo hoặc lệch</label>
+    <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy bảng để dán vào Sheet</button>
+  </div>
 
-    <div class="stats" id="stats"></div>
-    <div class="wrap" id="out"></div>
-  </main>
+  <div class="legend">
+    <span class="lg lg-y">Vàng: lệch 5 phút</span>
+    <span class="lg lg-r">Đỏ: điều xe trễ, hoặc lệch từ 6 phút</span>
+    <span class="lg lg-g">Xanh lá: giờ đi khác lịch chạy</span>
+    <span class="lg lg-p">Tím: trùng giờ chuyến liền kề</span>
+  </div>
 
-</div>
+  <div class="wrap" id="out"></div>
+</main>
+
 <script src="app.js"></script>
 </body>
 </html>
