@@ -11,16 +11,18 @@ function msg(t, cls) { $('msg').className = cls || ''; $('msg').textContent = t 
 function getKey(reset) {
   let k = localStorage.getItem('web_key');
   if (!k || reset) {
-    k = prompt('Nhập mã truy cập (WEB_KEY):') || '';
-    localStorage.setItem('web_key', k.trim());
-    k = k.trim();
+    const input = prompt('Nhập mã truy cập (WEB_KEY):');
+    if (input !== null) { // bấm Hủy thì giữ nguyên mã cũ, không ghi đè bằng chuỗi rỗng
+      k = input.trim();
+      localStorage.setItem('web_key', k);
+    }
   }
-  return k;
+  return k || '';
 }
 
-// ===== JSONP =====
+// ===== JSONP (tự thử lại khi lỗi kết nối) =====
 let _n = 0;
-function api(params, timeoutMs) {
+function apiOnce(params, timeoutMs) {
   return new Promise(function (resolve, reject) {
     let url, key;
     try { url = getUrl(); key = getKey(); } catch (e) { reject(e); return; }
@@ -30,10 +32,29 @@ function api(params, timeoutMs) {
     let done = false, timer;
     const clean = function () { done = true; delete window[cb]; script.remove(); clearTimeout(timer); };
     window[cb] = function (data) { clean(); data && data.ok ? resolve(data) : reject(new Error((data && data.error) || 'Lỗi không xác định')); };
-    script.onerror = function () { if (!done) { clean(); reject(new Error('Không kết nối được API. Kiểm tra: (1) URL đúng và đã Deploy bản mới, (2) Who has access = Anyone, (3) đã bấm Allow quyền trong editor.')); } };
+    script.onerror = function () {
+      if (!done) {
+        clean();
+        const e = new Error('Không kết nối được tới máy chủ (Google hoặc mạng đang chập chờn). Thử lại sau ít giây; nếu vẫn lỗi, mở trang bằng cửa sổ ẩn danh.');
+        e.net = true;
+        reject(e);
+      }
+    };
     timer = setTimeout(function () { if (!done) { clean(); reject(new Error('Hết thời gian chờ')); } }, timeoutMs || 120000);
     script.src = url + '?' + q.toString();
     document.body.appendChild(script);
+  });
+}
+
+function api(params, timeoutMs, tries) {
+  tries = tries == null ? 2 : tries; // thử lại tối đa 2 lần
+  return apiOnce(params, timeoutMs).catch(function (e) {
+    if (e.net && tries > 0) {
+      msg('Kết nối chập chờn, đang thử lại...');
+      return new Promise(function (r) { setTimeout(r, 1500); })
+        .then(function () { return api(params, timeoutMs, tries - 1); });
+    }
+    throw e;
   });
 }
 
@@ -47,6 +68,7 @@ function loadRoutes() {
     const opt = r => '<option value="' + esc(r.id) + '" data-code="' + esc(r.code) + '">Tuyến ' + esc(r.code) + (r.name ? ' — ' + esc(r.name) : '') + '</option>';
     $('route').innerHTML = (favs.length ? '<optgroup label="Hay dùng">' + favs.map(opt).join('') + '</optgroup>' : '') +
       '<optgroup label="Tất cả">' + rest.map(opt).join('') + '</optgroup>';
+    msg('');
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
 }
 loadRoutes();
