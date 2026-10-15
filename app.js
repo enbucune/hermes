@@ -62,23 +62,47 @@ function api(params, timeoutMs, tries) {
 const d = new Date();
 $('date').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
+let ROUTES = [];
+const routeText = r => r.code + (r.name ? ' — ' + r.name : '');
+
 function loadRoutes() {
   api({ action: 'routes' }).then(function (res) {
-    const favSet = new Set(res.fav), favs = res.routes.filter(r => favSet.has(r.code)), rest = res.routes.filter(r => !favSet.has(r.code));
-    const opt = r => '<option value="' + esc(r.id) + '" data-code="' + esc(r.code) + '">Tuyến ' + esc(r.code) + (r.name ? ' — ' + esc(r.name) : '') + '</option>';
-    $('route').innerHTML = (favs.length ? '<optgroup label="Hay dùng">' + favs.map(opt).join('') + '</optgroup>' : '') +
-      '<optgroup label="Tất cả">' + rest.map(opt).join('') + '</optgroup>';
+    const favSet = new Set(res.fav);
+    // tuyến "Hay dùng" lên đầu danh sách gợi ý
+    ROUTES = res.routes.filter(r => favSet.has(r.code)).concat(res.routes.filter(r => !favSet.has(r.code)));
+    $('routeList').innerHTML = ROUTES.map(r => '<option value="' + esc(routeText(r)) + '"></option>').join('');
+    const last = localStorage.getItem('last_route');
+    if (last && !$('route').value) $('route').value = last;
+    $('route').placeholder = 'Nhập số tuyến (vd: 30, 01, 60-1) hoặc chọn từ danh sách';
     msg('');
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
 }
 loadRoutes();
 
-function sel() { const o = $('route').selectedOptions[0]; return o ? { id: o.value, code: o.dataset.code } : {}; }
+// Đổi chữ người dùng gõ thành tuyến: khớp đúng cả dòng, hoặc đúng mã tuyến (gõ "1" cũng ra "01"), hoặc chỉ có 1 tuyến chứa chữ đó
+function sel() {
+  const v = $('route').value.trim().toLowerCase();
+  if (!v || !ROUTES.length) return {};
+  const nz = x => String(x).toLowerCase().replace(/^0+(?=\d)/, '');
+  let r = ROUTES.find(x => routeText(x).toLowerCase() === v) ||
+          ROUTES.find(x => x.code.toLowerCase() === v) ||
+          ROUTES.find(x => nz(x.code) === nz(v));
+  if (!r) {
+    const m = ROUTES.filter(x => routeText(x).toLowerCase().indexOf(v) !== -1);
+    if (m.length === 1) r = m[0];
+  }
+  if (!r) return {};
+  localStorage.setItem('last_route', routeText(r));
+  return { id: String(r.id), code: r.code };
+}
+
+$('route').onfocus = function () { this.select(); }; // bấm vào ô là bôi đen sẵn, gõ đè luôn
+$('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
 $('btnKey').onclick = function () { getKey(true); loadRoutes(); };
 
 $('btnLoad').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: $('date').value }).then(function (res) {
     DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
@@ -104,7 +128,7 @@ function catOf(loai) {
 }
 
 $('btnEbms').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
@@ -171,7 +195,7 @@ function render() {
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
 
 $('btnNv').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa chọn tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'nv', routeId: s.id, label: s.code, date: $('date').value, nguoiDo: nd }).then(function (res) {
