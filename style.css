@@ -51,13 +51,14 @@ button:disabled { opacity: .55; cursor: wait; }
 .day-btn { width: 34px; height: 34px; border-radius: 9px; background: var(--blue-50); color: var(--blue-700); font-size: 20px; font-weight: 700; line-height: 1; }
 .day-btn:hover { background: var(--blue-100); }
 
-.actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; }
+.actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 12px; }
 .act { height: 46px; padding: 0 20px; border-radius: 12px; font-size: 14.5px; font-weight: 700; transition: transform .12s, box-shadow .12s, background .12s; }
 .act:active:not(:disabled) { transform: translateY(1px); }
 .act-main { color: #fff; background: linear-gradient(180deg, #3D6CF0, var(--blue-600)); box-shadow: 0 6px 16px rgba(43, 89, 219, .35); }
 .act-main:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(43, 89, 219, .45); }
 .act-ebms { color: #5A2BB5; background: #EFE7FD; } .act-ebms:hover:not(:disabled) { background: #E3D6FB; }
 .act-nv { color: #0A7664; background: #DDF6EF; } .act-nv:hover:not(:disabled) { background: #CBF0E6; }
+.act-lvc { color: #8A4308; background: #FFEEDD; } .act-lvc:hover:not(:disabled) { background: #FFE2C2; }
 
 /* ===== Thông báo ===== */
 #msg { margin-top: 18px; font-size: 14px; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; white-space: pre-wrap; background: var(--blue-100); color: var(--blue-700); font-weight: 500; }
@@ -127,6 +128,11 @@ tr.e-noebms td { background: #FFEEDD; color: #8A4308; }
 tr.e-amb td { background: #FFF6CF; }
 tr[class^="e-"] td:first-child { box-shadow: inset 4px 0 0 currentColor; }
 tr[class^="e-"]:hover td { filter: brightness(.97); }
+
+/* Kiểm tra lệnh: ô xem JSON */
+td.lvraw { text-align: left; white-space: normal; }
+td.lvraw summary { cursor: pointer; color: var(--blue-700); font-weight: 600; }
+td.lvraw pre { white-space: pre-wrap; word-break: break-all; max-width: 480px; max-height: 240px; overflow: auto; text-align: left; font-size: 12px; margin-top: 6px; color: var(--ink); }
 
 h3 { padding: 24px 18px 10px; font-size: 15.5px; color: var(--err); font-weight: 700; background: var(--white); position: sticky; left: 0; }
 
