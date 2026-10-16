@@ -239,14 +239,15 @@ $('btnCopy').onclick = function () {
   else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { msg('❌ Không copy được', 'err'); } ta.remove(); }
 };
 
-// ===== KIỂM TRA LỆNH VẬN CHUYỂN =====
+// ===== KIỂM TRA LỆNH VẬN CHUYỂN (chỉ tuyến + ngày đang chọn) =====
 $('btnLvc').onclick = function () {
   const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
-  $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển tuyến ' + s.code + ' (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'lvc', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
     LV = res; MODE = 'lvc'; $('btnCopy').style.display = 'none';
-    msg(res.hint || ('✅ Lệnh tuyến ' + s.code + ' — ' + $('date').value + ' (' + res.rows.length + ' xe)'), res.hint ? 'err' : 'ok');
+    if (res.rows.length) msg('✅ Lệnh tuyến ' + s.code + ' — ngày ' + res.ngay + ' (' + res.rows.length + ' lệnh)', 'ok');
+    else msg('⚠️ Tuyến ' + s.code + ' — ngày ' + res.ngay + ' không có lệnh vận chuyển nào', 'err');
     renderLvc();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnLvc').disabled = false; });
@@ -255,7 +256,7 @@ $('btnLvc').onclick = function () {
 function renderLvc() {
   const c = { ok: 0, warn: 0, bad: 0 };
   LV.rows.forEach(function (r) { c[r.level]++; });
-  $('stats').innerHTML = [['Tổng xe', LV.rows.length, ''], ['Đạt', c.ok, 'e-ok'], ['Cảnh báo', c.warn, 'e-warn'], ['Không có lệnh', c.bad, 'e-nopc']]
+  $('stats').innerHTML = [['Tổng lệnh', LV.rows.length, ''], ['Đạt', c.ok, 'e-ok'], ['Cảnh báo', c.warn, 'e-warn'], ['Lỗi', c.bad, 'e-nopc']]
     .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 
   const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
@@ -263,22 +264,14 @@ function renderLvc() {
   let html = '';
   LV.rows.forEach(function (r) {
     if (only && r.level === 'ok') return;
-    if (q && (r.xe + ' ' + r.lenh.join(' ') + ' ' + r.ghi).toLowerCase().indexOf(q) === -1) return;
-    html += '<tr class="' + cls[r.level] + '"><td>' + esc(r.xe) + '</td><td>' + r.soChuyen + '</td><td class="left">' + esc(r.lenh.join(', ') || '-') +
-      '</td><td>' + tag[r.level] + '</td><td class="notes">' + esc(r.ghi) + '</td><td class="lvraw">' +
-      (r.raw ? '<details><summary>Xem JSON</summary><pre>' + esc(r.raw) + '</pre></details>' : '') + '</td></tr>';
+    if (q && [r.xe, r.code, r.lai, r.loi.join(' '), r.cb.join(' ')].join(' ').toLowerCase().indexOf(q) === -1) return;
+    const notes = r.loi.map(x => '<div>❌ ' + esc(x) + '</div>').concat(r.cb.map(x => '<div>⚠️ ' + esc(x) + '</div>')).join('');
+    html += '<tr class="' + cls[r.level] + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.code) + '</td><td class="left">' + esc(r.lai) +
+      '</td><td>' + (r.soChuyen == null ? '' : r.soChuyen) + '</td><td>' + tag[r.level] + '</td><td class="notes">' + notes + '</td></tr>';
   });
-  $('out').innerHTML = '<table><thead><tr>' + ['Xe', 'Số chuyến', 'Mã lệnh', 'Kết quả', 'Ghi chú', 'Dữ liệu lệnh'].map(x => '<th>' + x + '</th>').join('') +
+  $('out').innerHTML = '<table><thead><tr>' + ['Biển số', 'Mã lệnh', 'Lái xe', 'Số chuyến', 'Kết quả', 'Chi tiết'].map(x => '<th>' + x + '</th>').join('') +
     '</tr></thead><tbody>' + (html || '<tr><td colspan="6">Không có dòng nào</td></tr>') + '</tbody></table>';
 }
-
-$('btnLvcRaw').onclick = function () {
-  if (!LV || !LV.sample) { msg('❌ Chưa có lệnh nào để copy.', 'err'); return; }
-  const text = JSON.stringify(LV.sample, null, 2);
-  const done = function () { msg('📋 Đã copy JSON lệnh ' + LV.sample.code, 'ok'); };
-  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done).catch(function (e) { msg('❌ Không copy được: ' + e.message, 'err'); });
-  else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { msg('❌ Không copy được', 'err'); } ta.remove(); }
-};
 
 // ===== CHUYỂN NGÀY TRƯỚC / SAU =====
 function shiftDay(n) {
@@ -289,12 +282,11 @@ function shiftDay(n) {
 $('btnPrev').onclick = function () { shiftDay(-1); };
 $('btnNext').onclick = function () { shiftDay(1); };
 
-// ===== CHÚ THÍCH MÀU: chỉ hiện ở màn Bảng xe; nút copy JSON chỉ hiện ở màn Kiểm tra lệnh =====
+// ===== CHÚ THÍCH MÀU: chỉ hiện ở màn Bảng xe =====
 (function () {
   const lg = document.querySelector('.legend');
   const sync = function () {
     lg.style.display = (MODE === 'trips' && $('out').children.length) ? '' : 'none';
-    $('btnLvcRaw').style.display = (MODE === 'lvc' && LV && LV.sample && $('out').children.length) ? '' : 'none';
   };
   new MutationObserver(sync).observe($('out'), { childList: true });
   sync();
