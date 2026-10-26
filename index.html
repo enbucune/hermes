@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -33,10 +33,10 @@
 <datalist id="routeList"></datalist>
       </div>
       <div class="field">
-        <label for="date">Ngày</label>
+        <label for="date">Ngày (dd/mm/yyyy)</label>
         <div class="datebox">
           <button type="button" id="btnPrev" class="day-btn" title="Ngày trước" aria-label="Ngày trước">‹</button>
-          <input type="date" id="date">
+          <input type="text" id="date" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off">
           <button type="button" id="btnNext" class="day-btn" title="Ngày sau" aria-label="Ngày sau">›</button>
         </div>
       </div>
@@ -73,6 +73,6 @@
   <div class="wrap" id="out"></div>
 </main>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
