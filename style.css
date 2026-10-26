@@ -167,6 +167,7 @@ td.edcell { white-space: nowrap; }
 .edit-btn:disabled { background: #B9C4DD; cursor: not-allowed; }
 td.ed-off { color: #9AA5BD; font-size: 12.5px; }
 @media (max-width: 760px) { .actions.has-edit { grid-template-columns: 1fr; } }
+
 /* ===== Khung tiêu chí kiểm tra lệnh ===== */
 .rules { background: #FFF8EE; border: 1.5px solid #FFE2C2; border-radius: 16px; padding: 16px 22px; margin: 14px 0 16px; color: #5C3205; }
 .rules h4 { font-size: 15px; font-weight: 700; color: #8A4308; margin-bottom: 8px; }
