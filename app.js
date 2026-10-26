@@ -58,9 +58,17 @@ function api(params, timeoutMs, tries) {
   });
 }
 
+// ===== NGÀY: hiện dd/mm/yyyy, tính theo giờ Việt Nam =====
+function vnToday() { // dd/mm/yyyy theo giờ VN, bất kể máy để múi giờ nào
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+}
+function isoDate() { // dd/mm/yyyy -> yyyy-mm-dd cho server, rỗng nếu gõ sai
+  const m = $('date').value.trim().match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
+}
+
 // ===== KHỞI TẠO =====
-const d = new Date();
-$('date').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+$('date').value = vnToday();
 
 let ROUTES = [];
 const routeText = r => r.code + (r.name ? ' — ' + r.name : '');
@@ -98,13 +106,15 @@ function sel() {
 
 $('route').onfocus = function () { this.select(); }; // bấm vào ô là bôi đen sẵn, gõ đè luôn
 $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
+$('date').onfocus = function () { this.select(); };
+$('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
 $('btnKey').onclick = function () { getKey(true); loadRoutes(); };
 
 $('btnLoad').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  api({ action: 'load', routeId: s.id, label: s.code, date: $('date').value }).then(function (res) {
+  api({ action: 'load', routeId: s.id, label: s.code, date: isoDate() }).then(function (res) {
     DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnLoad').disabled = false; });
@@ -134,9 +144,9 @@ function catOf(loai) {
 }
 
 $('btnEbms').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  api({ action: 'ebms', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
+  api({ action: 'ebms', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
     EB = res; MODE = 'ebms'; $('btnCopy').style.display = 'none';
     msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến)', 'ok');
@@ -201,10 +211,10 @@ function render() {
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
 
 $('btnNv').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  api({ action: 'nv', routeId: s.id, label: s.code, date: $('date').value, nguoiDo: nd }).then(function (res) {
+  api({ action: 'nv', routeId: s.id, label: s.code, date: isoDate(), nguoiDo: nd }).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "nv". Thêm dòng router vào Web.gs, dán Nv.gs, rồi Deploy lại BẢN MỚI.');
     NV = res; MODE = 'nv'; $('btnCopy').style.display = '';
     msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến, đã bỏ chuyến mất và trùng)', 'ok');
@@ -241,9 +251,9 @@ $('btnCopy').onclick = function () {
 
 // ===== KIỂM TRA LỆNH VẬN CHUYỂN (chỉ tuyến + ngày đang chọn) =====
 $('btnLvc').onclick = function () {
-  const s = sel(); if (!s.id || !$('date').value) { msg('❌ Chưa nhập đúng tuyến/ngày, hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển tuyến ' + s.code + ' (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  api({ action: 'lvc', routeId: s.id, label: s.code, date: $('date').value }, 180000).then(function (res) {
+  api({ action: 'lvc', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
     LV = res; MODE = 'lvc'; $('btnCopy').style.display = 'none';
     if (res.rows.length) msg('✅ Lệnh tuyến ' + s.code + ' — ngày ' + res.ngay + ' (' + res.rows.length + ' lệnh)', 'ok');
@@ -275,9 +285,9 @@ function renderLvc() {
 
 // ===== CHUYỂN NGÀY TRƯỚC / SAU =====
 function shiftDay(n) {
-  const v = $('date').value; if (!v) return;
+  const v = isoDate(); if (!v) return;
   const p = v.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
-  $('date').value = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  $('date').value = String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear();
 }
 $('btnPrev').onclick = function () { shiftDay(-1); };
 $('btnNext').onclick = function () { shiftDay(1); };
