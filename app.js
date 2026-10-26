@@ -126,10 +126,12 @@ $('q').oninput = $('onlyWarn').onchange = function () { rerender(); };
 let EB = null, MODE = 'trips';
 let NV = null;
 let LV = null;
+let ED = null;
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
   else if (MODE === 'lvc' && LV) renderLvc();
+  else if (MODE === 'edit' && ED) renderEdit();
   else if (DATA) render();
 }
 
@@ -282,6 +284,108 @@ function renderLvc() {
   $('out').innerHTML = '<table><thead><tr>' + ['Biển số', 'Mã lệnh', 'Lái xe', 'Số chuyến', 'Kết quả', 'Chi tiết'].map(x => '<th>' + x + '</th>').join('') +
     '</tr></thead><tbody>' + (html || '<tr><td colspan="6">Không có dòng nào</td></tr>') + '</tbody></table>';
 }
+
+// ===== TÍNH NĂNG ẨN: SỬA LỆNH =====
+// Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
+function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
+function setUnlocked(on) {
+  $('btnEdit').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
+  $('actions').classList.toggle('has-edit', on);
+  if (!on && MODE === 'edit') { MODE = 'trips'; ED = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+}
+function tryUnlock(ekey, silent) {
+  return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
+    localStorage.setItem('edit_key', ekey); setUnlocked(true);
+    if (!silent) msg('🔓 Đã mở khoá tính năng sửa lệnh', 'ok');
+  }).catch(function (e) {
+    if (silent) { if (!e.net) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; }
+    msg('❌ ' + e.message, 'err');
+  });
+}
+(function () {
+  let n = 0, timer = null;
+  $('brandMark').onclick = function () {
+    n++; clearTimeout(timer); timer = setTimeout(function () { n = 0; }, 3000);
+    if (n < 5) return;
+    n = 0;
+    const input = prompt('Nhập mã mở khoá:');
+    if (input && input.trim()) tryUnlock(input.trim(), false);
+  };
+  $('btnLock').onclick = function () { localStorage.removeItem('edit_key'); setUnlocked(false); msg('🔒 Đã khoá lại', 'ok'); };
+  if (getEkey()) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
+})();
+
+$('btnEdit').onclick = function () {
+  const s = sel(); const plate = $('plate').value.trim();
+  if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy).', 'err'); return; }
+  if (!plate) { msg('❌ Nhập biển số xe cần sửa.', 'err'); $('plate').focus(); return; }
+  $('btnEdit').disabled = true; msg('Đang tải lệnh của xe ' + plate + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  loadEdit(s, plate).then(function () { msg('✅ Xe ' + ED.plate + ' — ' + ED.ngay + ': ' + ED.orders.length + ' lệnh. Sửa giờ rồi bấm Lưu.', 'ok'); })
+    .catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnEdit').disabled = false; });
+};
+$('plate').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnEdit').click(); } };
+
+function loadEdit(s, plate) {
+  return api({ action: 'editlist', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
+    if (!res.orders) throw new Error('Server chưa có action "editlist". Dán Edit.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
+    ED = res; ED.sel = s; ED.iso = isoDate(); MODE = 'edit'; $('btnCopy').style.display = 'none';
+    renderEdit();
+  });
+}
+
+const hm5 = v => String(v || '').slice(-5);
+function renderEdit() {
+  let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
+  $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
+    .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
+  let out = '';
+  ED.orders.forEach(function (o) {
+    out += '<div class="ord-h">Lệnh ' + esc(o.lenh) + '<small>' + esc(o.code) + '</small></div>';
+    if (o.canhBao.length) out += '<div class="ord-warn">⚠️ Danh sách chuyến bất thường: ' + esc(o.canhBao.join('; ')) + ' — kiểm tra kỹ mã chuyến trước khi sửa.</div>';
+    out += '<table><thead><tr>' + ['STT', 'Mã chuyến', 'Lịch tài', 'Giờ điều xe', 'Sửa điều xe', 'Giờ đi', 'Giờ đến', 'Giờ về bến', 'Sửa về bến']
+      .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>';
+    o.trips.forEach(function (t) {
+      const ended = !!(t.den && t.veben);
+      const base = ' data-oid="' + esc(o.id) + '" data-tid="' + esc(t.id) + '"';
+      out += '<tr><td>' + t.stt + '</td><td>' + esc(t.code) + '</td><td>' + esc(t.tai) + '</td><td>' + esc(hm5(t.dieuxe)) + '</td>' +
+        (ended
+          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.dieuxe)) + '" maxlength="5" data-f="dieuxe"' + base + '><button class="edit-btn" data-save="dieuxe"' + base + '>Lưu</button></td>'
+          : '<td class="ed-off">chưa kết thúc</td>') +
+        '<td>' + esc(hm5(t.di)) + '</td><td>' + esc(hm5(t.den)) + '</td><td>' + esc(hm5(t.veben)) + '</td>' +
+        (t.den
+          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.den)) + '" maxlength="5" data-f="veben"' + base + '><button class="edit-btn" data-save="veben"' + base + '>Lưu</button></td>'
+          : '<td class="ed-off">chưa có giờ đến</td>') + '</tr>';
+    });
+    out += '</tbody></table>';
+  });
+  $('out').innerHTML = out;
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-save]');
+  if (!b || MODE !== 'edit' || !ED) return;
+  const field = b.dataset.save, oid = b.dataset.oid, tid = b.dataset.tid;
+  const input = b.parentNode.querySelector('input[data-f="' + field + '"]');
+  const hhmm = (input.value || '').trim();
+  const order = ED.orders.find(o => String(o.id) === oid);
+  const trip = order && order.trips.find(t => String(t.id) === tid);
+  if (!trip) return;
+  const name = field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
+  const curV = field === 'dieuxe' ? trip.dieuxe : trip.veben;
+  if (!/^\d{1,2}:\d{1,2}$/.test(hhmm)) { msg('❌ Giờ phải dạng HH:mm (vd 22:36)', 'err'); input.focus(); return; }
+  if (!confirm('Xe ' + ED.plate + ' · lệnh ' + order.lenh + ' · chuyến ' + trip.stt + ' (' + trip.code + ')\n' + name + ': ' + hm5(curV) + '  →  ' + hhmm + '\n\nLưu lên hệ thống FUTA?')) return;
+
+  const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
+  msg('Đang lưu...');
+  api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, date: ED.iso, orderId: oid, tripId: tid, field: field, hhmm: hhmm, snap: trip.snap }, 120000, 0)
+    .then(function (r) {
+      const cls = r.same || r.ok ? 'ok' : 'err';
+      msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls);
+      return loadEdit(ED.sel, ED.plate).then(function () { msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls); }); // nạp lại bảng, giữ thông báo
+    })
+    .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
+});
 
 // ===== CHUYỂN NGÀY TRƯỚC / SAU =====
 function shiftDay(n) {
