@@ -31,6 +31,8 @@ button:disabled { opacity: .55; cursor: wait; }
 
 .controls { background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 24px; display: flex; flex-direction: column; gap: 20px; }
 .fields { display: flex; flex-wrap: wrap; gap: 16px; }
+.field .datebox input[type=text] { border: none; height: auto; min-width: 0; width: auto; padding: 0; background: transparent; }
+.field .datebox input[type=text]:focus { border: none; box-shadow: none; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-route { flex: 2 1 320px; min-width: 240px; }
 .field:not(.field-route) { flex: 1 1 200px; }
