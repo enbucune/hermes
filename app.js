@@ -290,6 +290,7 @@ function renderLvc() {
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
   $('btnEdit').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
+  $('fFrom').hidden = !on; $('fTo').hidden = !on;
   $('actions').classList.toggle('has-edit', on);
   if (!on && MODE === 'edit') { MODE = 'trips'; ED = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
@@ -339,28 +340,132 @@ function renderEdit() {
   let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
   $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
     .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
-  let out = '';
+  let out = '<div class="edit-bar">' +
+    '<button class="btn-soft" data-act="fillVeben">↔ Điền Giờ về bến = Giờ đến (các chuyến trong khoảng giờ)</button>' +
+    '<button class="edit-btn big" data-act="saveAll">💾 Lưu tất cả thay đổi</button>' +
+    '<span class="edit-hint">Chỉ tính các chuyến đang hiện (trong khoảng giờ). Có xác nhận trước khi lưu.</span></div>';
   ED.orders.forEach(function (o) {
     out += '<div class="ord-h">Lệnh ' + esc(o.lenh) + '<small>' + esc(o.code) + '</small></div>';
     if (o.canhBao.length) out += '<div class="ord-warn">⚠️ Danh sách chuyến bất thường: ' + esc(o.canhBao.join('; ')) + ' — kiểm tra kỹ mã chuyến trước khi sửa.</div>';
     out += '<table><thead><tr>' + ['STT', 'Mã chuyến', 'Lịch tài', 'Giờ điều xe', 'Sửa điều xe', 'Giờ đi', 'Giờ đến', 'Giờ về bến', 'Sửa về bến']
       .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>';
     o.trips.forEach(function (t) {
+      const sm = String(t.tai || '').match(/^(\d{1,2}):(\d{2})/);
+      const st = sm ? (+sm[1] * 60 + +sm[2]) : '';
       const ended = !!(t.den && t.veben);
       const base = ' data-oid="' + esc(o.id) + '" data-tid="' + esc(t.id) + '"';
-      out += '<tr><td>' + t.stt + '</td><td>' + esc(t.code) + '</td><td>' + esc(t.tai) + '</td><td>' + esc(hm5(t.dieuxe)) + '</td>' +
+      out += '<tr data-start="' + st + '" data-den="' + esc(hm5(t.den)) + '"><td>' + t.stt + '</td><td>' + esc(t.code) + '</td><td>' + esc(t.tai) + '</td><td>' + esc(hm5(t.dieuxe)) + '</td>' +
         (ended
-          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.dieuxe)) + '" maxlength="5" data-f="dieuxe"' + base + '><button class="edit-btn" data-save="dieuxe"' + base + '>Lưu</button></td>'
+          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.dieuxe)) + '" maxlength="5" data-f="dieuxe" data-orig="' + esc(hm5(t.dieuxe)) + '"' + base + '><button class="edit-btn" data-save="dieuxe"' + base + '>Lưu</button></td>'
           : '<td class="ed-off">chưa kết thúc</td>') +
         '<td>' + esc(hm5(t.di)) + '</td><td>' + esc(hm5(t.den)) + '</td><td>' + esc(hm5(t.veben)) + '</td>' +
         (t.den
-          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.den)) + '" maxlength="5" data-f="veben"' + base + '><button class="edit-btn" data-save="veben"' + base + '>Lưu</button></td>'
+          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.veben)) + '" maxlength="5" data-f="veben" data-orig="' + esc(hm5(t.veben)) + '"' + base + '><button class="edit-btn" data-save="veben"' + base + '>Lưu</button></td>'
           : '<td class="ed-off">chưa có giờ đến</td>') + '</tr>';
     });
     out += '</tbody></table>';
   });
   $('out').innerHTML = out;
+  applyRange();
 }
+
+// --- Lọc theo khoảng giờ lịch chạy (chỉ ẩn/hiện dòng, không mất giờ đang gõ) ---
+function parseHM(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2}):(\d{1,2})$/);
+  return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
+}
+function applyRange() {
+  if (MODE !== 'edit') return;
+  const from = parseHM($('tFrom').value), to = parseHM($('tTo').value);
+  const has = from !== null || to !== null;
+  $('out').querySelectorAll('tr[data-start]').forEach(function (tr) {
+    let show = true;
+    if (has) {
+      const s = tr.dataset.start === '' ? null : +tr.dataset.start;
+      if (s === null) show = false;
+      else if (from !== null && to !== null) show = from <= to ? (s >= from && s <= to) : (s >= from || s <= to); // qua nửa đêm
+      else if (from !== null) show = s >= from;
+      else show = s <= to;
+    }
+    tr.hidden = !show;
+  });
+}
+$('tFrom').oninput = $('tTo').oninput = applyRange;
+
+// --- Lưu hàng loạt (có xác nhận) ---
+function collectChanges() {
+  const list = [];
+  $('out').querySelectorAll('input.edit-in').forEach(function (inp) {
+    const tr = inp.closest('tr');
+    if (tr && tr.hidden) return;
+    const v = (inp.value || '').trim();
+    if (v === inp.dataset.orig) return;
+    list.push({ field: inp.dataset.f, oid: inp.dataset.oid, tid: inp.dataset.tid, hhmm: v, input: inp });
+  });
+  return list;
+}
+function findTrip(oid, tid) {
+  const order = ED.orders.find(o => String(o.id) === String(oid));
+  return { order: order, trip: order && order.trips.find(t => String(t.id) === String(tid)) };
+}
+function runBatch(ch) {
+  const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
+  const okN = [], bad = [];
+  let i = 0;
+  function next() {
+    if (i >= ch.length) return Promise.resolve();
+    const c = ch[i++], f = findTrip(c.oid, c.tid);
+    const name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
+    const tag = f.trip ? 'Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' · ' + name : name;
+    if (!f.trip) { bad.push(tag + ': không thấy chuyến, tải lại bảng'); return next(); }
+    msg('Đang lưu ' + i + '/' + ch.length + '...');
+    return api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, date: ED.iso, orderId: c.oid, tripId: c.tid, field: c.field, hhmm: c.hhmm, snap: f.trip.snap }, 120000, 0)
+      .then(function (r) {
+        (r.same || r.ok ? okN : bad).push(tag + ': ' + r.message);
+        const nx = ch[i];
+        if (nx && nx.tid === c.tid) return loadEdit(ED.sel, ED.plate); // cùng chuyến: nạp lại để có snap mới
+      })
+      .catch(function (e) { bad.push(tag + ': ' + e.message); })
+      .then(next);
+  }
+  return next()
+    .then(function () { return loadEdit(ED.sel, ED.plate); })
+    .then(function () {
+      msg((bad.length ? '⚠️ ' : '✅ ') + 'Đã xử lý ' + ch.length + ' thay đổi: ' + okN.length + ' thành công, ' + bad.length + ' lỗi' +
+        (bad.length ? '\n' + bad.join('\n') : ''), bad.length ? 'err' : 'ok');
+    })
+    .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
+}
+
+$('out').addEventListener('click', function (ev) {
+  const a = ev.target.closest && ev.target.closest('button[data-act]');
+  if (!a || MODE !== 'edit' || !ED) return;
+  if (a.dataset.act === 'fillVeben') {
+    let n = 0;
+    $('out').querySelectorAll('tr[data-den]').forEach(function (tr) {
+      if (tr.hidden || !tr.dataset.den) return;
+      const inp = tr.querySelector('input[data-f="veben"]');
+      if (inp && inp.value !== tr.dataset.den) { inp.value = tr.dataset.den; n++; }
+    });
+    msg(n ? 'Đã điền Giờ về bến = Giờ đến cho ' + n + ' chuyến. Kiểm tra rồi bấm "Lưu tất cả thay đổi".' : 'Các chuyến trong khoảng giờ đã có Giờ về bến = Giờ đến, không cần điền.', n ? 'ok' : '');
+    return;
+  }
+  if (a.dataset.act === 'saveAll') {
+    const ch = collectChanges();
+    if (!ch.length) { msg('Chưa có thay đổi nào để lưu (trong khoảng giờ đang hiện).', 'err'); return; }
+    for (let k = 0; k < ch.length; k++) {
+      if (parseHM(ch[k].hhmm) === null) { msg('❌ Giờ phải dạng HH:mm (vd 22:36)', 'err'); ch[k].input.focus(); return; }
+    }
+    const lines = ch.map(function (c) {
+      const f = findTrip(c.oid, c.tid);
+      const name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
+      return '• Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' (' + f.trip.code + ') · ' + name + ': ' + c.input.dataset.orig + ' → ' + c.hhmm;
+    });
+    const range = ($('tFrom').value.trim() || $('tTo').value.trim()) ? '\nKhoảng giờ lịch chạy: ' + ($('tFrom').value.trim() || '…') + ' – ' + ($('tTo').value.trim() || '…') : '';
+    if (!confirm('Xe ' + ED.plate + ' · ' + ED.ngay + range + '\nSẽ lưu ' + ch.length + ' thay đổi lên hệ thống FUTA:\n\n' + lines.join('\n') + '\n\nXác nhận lưu?')) return;
+    runBatch(ch);
+  }
+});
 
 $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-save]');
