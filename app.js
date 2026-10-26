@@ -405,3 +405,8 @@ $('btnNext').onclick = function () { shiftDay(1); };
   new MutationObserver(sync).observe($('out'), { childList: true });
   sync();
 })();
+// ===== KHUNG TIÊU CHÍ: hiện ngay khi bấm "Kiểm tra lệnh", ẩn khi bấm nút khác =====
+$('actions').addEventListener('click', function (e) {
+  const b = e.target.closest && e.target.closest('button');
+  if (b) $('lvcRules').hidden = (b.id !== 'btnLvc');
+});
