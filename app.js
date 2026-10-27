@@ -135,9 +135,19 @@ function sel() {
   return { id: String(r.id), code: r.code };
 }
 
-$('route').onfocus = function () { this.select(); }; // bấm vào ô là bôi đen sẵn, gõ đè luôn
+// Bấm vào ô là bôi đen hết, gõ đè luôn (không cần Ctrl+A).
+// Phải chặn mouseup đầu tiên: nếu không, trình duyệt bỏ bôi đen ngay khi nhả chuột.
+function selectAllOnClick(el) {
+  let fresh = false;
+  const all = function () { try { el.setSelectionRange(0, el.value.length); } catch (e) { el.select(); } };
+  el.addEventListener('focus', function () { fresh = true; all(); setTimeout(all, 0); });
+  el.addEventListener('mouseup', function (e) { if (fresh) { e.preventDefault(); all(); } fresh = false; });
+  el.addEventListener('touchend', function () { if (fresh) setTimeout(all, 0); fresh = false; });
+  el.addEventListener('blur', function () { fresh = false; });
+}
+['route', 'date', 'bt1', 'bt2', 'bt3', 'plate', 'tFrom', 'tTo', 'nguoiDo'].forEach(function (id) { if ($(id)) selectAllOnClick($(id)); });
+
 $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
-$('date').onfocus = function () { this.select(); };
 $('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
 $('btnKey').onclick = function () { getKey(true); loadRoutes(); };
@@ -692,7 +702,6 @@ $('out').addEventListener('click', function (ev) {
 const BT_IDS = ['bt1', 'bt2', 'bt3'];
 BT_IDS.forEach(function (id) {
   const v = localStorage.getItem('bt_' + id); if (v) $(id).value = v;
-  $(id).onfocus = function () { this.select(); };
   $(id).onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnBt').click(); } };
 });
 
