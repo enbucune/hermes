@@ -132,6 +132,7 @@ let NV = null;
 let LV = null;
 let ED = null;
 let BT = null;
+let GP = null;
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
@@ -139,6 +140,7 @@ function rerender() {
   else if (MODE === 'edit' && ED) renderEdit();
   else if (MODE === 'auto') { if (AU) renderAuto(); }
   else if (MODE === 'bt' && BT) renderBt();
+  else if (MODE === 'gps' && GP) renderGps();
   else if (DATA) render();
 }
 
@@ -755,3 +757,69 @@ $('btnXlsx').onclick = function () {
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnXlsx').disabled = false; });
 };
+
+// ===== CHỤP GPS MẤT CHUYẾN (gọi gps / gpsstatus trong gps.gs -> GitHub Actions) =====
+// Bấm nút: liệt kê chuyến có tài xế / tiếp viên / trạng thái "mất chuyến" của tuyến + ngày đang chọn (chưa chụp).
+// Bấm "Chụp": GitHub chụp lộ trình, ảnh lên Drive, link ghi vào Google Sheet như chay.command trên Mac.
+$('btnGps').onclick = function () {
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  $('btnGps').disabled = true; msg('Đang tìm chuyến mất chuyến tuyến ' + s.code + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  api({ action: 'gps', dry: '1', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
+    if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
+    GP = res; GP.sel = s; GP.iso = isoDate(); GP.run = null; MODE = 'gps'; $('btnCopy').style.display = 'none';
+    if (!res.trips.length) msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ' không có chuyến mất nào.', 'ok');
+    else msg('Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.trips.length + ' chuyến mất, chụp được ' + res.nChup + '. Bấm "🛰 Chụp" để gửi lên GitHub.', res.nChup ? 'ok' : 'err');
+    renderGps();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnGps').disabled = false; });
+};
+
+function renderGps() {
+  const daCo = GP.trips.filter(t => t.daCo).length, khongXe = GP.trips.filter(t => !t.chup).length;
+  $('stats').innerHTML = [['Chuyến mất', GP.trips.length, ''], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Sẽ chụp', GP.nChup, 'e-warn'], ['Không có xe', khongXe, 'e-nopc']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  let out = '';
+  const r = GP.run;
+  if (r && r.status === 'completed') {
+    out += '<div class="edit-bar gps-links">' + (r.conclusion === 'success' ? '✅ Chụp xong. ' : '⚠️ Lần chạy báo lỗi. ') +
+      (r.sheet ? '<a href="' + esc(r.sheet) + '" target="_blank" rel="noopener">📄 Mở Google Sheet</a>' : '') +
+      (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔎 Xem log GitHub</a>' : '') + '</div>';
+  } else if (r) {
+    out += '<div class="edit-bar"><span class="edit-hint">⏳ GitHub đang chụp (' + esc(r.status) + ')... có thể mất vài phút, cứ để trang mở.</span>' +
+      (r.url ? '<span class="gps-links"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔎 Xem tiến độ</a></span>' : '') + '</div>';
+  } else if (GP.nChup) {
+    out += '<div class="edit-bar"><button class="edit-btn big" data-gps="go">🛰 Chụp ' + GP.nChup + ' chuyến mất</button>' +
+      '<span class="edit-hint">Không cần bấm cũng được: hệ thống tự quét mỗi giờ. Bấm để chụp ngay. Ảnh lên Drive + link ghi vào Google Sheet.</span></div>';
+  }
+  const q = $('q').value.trim().toLowerCase();
+  const body = GP.trips.filter(t => !q || [t.xe, t.lich, t.taiXe, t.tiepVien].join(' ').toLowerCase().indexOf(q) !== -1).map(t =>
+    '<tr class="' + (!t.chup ? 'e-nopc' : t.daCo ? 'e-ok' : '') + '"><td>' + esc(t.daCo ? '✅ đã có' : t.chup ? '⏳ chưa' : '❌') + '</td><td>' + esc(t.lich) + '</td><td>' + esc(t.xe || '(không có xe)') + '</td><td class="left">' + esc(t.ben) +
+    '</td><td>' + esc(t.ma) + '</td><td class="left">' + esc(t.taiXe) + '</td><td class="left">' + esc(t.tiepVien) + '</td><td>' + esc(t.trangThai) + '</td></tr>').join('');
+  out += '<table><thead><tr>' + ['Ảnh GPS', 'Lịch chạy', 'Xe', 'Bến', 'Mã chuyến', 'Tài xế', 'Tiếp viên', 'Trạng thái'].map(x => '<th>' + x + '</th>').join('') +
+    '</tr></thead><tbody>' + (body || '<tr><td colspan="8">Không có chuyến mất nào</td></tr>') + '</tbody></table>';
+  $('out').innerHTML = out;
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-gps="go"]');
+  if (!b || MODE !== 'gps' || !GP) return;
+  if (!confirm('Gửi ' + GP.nChup + ' chuyến mất của tuyến ' + GP.sel.code + ' · ' + GP.ngay + ' lên GitHub để chụp GPS?\n\nẢnh lên Drive, link ghi vào Google Sheet như chạy trên Mac.')) return;
+  b.disabled = true; msg('Đang gửi lên GitHub...');
+  const g = GP;
+  api({ action: 'gps', routeId: g.sel.id, label: g.sel.code, date: g.iso }, 180000).then(function (res) {
+    if (!res.started) { msg('⚠️ Không có chuyến nào để chụp.', 'err'); return; }
+    g.run = { status: 'queued' }; renderGps();
+    msg('🛰 Đã gửi ' + res.nChup + ' chuyến lên GitHub, đang chờ chụp...', 'ok');
+    const title = g.sel.code + ' ' + res.ngay, t0 = Date.now();
+    (function poll() {
+      if (GP !== g) return; // đã bấm sang việc khác thì thôi theo dõi
+      api({ action: 'gpsstatus', since: res.since, title: title }, 60000).then(function (st) {
+        g.run = st; if (MODE === 'gps' && GP === g) renderGps();
+        if (st.status === 'completed') {
+          msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ GitHub báo lỗi (' + st.conclusion + '). Bấm "Xem log GitHub" để xem.', st.conclusion === 'success' ? 'ok' : 'err');
+        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 15000);
+        else msg('⚠️ Đã chờ 60 phút chưa xong, mở "Xem tiến độ" để kiểm tra.', 'err');
+      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 20000); });
+    })();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
+});

@@ -53,7 +53,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .day-btn { width: 34px; height: 34px; border-radius: 9px; background: var(--blue-50); color: var(--blue-700); font-size: 20px; font-weight: 700; line-height: 1; }
 .day-btn:hover { background: var(--blue-100); }
 
-.actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 12px; }
+.actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1.2fr; gap: 12px; }
 .act { height: 46px; padding: 0 20px; border-radius: 12px; font-size: 14.5px; font-weight: 700; transition: transform .12s, box-shadow .12s, background .12s; }
 .act:active:not(:disabled) { transform: translateY(1px); }
 .act-main { color: #fff; background: linear-gradient(180deg, #3D6CF0, var(--blue-600)); box-shadow: 0 6px 16px rgba(43, 89, 219, .35); }
@@ -198,3 +198,7 @@ table.bt td.bt-gio { font-weight: 700; color: var(--blue-900); }
 table.bt .bt-gap { background: var(--bg) !important; border: none; padding: 0; width: 18px; min-width: 18px; }
 table.bt td.bt-hit { background: #FFF1B5 !important; font-weight: 700; }
 @media (max-width: 760px) { .bt-row .field, .act-bt { flex: 1 1 100%; } }
+
+/* ===== Chụp GPS mất chuyến ===== */
+.act-gps { color: #0B5E8A; background: #DDF0FB; } .act-gps:hover:not(:disabled) { background: #C8E7F8; }
+.gps-links a { color: var(--blue-700); font-weight: 700; margin-right: 16px; }
