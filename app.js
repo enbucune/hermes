@@ -643,9 +643,23 @@ $('btnBt').onclick = function () {
     .then(function () { $('btnBt').disabled = false; });
 };
 
+// Màu theo đầu xuất phát: xe chạy chuyến đầu ngày ở bến nào thì mang màu bến đó cả ngày (kể cả lúc chạy ở đầu kia)
+const BT_COLORS = ['CFE2FF', 'FFDDB0', 'C8F0D4', 'F9D2E4', 'E3D7FB', 'FFF1A8'];
 function btBlocks() { // mỗi bến của mỗi tuyến = 1 khối 2 cột, theo thứ tự Tuyến 1 -> 3
   const out = [];
-  BT.routes.forEach(function (r) { r.ben.forEach(function (b) { out.push({ tuyen: r.tuyen, ten: b.ten, rows: b.rows }); }); });
+  BT.routes.forEach(function (r) {
+    const home = {}, first = {}, base = out.length;
+    r.ben.forEach(function (b, bi) {
+      b.rows.forEach(function (x) { if (x.xe && (first[x.xe] == null || x.gio < first[x.xe])) { first[x.xe] = x.gio; home[x.xe] = bi; } });
+    });
+    r.ben.forEach(function (b, bi) {
+      out.push({
+        tuyen: r.tuyen, ten: b.ten, mau: BT_COLORS[(base + bi) % BT_COLORS.length],
+        nXe: Object.keys(home).filter(x => home[x] === bi).length,
+        rows: b.rows.map(x => ({ gio: x.gio, xe: x.xe, mau: x.xe ? BT_COLORS[(base + home[x.xe]) % BT_COLORS.length] : '' }))
+      });
+    });
+  });
   return out;
 }
 
@@ -653,7 +667,7 @@ function btBlocks() { // mỗi bến của mỗi tuyến = 1 khối 2 cột, the
 function btGrid() {
   const bl = btBlocks(), n = Math.max(0, ...bl.map(b => b.rows.length));
   const row = f => { const a = []; bl.forEach(function (b, i) { if (i) a.push(''); a.push.apply(a, f(b)); }); return a; };
-  const g = [row(b => [b.tuyen + ' · ' + b.ten, '']), row(() => ['GIỜ XB', 'BKS'])];
+  const g = [row(b => [b.tuyen + ' · ' + b.ten + ' (' + b.nXe + ' xe)', '']), row(() => ['GIỜ XB', 'BKS'])];
   for (let k = 0; k < n; k++) g.push(row(b => b.rows[k] ? [b.rows[k].gio, b.rows[k].xe] : ['', '']));
   return g;
 }
@@ -665,16 +679,17 @@ function renderBt() {
   const gap = '<th class="bt-gap"></th>', gapd = '<td class="bt-gap"></td>';
   let head1 = '', head2 = '';
   bl.forEach(function (b, i) {
-    head1 += (i ? gap : '') + '<th class="bt-ben" colspan="2">' + esc(b.tuyen + ' · ' + b.ten) + '</th>';
+    head1 += (i ? gap : '') + '<th class="bt-ben" colspan="2" style="background:#' + b.mau + '">' + esc(b.tuyen + ' · ' + b.ten + ' (' + b.nXe + ' xe)') + '</th>';
     head2 += (i ? gap : '') + '<th>GIỜ XB</th><th>BKS</th>';
   });
   let body = '';
-  btGrid().slice(2).forEach(function (r) {
+  btGrid().slice(2).forEach(function (r, k) {
     body += '<tr>' + r.map(function (v, j) {
       const c = j % 3; // 0 = giờ, 1 = BKS, 2 = cột trống
       if (c === 2) return gapd;
       const hit = c === 1 && q && v && v.toLowerCase().replace(/[\s.\-]/g, '').indexOf(q) !== -1;
-      return '<td class="' + (c === 0 ? 'bt-gio' : '') + (hit ? ' bt-hit' : '') + '">' + esc(v) + '</td>';
+      const x = c === 1 && bl[(j - 1) / 3].rows[k];
+      return '<td class="' + (c === 0 ? 'bt-gio' : '') + (hit ? ' bt-hit' : '') + '"' + (x && x.mau ? ' style="background:#' + x.mau + '"' : '') + '>' + esc(v) + '</td>';
     }).join('') + '</tr>';
   });
   $('out').innerHTML = bl.length
@@ -701,10 +716,10 @@ $('btnXlsx').onclick = function () {
   if (MODE !== 'bt' || !BT) return;
   $('btnXlsx').disabled = true; msg('Đang tạo file Excel...');
   loadExcelJS().then(function (ExcelJS) {
-    const g = btGrid(), nBlk = btBlocks().length;
+    const g = btGrid(), bl = btBlocks(), nBlk = bl.length;
     const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Bảng tài', { views: [{ state: 'frozen', ySplit: 2 }] });
-    const font = { name: 'Times New Roman', size: 12 }, thin = { style: 'thin' };
-    const box = { top: thin, left: thin, bottom: thin, right: thin }, mid = { horizontal: 'center', vertical: 'middle' };
+    const font = { name: 'Times New Roman', size: 12 }, mid = { horizontal: 'center', vertical: 'middle' };
+    const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + argb } });
     g.forEach(function (r, i) {
       const row = ws.getRow(i + 1);
       r.forEach(function (v, j) {
@@ -715,8 +730,10 @@ $('btnXlsx').onclick = function () {
           const p = v.split(':'); cell.value = (+p[0] * 60 + +p[1]) / 1440; cell.numFmt = 'h:mm';
         } else cell.value = v;
         cell.font = Object.assign({}, font, { bold: i < 2 || c === 0 });
-        cell.alignment = mid; cell.border = box;
-        if (i < 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i ? 'FFDCE6FC' : 'FFC9D8FA' } };
+        cell.alignment = mid;
+        const b = bl[(j - c) / 3], x = i >= 2 && c === 1 && b.rows[i - 2];
+        if (i === 0) cell.fill = fill(b.mau); // tiêu đề bến mang màu của xe xuất phát ở bến đó
+        else if (x && x.mau) cell.fill = fill(x.mau);
       });
       row.height = i === 0 ? 30 : 18;
     });
