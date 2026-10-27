@@ -132,6 +132,7 @@ function rerender() {
   else if (MODE === 'nv' && NV) renderNv();
   else if (MODE === 'lvc' && LV) renderLvc();
   else if (MODE === 'edit' && ED) renderEdit();
+  else if (MODE === 'auto') { if (AU) renderAuto(); }
   else if (DATA) render();
 }
 
@@ -289,10 +290,10 @@ function renderLvc() {
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
-  $('btnEdit').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
+  $('btnEdit').hidden = !on; $('btnAuto').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
   $('fFrom').hidden = !on; $('fTo').hidden = !on;
   $('actions').classList.toggle('has-edit', on);
-  if (!on && MODE === 'edit') { MODE = 'trips'; ED = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'edit' || MODE === 'auto')) { MODE = 'trips'; ED = null; AU = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -340,8 +341,8 @@ function renderEdit() {
   let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
   $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
     .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
+  // (nút "Điền Giờ về bến = Giờ đến" đã bỏ: theo luật mới, bình thường về bến = đến + 1 phút -> dùng "⚡ Tự chỉnh theo luật")
   let out = '<div class="edit-bar">' +
-    '<button class="btn-soft" data-act="fillVeben">↔ Điền Giờ về bến = Giờ đến (các chuyến trong khoảng giờ)</button>' +
     '<button class="edit-btn big" data-act="saveAll">💾 Lưu tất cả thay đổi</button>' +
     '<span class="edit-hint">Chỉ tính các chuyến đang hiện (trong khoảng giờ). Có xác nhận trước khi lưu.</span></div>';
   ED.orders.forEach(function (o) {
@@ -440,16 +441,6 @@ function runBatch(ch) {
 $('out').addEventListener('click', function (ev) {
   const a = ev.target.closest && ev.target.closest('button[data-act]');
   if (!a || MODE !== 'edit' || !ED) return;
-  if (a.dataset.act === 'fillVeben') {
-    let n = 0;
-    $('out').querySelectorAll('tr[data-den]').forEach(function (tr) {
-      if (tr.hidden || !tr.dataset.den) return;
-      const inp = tr.querySelector('input[data-f="veben"]');
-      if (inp && inp.value !== tr.dataset.den) { inp.value = tr.dataset.den; n++; }
-    });
-    msg(n ? 'Đã điền Giờ về bến = Giờ đến cho ' + n + ' chuyến. Kiểm tra rồi bấm "Lưu tất cả thay đổi".' : 'Các chuyến trong khoảng giờ đã có Giờ về bến = Giờ đến, không cần điền.', n ? 'ok' : '');
-    return;
-  }
   if (a.dataset.act === 'saveAll') {
     const ch = collectChanges();
     if (!ch.length) { msg('Chưa có thay đổi nào để lưu (trong khoảng giờ đang hiện).', 'err'); return; }
@@ -515,4 +506,92 @@ $('btnNext').onclick = function () { shiftDay(1); };
 $('actions').addEventListener('click', function (e) {
   const b = e.target.closest && e.target.closest('button');
   if (b) $('lvcRules').hidden = (b.id !== 'btnLvc');
+});
+
+// ===== TỰ CHỈNH THEO LUẬT (gọi autoplan / autosave trong edit.gs) =====
+// Hiện cùng nút "✏️ Sửa lệnh" sau khi mở khoá. Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
+// Luật: cặp chuyến (trước, sau), đến >= lịch - 1p = quay đầu: về bến = đến, điều xe = đi = đến + 1p;
+// ngược lại: về bến = đến + 1p, điều xe = lịch - 1p, đi = lịch. Đầu ngày: điều xe = lịch - 1p, đi = lịch.
+// Cuối ngày: về bến = đến + 1p. Về bến trống (chưa xác nhận) để nguyên. Giờ đến không bao giờ đổi.
+let AU = null;
+
+$('btnAuto').onclick = function () { autoPlan(''); };
+
+function autoPlan(prefix) {
+  const s = sel();
+  if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy).', 'err'); return Promise.resolve(); }
+  const plate = $('plate').value.trim().toUpperCase();
+  $('btnAuto').disabled = true;
+  msg((prefix ? prefix + '\n' : '') + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'cả tuyến ' + s.code) + ' và lập kế hoạch (chưa ghi gì)...');
+  $('out').innerHTML = ''; $('stats').innerHTML = '';
+  return api({ action: 'autoplan', ekey: getEkey(), routeId: s.id, date: isoDate(), plate: plate }, 180000).then(function (res) {
+    if (!res.stats) throw new Error('Server chưa có action "autoplan". Dán edit.gs mới, thêm router vào web.gs, rồi Deploy lại BẢN MỚI.');
+    AU = res; AU.sel = s; MODE = 'auto'; $('btnCopy').style.display = 'none';
+    renderAuto();
+    const st = res.stats;
+    msg((prefix ? prefix + '\n' : '') + (st.sua ? '✅ ' : '✅ Không còn gì cần sửa. ') +
+      (plate ? 'Xe ' + plate : 'Tuyến ' + s.code + ' (' + st.xe + ' xe)') + ' — ' + res.ngay + ': sẽ sửa ' + st.sua + ' chuyến, đã đúng ' + st.dung +
+      (st.canXem ? ', CẦN XEM ' + st.canXem : '') + (st.loi ? ', LỖI ' + st.loi : '') + '. Chưa ghi gì lên hệ thống.',
+      st.canXem || st.loi ? 'err' : 'ok');
+  }).catch(function (e) { msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err'); })
+    .then(function () { $('btnAuto').disabled = false; });
+}
+
+function renderAuto() {
+  const st = AU.stats;
+  $('stats').innerHTML = [['Xe', st.xe, ''], ['Sẽ sửa', st.sua, 'e-warn'], ['Đã đúng', st.dung, 'e-ok'],
+    ['Cần xem / lỗi', st.canXem + st.loi, 'e-nopc']]
+    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>'; }).join('');
+
+  const q = $('q').value.trim().toLowerCase();
+  const hit = function (r) { return !q || (r.plate + ' ' + r.code + ' ' + r.sched).toLowerCase().indexOf(q) !== -1; };
+  const cell = function (r, label) {
+    const d = r.diff.filter(function (x) { return x.label === label; })[0];
+    return d ? '<td class="green">' + esc(d.from) + ' → ' + esc(d.to) + '</td>' : '<td></td>';
+  };
+
+  let out = '';
+  if (AU.errors.length || AU.problems.length) {
+    out += '<h3>⚠️ Cần xem / lỗi (không tự sửa)</h3><div class="ord-warn">' +
+      AU.errors.map(function (e) { return '<div>❌ ' + esc(e) + '</div>'; }).join('') +
+      AU.problems.map(function (r) { return '<div>⚠️ ' + esc(r.plate + ' lệnh ' + r.lenh + ' chuyến ' + r.stt + ' (' + r.code + '): ' + r.reason) + '</div>'; }).join('') +
+      '</div>';
+  }
+  if (AU.warns.length) out += '<div class="ord-warn">' + AU.warns.map(function (w) { return '<div>⚠️ ' + esc(w) + '</div>'; }).join('') + '</div>';
+  if (AU.planId) {
+    out += '<div class="edit-bar"><button class="edit-btn big" data-auto="save">💾 Lưu ' + st.sua + ' chuyến theo luật</button>' +
+      '<span class="edit-hint">Lưu xong tự đọc lại để kiểm. Dòng nào vừa bị đổi kể từ lúc xem sẽ KHÔNG lưu. Kế hoạch giữ 15 phút.</span></div>';
+  }
+  let body = '', band = false, prev = null;
+  AU.changes.forEach(function (r) {
+    if (!hit(r)) return;
+    if (r.plate !== prev) { band = !band; prev = r.plate; }
+    body += '<tr class="' + (band ? 'bandB' : '') + '"><td>' + esc(r.plate) + '</td><td>' + esc(r.lenh) + '</td><td>' + r.stt + '</td><td>' + esc(r.code) +
+      '</td><td>' + esc(r.sched) + '</td><td class="left">' + esc(r.mode) + '</td>' +
+      cell(r, 'Giờ điều xe') + cell(r, 'Giờ đi') + cell(r, 'Giờ về bến') +
+      '<td class="notes">' + esc([r.note, r.warn && '⚠️ ' + r.warn].filter(Boolean).join(' | ')) + '</td></tr>';
+  });
+  out += '<table><thead><tr>' + ['Xe', 'Lệnh', 'STT', 'Mã chuyến', 'Lịch', 'Chế độ', 'Giờ điều xe', 'Giờ đi', 'Giờ về bến', 'Ghi chú']
+    .map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (body || '<tr><td colspan="10">Không có chuyến nào cần sửa</td></tr>') + '</tbody></table>';
+  $('out').innerHTML = out;
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-auto="save"]');
+  if (!b || MODE !== 'auto' || !AU || !AU.planId) return;
+  const who = AU.plate ? 'xe ' + AU.plate : 'cả tuyến ' + AU.sel.code + ' (' + AU.stats.xe + ' xe)';
+  if (!confirm('Lưu ' + AU.stats.sua + ' chuyến của ' + who + ' · ' + AU.ngay + ' lên hệ thống FUTA theo luật?\n\n' +
+               'Giờ đến không bị đổi. Dòng nào vừa bị đổi kể từ lúc xem sẽ bỏ qua.')) return;
+  $('out').querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+  $('btnAuto').disabled = true;
+  msg('Đang lưu ' + AU.stats.sua + ' chuyến (có thể mất 1-3 phút, đừng đóng trang)...');
+  api({ action: 'autosave', ekey: getEkey(), planId: AU.planId }, 360000, 0).then(function (r) {
+    const bad = r.verifyBad.concat(r.failed, r.skipped);
+    const line = (bad.length || r.stopped ? '⚠️ ' : '✔ ') + 'Đã lưu + kiểm khớp ' + r.saved + ' chuyến (' + r.elapsed + 's)' +
+      (r.verifyBad.length ? ', VERIFY LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi lưu ' + r.failed.length : '') +
+      (r.skipped.length ? ', bỏ qua ' + r.skipped.length : '') + (r.stopped ? ', chưa kịp lưu ' + r.stopped + ' (hết giờ, bấm lại)' : '') +
+      (bad.length ? '\n' + bad.join('\n') : '');
+    return autoPlan(line); // lập lại kế hoạch: bình thường còn 0 chuyến cần sửa
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
 });

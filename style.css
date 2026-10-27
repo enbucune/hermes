@@ -154,7 +154,7 @@ h3 { padding: 24px 18px 10px; font-size: 15.5px; color: var(--err); font-weight:
 [hidden] { display: none !important; }
 .hero-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .brand-mark { user-select: none; -webkit-user-select: none; }
-.actions.has-edit { grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; }
+.actions.has-edit { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .act-edit { color: #A0202D; background: #FDE8EA; } .act-edit:hover:not(:disabled) { background: #FAD3D7; }
 .ord-h { padding: 18px 18px 8px; font-size: 15px; font-weight: 700; color: var(--blue-900); background: var(--white); position: sticky; left: 0; }
 .ord-h small { font-weight: 500; color: var(--muted); margin-left: 8px; }
