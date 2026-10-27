@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -69,6 +69,16 @@
       <button id="btnEdit" class="act act-edit" hidden>✏️ Sửa lệnh</button>
       <button id="btnAuto" class="act act-edit" hidden>⚡ Tự chỉnh theo luật</button>
     </div>
+
+    <div class="bt-box">
+      <div class="bt-title">🗂 Bảng tài ghép tuyến <small>chọn 2–3 tuyến, cùng ngày ở trên → ghép thành 1 file Excel</small></div>
+      <div class="bt-row">
+        <div class="field"><label for="bt1">Tuyến 1</label><input type="text" id="bt1" list="routeList" placeholder="vd: 161" autocomplete="off"></div>
+        <div class="field"><label for="bt2">Tuyến 2</label><input type="text" id="bt2" list="routeList" placeholder="vd: 157" autocomplete="off"></div>
+        <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><input type="text" id="bt3" list="routeList" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off"></div>
+        <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
+      </div>
+    </div>
   </section>
 
   <div id="msg"></div>
@@ -78,6 +88,7 @@
     <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..."></div>
     <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ hiện dòng cảnh báo hoặc lệch</label>
     <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy bảng để dán vào Sheet</button>
+    <button class="btn-soft" id="btnXlsx" style="display:none">⬇️ Tải Excel</button>
   </div>
 
   <div class="legend">
@@ -104,6 +115,6 @@
   <div class="wrap" id="out"></div>
 </main>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -88,9 +88,9 @@ function loadRoutes() {
 loadRoutes();
 
 // Đổi chữ người dùng gõ thành tuyến: khớp đúng cả dòng, hoặc đúng mã tuyến (gõ "1" cũng ra "01"), hoặc chỉ có 1 tuyến chứa chữ đó
-function sel() {
-  const v = $('route').value.trim().toLowerCase();
-  if (!v || !ROUTES.length) return {};
+function findRoute(text) {
+  const v = String(text || '').trim().toLowerCase();
+  if (!v || !ROUTES.length) return null;
   const nz = x => String(x).toLowerCase().replace(/^0+(?=\d)/, '');
   let r = ROUTES.find(x => routeText(x).toLowerCase() === v) ||
           ROUTES.find(x => x.code.toLowerCase() === v) ||
@@ -99,6 +99,10 @@ function sel() {
     const m = ROUTES.filter(x => routeText(x).toLowerCase().indexOf(v) !== -1);
     if (m.length === 1) r = m[0];
   }
+  return r || null;
+}
+function sel() {
+  const r = findRoute($('route').value);
   if (!r) return {};
   localStorage.setItem('last_route', routeText(r));
   return { id: String(r.id), code: r.code };
@@ -127,12 +131,14 @@ let EB = null, MODE = 'trips';
 let NV = null;
 let LV = null;
 let ED = null;
+let BT = null;
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
   else if (MODE === 'lvc' && LV) renderLvc();
   else if (MODE === 'edit' && ED) renderEdit();
   else if (MODE === 'auto') { if (AU) renderAuto(); }
+  else if (MODE === 'bt' && BT) renderBt();
   else if (DATA) render();
 }
 
@@ -243,14 +249,18 @@ function renderNv() {
 }
 
 $('btnCopy').onclick = function () {
+  if (MODE === 'bt' && BT) { copyText(btGrid().map(r => r.join('\t')).join('\n'), '📋 Đã copy bảng tài, qua Google Sheet bấm Ctrl+V'); return; }
   if (!NV) return;
   const clean = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ');
   const text = nvVisible().map(r => [r.ngay, r.tuyen, r.gioDi, r.gioXuatBen, r.thoiGianDo, r.ten, r.chucVu,
     r.trangThai ? 'TRUE' : 'FALSE', r.viPham ? 'TRUE' : 'FALSE', r.nguoiDo].map(clean).join('\t')).join('\n');
-  const done = function () { msg('📋 Đã copy ' + nvVisible().length + ' dòng, qua Google Sheet bấm Ctrl+V', 'ok'); };
+  copyText(text, '📋 Đã copy ' + nvVisible().length + ' dòng, qua Google Sheet bấm Ctrl+V');
+};
+function copyText(text, okMsg) {
+  const done = function () { msg(okMsg, 'ok'); };
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done).catch(function (e) { msg('❌ Không copy được: ' + e.message, 'err'); });
   else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { msg('❌ Không copy được', 'err'); } ta.remove(); }
-};
+}
 
 // ===== KIỂM TRA LỆNH VẬN CHUYỂN (chỉ tuyến + ngày đang chọn) =====
 $('btnLvc').onclick = function () {
@@ -505,7 +515,7 @@ $('btnNext').onclick = function () { shiftDay(1); };
 // ===== KHUNG TIÊU CHÍ: hiện ngay khi bấm "Kiểm tra lệnh", ẩn khi bấm nút khác =====
 $('actions').addEventListener('click', function (e) {
   const b = e.target.closest && e.target.closest('button');
-  if (b) $('lvcRules').hidden = (b.id !== 'btnLvc');
+  if (b) { $('lvcRules').hidden = (b.id !== 'btnLvc'); $('btnXlsx').style.display = 'none'; }
 });
 
 // ===== TỰ CHỈNH THEO LUẬT (gọi autoplan / autosave trong edit.gs) =====
@@ -595,3 +605,136 @@ $('out').addEventListener('click', function (ev) {
     return autoPlan(line); // lập lại kế hoạch: bình thường còn 0 chuyến cần sửa
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
 });
+
+// ===== BẢNG TÀI GHÉP TUYẾN (gọi bangtai trong bangtai.gs) =====
+// Chọn 2-3 tuyến + ngày ở trên -> ghép ngang thành 1 bảng: mỗi bến 2 cột GIỜ XB | BKS, 1 cột trống giữa các bến.
+const BT_IDS = ['bt1', 'bt2', 'bt3'];
+BT_IDS.forEach(function (id) {
+  const v = localStorage.getItem('bt_' + id); if (v) $(id).value = v;
+  $(id).onfocus = function () { this.select(); };
+  $(id).onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnBt').click(); } };
+});
+
+$('btnBt').onclick = function () {
+  if (!isoDate()) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
+  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const list = [], bad = [];
+  BT_IDS.forEach(function (id, i) {
+    const v = $(id).value.trim(); localStorage.setItem('bt_' + id, v);
+    if (!v) return;
+    const r = findRoute(v);
+    if (!r) bad.push('Tuyến ' + (i + 1) + ' "' + v + '"');
+    else if (!list.some(x => x.id === String(r.id))) list.push({ id: String(r.id), code: r.code });
+  });
+  if (bad.length) { msg('❌ Không nhận ra: ' + bad.join(', ') + '. Gõ số tuyến (vd 161) hoặc chọn từ danh sách.', 'err'); return; }
+  if (!list.length) { msg('❌ Nhập ít nhất 1 tuyến (thường 2-3 tuyến).', 'err'); $('bt1').focus(); return; }
+  const iso = isoDate();
+  $('btnBt').disabled = true; $('lvcRules').hidden = true; $('btnXlsx').style.display = 'none';
+  msg('Đang lấy lịch chạy ' + list.map(x => x.code).join(', ') + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
+  Promise.all(list.map(s => api({ action: 'bangtai', routeId: s.id, label: s.code, date: iso }, 180000))).then(function (res) {
+    if (!res[0].ben) throw new Error('Server chưa có action "bangtai". Dán bangtai.gs, thêm dòng vào RO trong Web.gs, rồi Deploy lại BẢN MỚI.');
+    BT = { ngay: res[0].ngay, iso: iso, routes: res }; MODE = 'bt';
+    $('btnCopy').style.display = ''; $('btnXlsx').style.display = '';
+    const empty = res.filter(r => !r.ben.length).map(r => r.tuyen);
+    msg((empty.length ? '⚠️ Tuyến ' + empty.join(', ') + ' không có chuyến nào. ' : '✅ ') + 'Bảng tài ' + res.map(r => r.tuyen).join(' + ') + ' — ' + BT.ngay +
+      '. Bấm "⬇️ Tải Excel" hoặc "📋 Copy".', empty.length ? 'err' : 'ok');
+    renderBt();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnBt').disabled = false; });
+};
+
+function btBlocks() { // mỗi bến của mỗi tuyến = 1 khối 2 cột, theo thứ tự Tuyến 1 -> 3
+  const out = [];
+  BT.routes.forEach(function (r) { r.ben.forEach(function (b) { out.push({ tuyen: r.tuyen, ten: b.ten, rows: b.rows }); }); });
+  return out;
+}
+
+// Lưới 2 chiều dùng chung cho màn hình, copy và Excel. Dòng 0: "161 · Văn Thánh", dòng 1: GIỜ XB | BKS, sau đó là dữ liệu.
+function btGrid() {
+  const bl = btBlocks(), n = Math.max(0, ...bl.map(b => b.rows.length));
+  const row = f => { const a = []; bl.forEach(function (b, i) { if (i) a.push(''); a.push.apply(a, f(b)); }); return a; };
+  const g = [row(b => [b.tuyen + ' · ' + b.ten, '']), row(() => ['GIỜ XB', 'BKS'])];
+  for (let k = 0; k < n; k++) g.push(row(b => b.rows[k] ? [b.rows[k].gio, b.rows[k].xe] : ['', '']));
+  return g;
+}
+
+function renderBt() {
+  const bl = btBlocks();
+  $('stats').innerHTML = BT.routes.map(r => '<div class="stat"><b>' + r.ben.reduce((s, b) => s + b.rows.length, 0) + '</b>Chuyến tuyến ' + esc(r.tuyen) + '</div>').join('');
+  const q = $('q').value.trim().toLowerCase().replace(/[\s.\-]/g, '');
+  const gap = '<th class="bt-gap"></th>', gapd = '<td class="bt-gap"></td>';
+  let head1 = '', head2 = '';
+  bl.forEach(function (b, i) {
+    head1 += (i ? gap : '') + '<th class="bt-ben" colspan="2">' + esc(b.tuyen + ' · ' + b.ten) + '</th>';
+    head2 += (i ? gap : '') + '<th>GIỜ XB</th><th>BKS</th>';
+  });
+  let body = '';
+  btGrid().slice(2).forEach(function (r) {
+    body += '<tr>' + r.map(function (v, j) {
+      const c = j % 3; // 0 = giờ, 1 = BKS, 2 = cột trống
+      if (c === 2) return gapd;
+      const hit = c === 1 && q && v && v.toLowerCase().replace(/[\s.\-]/g, '').indexOf(q) !== -1;
+      return '<td class="' + (c === 0 ? 'bt-gio' : '') + (hit ? ' bt-hit' : '') + '">' + esc(v) + '</td>';
+    }).join('') + '</tr>';
+  });
+  $('out').innerHTML = bl.length
+    ? '<table class="bt"><thead><tr>' + head1 + '</tr><tr>' + head2 + '</tr></thead><tbody>' + body + '</tbody></table>'
+    : '<table><tbody><tr><td>Không có chuyến nào</td></tr></tbody></table>';
+}
+
+// --- Tải Excel (ExcelJS chỉ nạp khi bấm lần đầu) ---
+let _xl = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (_xl) return _xl;
+  _xl = new Promise(function (resolve, reject) {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    sc.onload = function () { resolve(window.ExcelJS); };
+    sc.onerror = function () { _xl = null; reject(new Error('Không tải được thư viện Excel, kiểm tra mạng rồi bấm lại')); };
+    document.head.appendChild(sc);
+  });
+  return _xl;
+}
+
+$('btnXlsx').onclick = function () {
+  if (MODE !== 'bt' || !BT) return;
+  $('btnXlsx').disabled = true; msg('Đang tạo file Excel...');
+  loadExcelJS().then(function (ExcelJS) {
+    const g = btGrid(), nBlk = btBlocks().length;
+    const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Bảng tài', { views: [{ state: 'frozen', ySplit: 2 }] });
+    const font = { name: 'Times New Roman', size: 12 }, thin = { style: 'thin' };
+    const box = { top: thin, left: thin, bottom: thin, right: thin }, mid = { horizontal: 'center', vertical: 'middle' };
+    g.forEach(function (r, i) {
+      const row = ws.getRow(i + 1);
+      r.forEach(function (v, j) {
+        const c = j % 3;
+        if (c === 2) return;
+        const cell = row.getCell(j + 1);
+        if (i >= 2 && c === 0 && v) { // giờ lưu dạng thời gian thật để Excel tính/sắp được
+          const p = v.split(':'); cell.value = (+p[0] * 60 + +p[1]) / 1440; cell.numFmt = 'h:mm';
+        } else cell.value = v;
+        cell.font = Object.assign({}, font, { bold: i < 2 || c === 0 });
+        cell.alignment = mid; cell.border = box;
+        if (i < 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i ? 'FFDCE6FC' : 'FFC9D8FA' } };
+      });
+      row.height = i === 0 ? 30 : 18;
+    });
+    for (let k = 0; k < nBlk; k++) {
+      ws.mergeCells(1, k * 3 + 1, 1, k * 3 + 2);
+      ws.getCell(1, k * 3 + 1).alignment = Object.assign({ wrapText: true }, mid);
+      ws.getColumn(k * 3 + 1).width = 9; ws.getColumn(k * 3 + 2).width = 13;
+      if (k < nBlk - 1) ws.getColumn(k * 3 + 3).width = 3;
+    }
+    ws.pageSetup = { fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait', paperSize: 9 };
+    return wb.xlsx.writeBuffer();
+  }).then(function (buf) {
+    const name = 'bang-tai_' + BT.routes.map(r => r.tuyen).join('-') + '_' + BT.ngay.replace(/\//g, '-') + '.xlsx';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    msg('⬇️ Đã tải ' + name, 'ok');
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnXlsx').disabled = false; });
+};
