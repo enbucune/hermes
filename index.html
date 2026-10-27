@@ -6,22 +6,42 @@
 <title>Check edit cụm 9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=15">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
-<header class="hero">
-  <div class="hero-in">
+<!-- Bộ icon dùng chung (nét mảnh, cùng kiểu) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bus" viewBox="0 0 24 24"><path d="M8 6v6M15 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="topbar-in">
     <div class="brand">
-      <span class="brand-mark" id="brandMark">🚌</span>
-      <div>
-        <h1>Check edit cụm 9</h1>
-      </div>
+      <span class="brand-mark" id="brandMark"><svg class="ic"><use href="#i-bus"/></svg></span>
+      <h1>Check edit cụm 9</h1>
     </div>
     <div class="hero-btns">
-      <button id="btnLock" class="ghost-light" hidden>🔒 Địt lệnh vận chuyển </button>
-      <button id="btnKey" class="ghost-light">🔑 Đổi mã<span class="hide-sm"> truy cập</span></button>
+      <button id="btnLock" class="ghost-light" hidden><svg class="ic"><use href="#i-lock"/></svg><span class="hide-sm">Khoá sửa lệnh</span></button>
+      <button id="btnKey" class="ghost-light"><svg class="ic"><use href="#i-key"/></svg>Đổi mã<span class="hide-sm"> truy cập</span></button>
     </div>
   </div>
 </header>
@@ -33,76 +53,77 @@
       <div class="field field-route">
         <label for="route">Tuyến</label>
         <input type="text" id="route" list="routeList" placeholder="Đang tải tuyến..." autocomplete="off">
-<datalist id="routeList"></datalist>
+        <datalist id="routeList"></datalist>
       </div>
-      <div class="field">
-        <label for="date">Ngày (dd/mm/yyyy)</label>
+      <div class="field field-date">
+        <label for="date">Ngày</label>
         <div class="datebox">
-          <button type="button" id="btnPrev" class="day-btn" title="Ngày trước" aria-label="Ngày trước">‹</button>
+          <button type="button" id="btnPrev" class="day-btn" title="Ngày trước" aria-label="Ngày trước"><svg class="ic"><use href="#i-left"/></svg></button>
           <input type="text" id="date" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off">
-          <button type="button" id="btnNext" class="day-btn" title="Ngày sau" aria-label="Ngày sau">›</button>
+          <span class="dow" id="dow"></span>
+          <button type="button" id="btnNext" class="day-btn" title="Ngày sau" aria-label="Ngày sau"><svg class="ic"><use href="#i-right"/></svg></button>
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="fNguoiDo" hidden>
         <label for="nguoiDo">Người đo nồng độ cồn</label>
         <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam">
       </div>
       <div class="field" id="fPlate" hidden>
-        <label for="plate">Biển số xe (trống = cả tuyến khi tự chỉnh)</label>
+        <label for="plate">Biển số xe <span class="lbl-note">(trống = cả tuyến khi tự chỉnh)</span></label>
         <input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off">
       </div>
-      <div class="field" id="fFrom" hidden>
-        <label for="tFrom">Sửa từ giờ (lịch chạy)</label>
-        <input type="text" id="tFrom" placeholder="vd: 14:00" maxlength="5" autocomplete="off">
+      <div class="field field-time" id="fFrom" hidden>
+        <label for="tFrom">Sửa từ giờ</label>
+        <input type="text" id="tFrom" placeholder="14:00" maxlength="5" autocomplete="off">
       </div>
-      <div class="field" id="fTo" hidden>
+      <div class="field field-time" id="fTo" hidden>
         <label for="tTo">Đến giờ</label>
-        <input type="text" id="tTo" placeholder="vd: 22:00" maxlength="5" autocomplete="off">
+        <input type="text" id="tTo" placeholder="22:00" maxlength="5" autocomplete="off">
       </div>
     </div>
 
-    <div class="actions" id="actions">
-      <button id="btnLoad" class="act act-main">🚐 Tải bảng xe</button>
-      <button id="btnEbms" class="act act-ebms">📊 So sánh EBMS</button>
-      <button id="btnNv" class="act act-nv">👥 Trích xuất nhân viên</button>
-      <button id="btnLvc" class="act act-lvc">📋 Kiểm tra lệnh</button>
-      <button id="btnGps" class="act act-gps">🛰 Chụp GPS<span class="hide-sm"> mất chuyến</span></button>
-      <button id="btnEdit" class="act act-edit" hidden>✏️ Sửa lệnh</button>
-      <button id="btnAuto" class="act act-edit" hidden>⚡ Tự chỉnh theo luật</button>
+    <div class="actions" id="actions" role="toolbar" aria-label="Chế độ xem">
+      <button id="btnLoad" class="act"><svg class="ic"><use href="#i-table"/></svg>Bảng xe</button>
+      <button id="btnEbms" class="act"><svg class="ic"><use href="#i-compare"/></svg>So sánh EBMS</button>
+      <button id="btnNv" class="act"><svg class="ic"><use href="#i-users"/></svg>Nhân viên</button>
+      <button id="btnLvc" class="act"><svg class="ic"><use href="#i-check"/></svg>Kiểm tra lệnh</button>
+      <button id="btnGps" class="act"><svg class="ic"><use href="#i-pin"/></svg>GPS mất chuyến</button>
+      <button id="btnBtTab" class="act"><svg class="ic"><use href="#i-layers"/></svg>Bảng tài</button>
+      <button id="btnEdit" class="act act-edit" hidden><svg class="ic"><use href="#i-pencil"/></svg>Sửa lệnh</button>
+      <button id="btnAuto" class="act act-edit" hidden><svg class="ic"><use href="#i-zap"/></svg>Tự chỉnh theo luật</button>
     </div>
 
-    <div class="bt-box">
-      <div class="bt-title"><span class="bt-ico">🗂</span><div><b>Bảng tài ghép tuyến</b><small>Chọn 2–3 tuyến, dùng ngày ở trên, ghép thành 1 file Excel</small></div></div>
+    <div class="bt-box" id="btBox" hidden>
+      <p class="bt-title">Ghép 2–3 tuyến của ngày đang chọn thành một bảng tài, tải về Excel hoặc copy sang Google Sheet.</p>
       <div class="bt-row">
         <div class="field"><label for="bt1">Tuyến 1</label><input type="text" id="bt1" list="routeList" placeholder="vd: 161" autocomplete="off"></div>
         <div class="field"><label for="bt2">Tuyến 2</label><input type="text" id="bt2" list="routeList" placeholder="vd: 157" autocomplete="off"></div>
-        <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><input type="text" id="bt3" list="routeList" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off"></div>
-        <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
+        <div class="field"><label for="bt3">Tuyến 3 <span class="lbl-note">(không bắt buộc)</span></label><input type="text" id="bt3" list="routeList" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off"></div>
+        <button id="btnBt" class="btn-primary">Ghép bảng tài</button>
       </div>
     </div>
   </section>
 
-  <div id="msg"></div>
+  <div id="msg" role="status" aria-live="polite"></div>
   <div class="stats" id="stats"></div>
 
   <div class="toolbar">
-    <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..."></div>
-    <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ hiện dòng cảnh báo hoặc lệch</label>
+    <div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..." aria-label="Lọc"></div>
+    <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ dòng có cảnh báo</label>
+    <div class="legend" aria-label="Chú thích màu">
+      <span class="lg lg-y">Lệch 5 phút</span>
+      <span class="lg lg-r">Điều xe trễ / lệch từ 6 phút</span>
+      <span class="lg lg-g">Giờ đi khác lịch</span>
+      <span class="lg lg-p">Trùng giờ chuyến liền kề</span>
+    </div>
     <div class="tb-right">
-      <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy dán vào Sheet</button>
-      <button class="btn-soft btn-solid" id="btnXlsx" style="display:none">⬇️ Tải Excel</button>
+      <button class="btn-soft" id="btnCopy" style="display:none"><svg class="ic"><use href="#i-copy"/></svg>Copy sang Sheet</button>
+      <button class="btn-soft btn-solid" id="btnXlsx" style="display:none"><svg class="ic"><use href="#i-down"/></svg>Tải Excel</button>
     </div>
   </div>
 
-  <div class="legend">
-    <span class="lg lg-y">Vàng: lệch 5 phút</span>
-    <span class="lg lg-r">Đỏ: điều xe trễ, hoặc lệch từ 6 phút</span>
-    <span class="lg lg-g">Xanh lá: giờ đi khác lịch chạy</span>
-    <span class="lg lg-p">Tím: trùng giờ chuyến liền kề</span>
-  </div>
-
-  <section class="rules" id="lvcRules" hidden>
-    <h4>📋 Tiêu chí kiểm tra lệnh vận chuyển</h4>
+  <details class="rules" id="lvcRules" hidden>
+    <summary>Tiêu chí kiểm tra lệnh vận chuyển (7)</summary>
     <ol>
       <li><b>GPLX theo sức chứa:</b> xe 60 chỗ cần hạng <b>E hoặc D</b>; xe 30 chỗ cần <b>D2, E hoặc D</b>.</li>
       <li><b>Đăng kiểm:</b> hạn đăng kiểm phải <b>sau thời điểm hiện tại</b>.</li>
@@ -112,12 +133,12 @@
       <li><b>Lái xe / NV bán vé</b> ký <b>sau</b> giờ đến cuối bến của chuyến cuối.</li>
       <li><b>Điều hành</b> ký <b>sau</b> giờ xác nhận về bến của chuyến cuối.</li>
     </ol>
-    <p class="rules-note">Kết quả: ✅ Đạt · 🟠 Cảnh báo (thiếu dữ liệu để kiểm tra) · 🔴 Lỗi (vi phạm tiêu chí). Cho phép bằng nhau ở quy tắc 4, 6, 7 (cùng phút vẫn đạt).</p>
-  </section>
+    <p class="rules-note">Đạt / Cảnh báo (thiếu dữ liệu để kiểm tra) / Lỗi (vi phạm tiêu chí). Quy tắc 4, 6, 7 cho phép bằng nhau (cùng phút vẫn đạt).</p>
+  </details>
 
   <div class="wrap" id="out"></div>
 </main>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
