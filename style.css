@@ -202,3 +202,7 @@ table.bt td.bt-hit { background: #FFF1B5 !important; font-weight: 700; }
 /* ===== Chụp GPS mất chuyến ===== */
 .act-gps { color: #0B5E8A; background: #DDF0FB; } .act-gps:hover:not(:disabled) { background: #C8E7F8; }
 .gps-links a { color: var(--blue-700); font-weight: 700; margin-right: 16px; }
+.link-btn { display: inline-flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 10px; background: var(--blue-600); color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; }
+.link-btn:hover { background: var(--blue-700); }
+.link-btn.soft { background: var(--blue-100); color: var(--blue-700); }
+.link-btn.soft:hover { background: #D4E0FB; }

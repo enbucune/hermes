@@ -227,7 +227,7 @@ $('btnNv').onclick = function () {
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'nv', routeId: s.id, label: s.code, date: isoDate(), nguoiDo: nd }).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "nv". Thêm dòng router vào Web.gs, dán Nv.gs, rồi Deploy lại BẢN MỚI.');
-    NV = res; MODE = 'nv'; $('btnCopy').style.display = '';
+    NV = res; NV.tuyen = s.code; MODE = 'nv'; $('btnCopy').style.display = '';
     msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến, đã bỏ chuyến mất và trùng)', 'ok');
     renderNv();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
@@ -246,7 +246,12 @@ function renderNv() {
   const body = nvVisible().map(r => '<tr class="' + (r.isAmbiguous ? 'e-amb' : '') + '"><td>' + esc(r.ngay) + '</td><td>' + esc(r.tuyen) + '</td><td>' + esc(r.gioDi) +
     '</td><td>' + esc(r.gioXuatBen) + '</td><td>' + esc(r.thoiGianDo) + '</td><td class="left">' + esc(r.ten) + '</td><td>' + esc(r.chucVu) +
     '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
-  $('out').innerHTML = '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
+  // nút mở file báo cáo đo nồng độ cồn của tuyến (đọc từ tab DS của file tổng, xem Con.gs)
+  const con = (NV.con || []).map(x => '<a class="link-btn" href="' + esc(x.url) + '" target="_blank" rel="noopener">📝 Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
+    (NV.conAll ? '<span class="edit-hint">Chưa thấy file đo cồn của tuyến ' + esc(NV.tuyen || '') + ' trong tab DS.</span>' : '');
+  const bar = con || NV.conAll ? '<div class="edit-bar">' + con +
+    (NV.conAll ? '<a class="link-btn soft" href="' + esc(NV.conAll) + '" target="_blank" rel="noopener">📊 File tổng đo cồn</a>' : '') + '</div>' : '';
+  $('out').innerHTML = bar + '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
     .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="10">Không có nhân viên nào</td></tr>') + '</tbody></table>';
 }
 
@@ -775,19 +780,19 @@ $('btnGps').onclick = function () {
     .then(function () { $('btnGps').disabled = false; });
 };
 
+const MAT_CHUYEN_URL = 'https://docs.google.com/spreadsheets/d/1ysOVfyktQ5p-zlI0L2ZduG8uPneZkJZ3ZHoI7ZZ1KBg/edit?gid=1226700115#gid=1226700115'; // báo cáo mất chuyến
 function renderGps() {
   const daCo = GP.trips.filter(t => t.daCo).length, khongXe = GP.trips.filter(t => !t.chup).length;
   $('stats').innerHTML = [['Chuyến mất', GP.trips.length, ''], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, 'e-warn'], ['Không có xe', khongXe, 'e-nopc']]
     .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
-  let out = '';
-  const r = GP.run;
+  const r = GP.run, sheet = GP.sheet || (r && r.sheet);
+  let out = '<div class="edit-bar">' +
+    (sheet ? '<a class="link-btn" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Mở Google Sheet GPS</a>' : '') +
+    '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a></div>';
   if (r && r.status === 'completed') {
-    out += '<div class="edit-bar gps-links">' + (r.conclusion === 'success' ? '✅ Chụp xong. ' : '⚠️ Lần chạy báo lỗi. ') +
-      (r.sheet ? '<a href="' + esc(r.sheet) + '" target="_blank" rel="noopener">📄 Mở Google Sheet</a>' : '') +
-      (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔎 Xem log GitHub</a>' : '') + '</div>';
+    out += '<div class="edit-bar">' + (r.conclusion === 'success' ? '✅ Chụp xong, link ảnh đã ghi vào Google Sheet.' : '⚠️ Có chuyến chụp lỗi, xem Google Sheet.') + '</div>';
   } else if (r) {
-    out += '<div class="edit-bar"><span class="edit-hint">⏳ GitHub đang chụp (' + esc(r.status) + ')... có thể mất vài phút, cứ để trang mở.</span>' +
-      (r.url ? '<span class="gps-links"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔎 Xem tiến độ</a></span>' : '') + '</div>';
+    out += '<div class="edit-bar"><span class="edit-hint">⏳ Đang chụp... có thể mất vài phút, cứ để trang mở.</span></div>';
   }
   if ((!r || r.status === 'completed') && GP.trips.some(t => t.chup)) {
     out += '<div class="edit-bar"><button class="edit-btn big" data-gps="go"' + (GP.pick.size ? '' : ' disabled') + '>🛰 Chụp ' + GP.pick.size + ' chuyến đã chọn</button>' +
@@ -811,21 +816,21 @@ $('out').addEventListener('click', function (ev) {
   if (!picked.length) { msg('Chưa tick chuyến nào.', 'err'); return; }
   if (!confirm('Chụp GPS ' + picked.length + ' chuyến của tuyến ' + GP.sel.code + ' · ' + GP.ngay + ':\n\n' +
     picked.map(t => '• ' + t.lich + '  ' + t.xe + (t.daCo ? '  (chụp lại)' : '')).join('\n') + '\n\nẢnh lên Drive, link ghi vào Google Sheet.')) return;
-  b.disabled = true; msg('Đang gửi lên GitHub...');
+  b.disabled = true; msg('Đang gửi lệnh chụp...');
   const g = GP;
   api({ action: 'gps', routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000).then(function (res) {
     if (!res.started) { msg('⚠️ Không có chuyến nào để chụp.', 'err'); return; }
     g.run = { status: 'queued' }; renderGps();
-    msg('🛰 Đã gửi ' + res.nChup + ' chuyến lên GitHub, đang chờ chụp...', 'ok');
+    msg('🛰 Đã gửi ' + res.nChup + ' chuyến, đang chụp...', 'ok');
     const title = g.sel.code + ' ' + res.ngay, t0 = Date.now();
     (function poll() {
       if (GP !== g) return; // đã bấm sang việc khác thì thôi theo dõi
       api({ action: 'gpsstatus', since: res.since, title: title }, 60000).then(function (st) {
         g.run = st; if (MODE === 'gps' && GP === g) renderGps();
         if (st.status === 'completed') {
-          msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ GitHub báo lỗi (' + st.conclusion + '). Bấm "Xem log GitHub" để xem.', st.conclusion === 'success' ? 'ok' : 'err');
+          msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
         } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 15000);
-        else msg('⚠️ Đã chờ 60 phút chưa xong, mở "Xem tiến độ" để kiểm tra.', 'err');
+        else msg('⚠️ Đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err');
       }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 20000); });
     })();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
