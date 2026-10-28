@@ -269,3 +269,29 @@ table.bt th.bt-ben { font-size: 13px; }
   .panel-bar { padding: 12px 14px; } .panel-bar .edit-btn.big { width: 100%; }
   .stat b { font-size: 30px; }
 }
+
+/* ===== Đăng nhập / tài khoản ===== */
+.auth { position: fixed; inset: 0; z-index: 100; background: rgba(15, 28, 60, .55); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 40px 16px; }
+.auth[hidden] { display: none; }
+.auth-card { position: relative; width: 100%; max-width: 420px; background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 26px 24px 22px; display: flex; flex-direction: column; gap: 14px; }
+.auth-x { position: absolute; top: 10px; right: 12px; width: 34px; height: 34px; border-radius: 10px; font-size: 22px; color: var(--muted); background: var(--bg); }
+.auth-logo { font-size: 18px; color: var(--ink); text-align: center; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg); padding: 4px; border-radius: 12px; }
+.auth-tabs[hidden] { display: none; }
+.auth-tabs button { height: 38px; border-radius: 9px; font-weight: 700; font-size: 14px; color: var(--muted); background: transparent; }
+.auth-tabs button.on { background: var(--white); color: var(--blue-700); box-shadow: 0 2px 6px rgba(23,45,110,.10); }
+.auth form, .auth [data-pane="acc"] { display: flex; flex-direction: column; gap: 12px; }
+.auth form[hidden], .auth [data-pane][hidden] { display: none; }
+.auth .field { flex: none; }
+.auth .field input { height: 44px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 14.5px; color: var(--ink); min-width: 0; width: 100%; }
+.auth .field input:focus { border-color: var(--blue-600); box-shadow: 0 0 0 4px var(--blue-100); outline: none; }
+.auth .fe, .auth-err { color: var(--err); font-size: 13px; font-weight: 600; }
+.auth .fe:empty, .auth-err:empty { display: none; }
+.auth-err { white-space: pre-line; }
+.auth-sec { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 700; color: var(--ink); font-size: 14.5px; }
+.auth-sec small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.auth .act { width: 100%; }
+.acc-info { display: flex; flex-direction: column; gap: 3px; background: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; color: var(--muted); }
+.acc-info b { color: var(--ink); font-size: 16px; }
+.btn-out { height: 42px; border-radius: 12px; background: #FDE8EA; color: #A0202D; font-weight: 700; font-size: 14px; margin-top: 4px; }
+.auth-err.ok { color: var(--ok); }

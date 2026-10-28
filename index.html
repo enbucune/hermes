@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
     </div>
     <div class="hero-btns">
       <button id="btnLock" class="ghost-light" hidden>🔒 Địt lệnh vận chuyển </button>
-      <button id="btnKey" class="ghost-light">🔑 Đổi mã<span class="hide-sm"> truy cập</span></button>
+      <button id="btnUser" class="ghost-light">👤 Đăng nhập</button>
     </div>
   </div>
 </header>
@@ -118,6 +118,57 @@
   <div class="wrap" id="out"></div>
 </main>
 
-<script src="app.js?v=16"></script>
+<!-- ĐĂNG NHẬP / ĐĂNG KÝ / TÀI KHOẢN (app.js: showAuth) -->
+<div class="auth" id="auth" hidden>
+  <div class="auth-card">
+    <button type="button" class="auth-x" id="authX" title="Đóng" hidden>×</button>
+    <div class="auth-logo">🚌 <b>Check edit cụm 9</b></div>
+    <div class="auth-tabs" id="authTabs">
+      <button type="button" data-tab="login" class="on">Đăng nhập</button>
+      <button type="button" data-tab="reg">Đăng ký</button>
+    </div>
+
+    <form id="fLogin" data-pane="login" autocomplete="on">
+      <div class="field"><label>Số điện thoại</label><input type="text" name="phone" inputmode="numeric" autocomplete="username"><small class="fe" data-for="phone"></small></div>
+      <div class="field"><label>Mật khẩu</label><input type="password" name="pass" autocomplete="current-password"><small class="fe" data-for="pass"></small></div>
+      <div class="auth-err"></div>
+      <button type="submit" class="act act-main">Đăng nhập</button>
+    </form>
+
+    <form id="fReg" data-pane="reg" hidden autocomplete="off">
+      <div class="field"><label>Số điện thoại (dùng để đăng nhập web)</label><input type="text" name="phone" inputmode="numeric" autocomplete="username"><small class="fe" data-for="phone"></small></div>
+      <div class="field"><label>Họ tên</label><input type="text" name="name"><small class="fe" data-for="name"></small></div>
+      <div class="field"><label>Mật khẩu web (ít nhất 1 chữ viết hoa và 5 chữ thường)</label><input type="password" name="pass" autocomplete="new-password"><small class="fe" data-for="pass"></small></div>
+      <div class="field"><label>Nhập lại mật khẩu</label><input type="password" name="pass2" autocomplete="new-password"><small class="fe" data-for="pass2"></small></div>
+      <div class="auth-sec">🔗 Tài khoản FUTA của bạn<small>Web sẽ dùng tài khoản này để chạy mọi thao tác thay cho bạn. Mật khẩu FUTA không được lưu lại.</small></div>
+      <div class="field"><label>Tài khoản FUTA</label><input type="text" name="futaUser" autocomplete="off"></div>
+      <div class="field"><label>Mật khẩu FUTA</label><input type="password" name="futaPass" autocomplete="off"><small class="fe" data-for="futa"></small></div>
+      <div class="auth-err"></div>
+      <button type="submit" class="act act-main">Tạo tài khoản</button>
+    </form>
+
+    <div data-pane="acc" hidden>
+      <div class="acc-info" id="accInfo"></div>
+      <form id="fFuta" autocomplete="off">
+        <div class="auth-sec">🔗 Nhập lại tài khoản FUTA<small>Dùng khi bạn đổi mật khẩu FUTA hoặc web báo phiên FUTA hết hạn.</small></div>
+        <div class="field"><label>Tài khoản FUTA</label><input type="text" name="futaUser" autocomplete="off"></div>
+        <div class="field"><label>Mật khẩu FUTA</label><input type="password" name="futaPass" autocomplete="off"><small class="fe" data-for="futa"></small></div>
+        <div class="auth-err"></div>
+        <button type="submit" class="btn-soft">Cập nhật FUTA</button>
+      </form>
+      <form id="fPw" autocomplete="off">
+        <div class="auth-sec">🔑 Đổi mật khẩu web</div>
+        <div class="field"><label>Mật khẩu cũ</label><input type="password" name="old" autocomplete="current-password"><small class="fe" data-for="old"></small></div>
+        <div class="field"><label>Mật khẩu mới</label><input type="password" name="pass" autocomplete="new-password"><small class="fe" data-for="pass"></small></div>
+        <div class="field"><label>Nhập lại mật khẩu mới</label><input type="password" name="pass2" autocomplete="new-password"><small class="fe" data-for="pass2"></small></div>
+        <div class="auth-err"></div>
+        <button type="submit" class="btn-soft">Đổi mật khẩu</button>
+      </form>
+      <button type="button" class="btn-out" id="btnLogout">🚪 Đăng xuất</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=18"></script>
 </body>
 </html>

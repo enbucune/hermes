@@ -7,31 +7,26 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function msg(t, cls) { $('msg').className = cls || ''; $('msg').textContent = t || ''; }
 
-// ===== MÃ TRUY CẬP (khớp Script Property WEB_KEY) =====
-function getKey(reset) {
-  let k = localStorage.getItem('web_key');
-  if (!k || reset) {
-    const input = prompt('Nhập mã truy cập (WEB_KEY):');
-    if (input !== null) { // bấm Hủy thì giữ nguyên mã cũ, không ghi đè bằng chuỗi rỗng
-      k = input.trim();
-      localStorage.setItem('web_key', k);
-    }
-  }
-  return k || '';
-}
+// Google Cloud OAuth Client ID (loại Web application) để mỗi người lưu ảnh GPS vào Google của họ.
+// Để trống = ảnh GPS lưu vào Drive/Sheet chung như cũ.
+const GOOGLE_CLIENT_ID = '';
+
+// ===== ĐĂNG NHẬP (tài khoản web, gắn tài khoản FUTA riêng) =====
+function getSid() { try { return localStorage.getItem('web_sid') || ''; } catch (e) { return ''; } }
+let ME = null;
 
 // ===== JSONP (tự thử lại khi lỗi kết nối) =====
 let _n = 0;
 function apiOnce(params, timeoutMs) {
   return new Promise(function (resolve, reject) {
-    let url, key;
-    try { url = getUrl(); key = getKey(); } catch (e) { reject(e); return; }
+    let url;
+    try { url = getUrl(); } catch (e) { reject(e); return; }
     const cb = '__cb' + (++_n) + '_' + Date.now();
-    const q = new URLSearchParams(Object.assign({ key: key, callback: cb }, params));
+    const q = new URLSearchParams(Object.assign({ sid: getSid(), callback: cb }, params));
     const script = document.createElement('script');
     let done = false, timer;
     const clean = function () { done = true; delete window[cb]; script.remove(); clearTimeout(timer); };
-    window[cb] = function (data) { clean(); data && data.ok ? resolve(data) : reject(new Error((data && data.error) || 'Lỗi không xác định')); };
+    window[cb] = function (data) { clean(); data && data.ok ? resolve(data) : reject(apiErr(data)); };
     script.onerror = function () {
       if (!done) {
         clean();
@@ -44,6 +39,26 @@ function apiOnce(params, timeoutMs) {
     script.src = url + '?' + q.toString();
     document.body.appendChild(script);
   });
+}
+
+// Lỗi từ server: data.login -> hiện màn đăng nhập; data.futa -> phiên FUTA hết hạn, nhập lại ở mục Tài khoản
+function apiErr(data) {
+  const e = new Error((data && data.error) || 'Lỗi không xác định');
+  if (data && data.login) { e.login = true; showAuth('login'); }
+  if (data && data.futa) e.futa = true;
+  if (data && data.field) e.field = data.field;
+  return e;
+}
+
+// POST (mật khẩu, token Google không nằm trên URL). Apps Script trả CORS cho body text/plain.
+function apiPost(params, timeoutMs) {
+  const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
+  return fetch(getUrl(), { method: 'POST', body: JSON.stringify(Object.assign({ sid: getSid() }, params)), signal: ctl.signal })
+    .then(function (r) { return r.json(); }, function (e) {
+      throw new Error(e.name === 'AbortError' ? 'Hết thời gian chờ' : 'Không kết nối được tới máy chủ, thử lại sau ít giây.');
+    })
+    .then(function (data) { if (!data || !data.ok) throw apiErr(data); return data; })
+    .finally(function () { clearTimeout(timer); });
 }
 
 function api(params, timeoutMs, tries) {
@@ -74,7 +89,9 @@ let ROUTES = [];
 const routeText = r => r.code + (r.name ? ' — ' + r.name : '');
 
 function loadRoutes() {
+  if (!getSid()) { showAuth('login'); return; }
   api({ action: 'routes' }).then(function (res) {
+    setMe(res.me);
     const favSet = new Set(res.fav);
     // tuyến "Hay dùng" lên đầu danh sách gợi ý
     ROUTES = res.routes.filter(r => favSet.has(r.code)).concat(res.routes.filter(r => !favSet.has(r.code)));
@@ -83,7 +100,7 @@ function loadRoutes() {
     if (last && !$('route').value) $('route').value = last;
     $('route').placeholder = 'Nhập số tuyến (vd: 30, 01, 60-1) hoặc chọn từ danh sách';
     msg('');
-  }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
+  }).catch(function (e) { if (!e.login) msg('❌ ' + e.message, 'err'); });
 }
 loadRoutes();
 
@@ -113,10 +130,10 @@ $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(
 $('date').onfocus = function () { this.select(); };
 $('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
-$('btnKey').onclick = function () { getKey(true); loadRoutes(); };
+$('btnUser').onclick = function () { showAuth(ME ? 'acc' : 'login'); };
 
 $('btnLoad').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: isoDate() }).then(function (res) {
     DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
@@ -155,12 +172,13 @@ function catOf(loai) {
 }
 
 $('btnEbms').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
     EB = res; MODE = 'ebms'; $('btnCopy').style.display = 'none';
-    msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến)', 'ok');
+    msg('✅ So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến' +
+        (res.gps ? ' · 🛰 ' + res.gps : '') + ')', 'ok');
     renderEbms();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnEbms').disabled = false; });
@@ -179,13 +197,14 @@ function renderEbms() {
     const c = catOf(r.loai);
     if (only && c === 'ok') return;
     const f = [r.loai, r.khDi, r.khDen, r.khXe, r.thXe, r.thDi, r.thDen, r.benDau, r.trangThaiEBMS, r.lichChayPC, r.xePC, r.benXuatPhatPC,
-      r.gioDiPC, r.gioDenPC, r.chenhLechDi, r.chenhLechDen, r.soBen];
+      r.gioDiPC, r.gioDenPC, r.chenhLechDi, r.chenhLechDen, r.gpsDi || '', r.gpsVe || '', r.pcGps || '', r.ebGps || '', r.soBen];
     if (q && (f.join(' ') + ' ' + r.ghi).toLowerCase().indexOf(q) === -1) return;
     html += '<tr class="e-' + c + '">' + f.map(v => '<td>' + esc(v) + '</td>').join('') + '<td class="notes">' + esc(r.ghi) + '</td></tr>';
   });
-  const heads = ['Loại', 'KH Đi', 'KH Đến', 'KH Xe', 'TH Xe', 'TH Đi', 'TH Đến', 'Bến đầu', 'TT EBMS', 'Lịch chạy PC', 'Xe PC', 'Bến PC', 'Giờ đi PC', 'Giờ đến PC', 'Lệch Đi', 'Lệch Về', 'So bến', 'Ghi chú'];
+  const heads = ['Loại', 'KH Đi', 'KH Đến', 'KH Xe', 'TH Xe', 'TH Đi', 'TH Đến', 'Bến đầu', 'TT EBMS', 'Lịch chạy PC', 'Xe PC', 'Bến PC', 'Giờ đi PC', 'Giờ đến PC', 'Lệch Đi', 'Lệch Về',
+    'GPS Đi', 'GPS Về', 'PC−GPS (đi/về)', 'EBMS−GPS (đi/về)', 'So bến', 'Ghi chú'];
   $('out').innerHTML = '<table><thead><tr>' + heads.map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' +
-    (html || '<tr><td colspan="18">Không có dòng nào</td></tr>') + '</tbody></table>';
+    (html || '<tr><td colspan="' + heads.length + '">Không có dòng nào</td></tr>') + '</tbody></table>';
 }
 
 // ===== RENDER =====
@@ -222,7 +241,7 @@ function render() {
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
 
 $('btnNv').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'nv', routeId: s.id, label: s.code, date: isoDate(), nguoiDo: nd }).then(function (res) {
@@ -271,7 +290,7 @@ function copyText(text, okMsg) {
 
 // ===== KIỂM TRA LỆNH VẬN CHUYỂN (chỉ tuyến + ngày đang chọn) =====
 $('btnLvc').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển tuyến ' + s.code + ' (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'lvc', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
@@ -317,7 +336,7 @@ function tryUnlock(ekey, silent) {
     localStorage.setItem('edit_key', ekey); setUnlocked(true);
     if (!silent) msg('🔓 Đã mở khoá tính năng sửa lệnh', 'ok');
   }).catch(function (e) {
-    if (silent) { if (!e.net) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; }
+    if (silent) { if (!e.net && !e.login) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
     msg('❌ ' + e.message, 'err');
   });
 }
@@ -331,7 +350,7 @@ function tryUnlock(ekey, silent) {
     if (input && input.trim()) tryUnlock(input.trim(), false);
   };
   $('btnLock').onclick = function () { localStorage.removeItem('edit_key'); setUnlocked(false); msg('🔒 Đã khoá lại', 'ok'); };
-  if (getEkey()) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
+  if (getEkey() && getSid()) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
 })();
 
 $('btnEdit').onclick = function () {
@@ -625,7 +644,7 @@ BT_IDS.forEach(function (id) {
 
 $('btnBt').onclick = function () {
   if (!isoDate()) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
-  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong.', 'err'); return; }
   const list = [], bad = [];
   BT_IDS.forEach(function (id, i) {
     const v = $(id).value.trim(); localStorage.setItem('bt_' + id, v);
@@ -768,9 +787,11 @@ $('btnXlsx').onclick = function () {
 // Bấm nút: liệt kê chuyến có tài xế / tiếp viên / trạng thái "mất chuyến" của tuyến + ngày đang chọn (chưa chụp).
 // Tick chọn chuyến, bấm "Chụp": GitHub chụp lộ trình, ảnh lên Drive, link ghi vào Google Sheet như chay.command trên Mac.
 $('btnGps').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnGps').disabled = true; msg('Đang tìm chuyến mất chuyến tuyến ' + s.code + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  api({ action: 'gps', dry: '1', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
+  gToken(50).then(function (gtok) { // xin token Google ngay lúc bấm (đủ dài cho cả lần chụp sau)
+    return apiPost({ action: 'gps', dry: '1', gtok: gtok, routeId: s.id, label: s.code, date: isoDate() }, 180000);
+  }).then(function (res) {
     if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
     GP = res; GP.sel = s; GP.iso = isoDate(); GP.run = null; MODE = 'gps'; $('btnCopy').style.display = 'none';
     GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo).map(t => t.key)); // tick sẵn chuyến chưa có ảnh
@@ -789,7 +810,7 @@ function renderGps() {
   const r = GP.run, sheet = GP.sheet || (r && r.sheet);
   const canGo = (!r || r.status === 'completed') && GP.trips.some(t => t.chup);
   let out = '<div class="panel-bar"><div class="pb-left">' +
-    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS</a>' : '') +
+    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS' + (GP.rieng ? ' của bạn' : '') + '</a>' : '') +
     '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a></div>' +
     (canGo ? '<button class="edit-btn big" data-gps="go"' + (GP.pick.size ? '' : ' disabled') + '>🛰 Chụp ' + GP.pick.size + ' chuyến đã chọn</button>' : '') + '</div>';
   if (r && r.status === 'completed') {
@@ -819,7 +840,9 @@ $('out').addEventListener('click', function (ev) {
     picked.map(t => '• ' + t.lich + '  ' + t.xe + (t.daCo ? '  (chụp lại)' : '')).join('\n') + '\n\nẢnh lên Drive, link ghi vào Google Sheet.')) return;
   b.disabled = true; msg('Đang gửi lệnh chụp...');
   const g = GP;
-  api({ action: 'gps', routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000).then(function (res) {
+  gToken(40).then(function (gtok) {
+    return apiPost({ action: 'gps', gtok: gtok, routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
+  }).then(function (res) {
     if (!res.started) { msg('⚠️ Không có chuyến nào để chụp.', 'err'); return; }
     g.run = { status: 'queued' }; renderGps();
     msg('🛰 Đã gửi ' + res.nChup + ' chuyến, đang chụp...', 'ok');
@@ -846,3 +869,111 @@ $('out').addEventListener('change', function (ev) {
   else return;
   renderGps();
 });
+
+// ===== GOOGLE: lưu ảnh GPS vào Drive / Sheet của chính người dùng (quyền drive.file: chỉ file do web tạo) =====
+let GTOK = null, GCLIENT = null, GWAIT = null;
+if (GOOGLE_CLIENT_ID) {
+  const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; document.head.appendChild(sc);
+}
+// Gọi NGAY trong lúc bấm nút để trình duyệt không chặn cửa sổ Google. minLeft: token phải còn ít nhất bấy nhiêu phút.
+function gToken(minLeft) {
+  if (!GOOGLE_CLIENT_ID) return Promise.resolve('');
+  if (GTOK && GTOK.exp > Date.now() + minLeft * 60000) return Promise.resolve(GTOK.t);
+  if (!(window.google && google.accounts && google.accounts.oauth2)) return Promise.reject(new Error('Đăng nhập Google chưa tải xong, bấm lại sau vài giây'));
+  if (!GCLIENT) GCLIENT = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: function (r) {
+      const w = GWAIT; GWAIT = null; if (!w) return;
+      if (r.error || !r.access_token) w.reject(new Error('Google từ chối: ' + (r.error_description || r.error || 'không có token')));
+      else { GTOK = { t: r.access_token, exp: Date.now() + Number(r.expires_in || 3600) * 1000 }; w.resolve(GTOK.t); }
+    },
+    error_callback: function (e) {
+      const w = GWAIT; GWAIT = null;
+      if (w) w.reject(new Error(e && e.type === 'popup_failed_to_open' ? 'Trình duyệt chặn cửa sổ Google, cho phép popup rồi bấm lại' : 'Chưa đăng nhập Google nên chưa lưu được ảnh GPS'));
+    }
+  });
+  return new Promise(function (resolve, reject) { GWAIT = { resolve: resolve, reject: reject }; GCLIENT.requestAccessToken({ prompt: '' }); });
+}
+
+// ===== TÀI KHOẢN: đăng nhập / đăng ký / cập nhật FUTA / đổi mật khẩu =====
+function setMe(me) {
+  ME = me || null;
+  $('btnUser').textContent = ME ? '👤 ' + ME.name : '👤 Đăng nhập';
+}
+function showAuth(tab) {
+  $('auth').hidden = false;
+  $('authX').hidden = !ME;                 // chưa đăng nhập thì không đóng được
+  $('authTabs').hidden = tab === 'acc';
+  document.querySelectorAll('#auth [data-pane]').forEach(function (el) { el.hidden = el.dataset.pane !== tab; });
+  $('authTabs').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
+  document.querySelectorAll('#auth .fe, #auth .auth-err').forEach(function (el) { el.textContent = ''; el.classList.remove('ok'); });
+  if (tab === 'acc' && ME) $('accInfo').innerHTML = '<b>' + esc(ME.name) + '</b><span>SĐT: ' + esc(ME.phone) + '</span><span>Tài khoản FUTA đang dùng: ' + esc(ME.futa) + '</span>';
+  const f = document.querySelector('#auth [data-pane="' + tab + '"] input');
+  if (f) setTimeout(function () { f.focus(); }, 50);
+}
+function authOk(form, text) { const el = form.querySelector('.auth-err'); el.textContent = text; el.classList.add('ok'); }
+function hideAuth() { $('auth').hidden = true; }
+function okPass(pw) { return /[A-Z]/.test(pw) && (pw.match(/[a-z]/g) || []).length >= 5; }
+const PASS_RULE = 'Mật khẩu cần ít nhất 1 chữ viết hoa và 5 chữ thường';
+
+// Gắn xử lý cho 1 form: check() trả lỗi {field, message} hoặc null; send() trả Promise
+function authForm(form, busyText, check, send, done) {
+  form.onsubmit = function (ev) {
+    ev.preventDefault();
+    form.querySelectorAll('.fe, .auth-err').forEach(function (el) { el.textContent = ''; el.classList.remove('ok'); });
+    const v = {}; form.querySelectorAll('input[name]').forEach(function (i) { v[i.name] = i.value.trim(); });
+    const showErr = function (e) {
+      const el = (e.field && form.querySelector('.fe[data-for="' + e.field + '"]')) || form.querySelector('.auth-err');
+      el.textContent = '❌ ' + e.message;
+    };
+    const bad = check(v); if (bad) { showErr(bad); return; }
+    const btn = form.querySelector('button[type=submit]'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = busyText;
+    send(v).then(function (res) { form.reset(); done(res); }).catch(showErr)
+      .then(function () { btn.disabled = false; btn.textContent = label; });
+  };
+}
+function onLogin(res) {
+  localStorage.setItem('web_sid', res.sid); setMe(res.user); hideAuth();
+  msg('✅ Xin chào ' + res.user.name, 'ok'); loadRoutes();
+  if (getEkey()) tryUnlock(getEkey(), true); // mở lại tính năng sửa lệnh nếu đã nhập mã trước đó
+}
+
+authForm($('fLogin'), 'Đang đăng nhập...', function (v) {
+  if (!v.phone) return { field: 'phone', message: 'Chưa nhập số điện thoại' };
+  if (!v.pass) return { field: 'pass', message: 'Chưa nhập mật khẩu' };
+  return null;
+}, function (v) { return apiPost({ action: 'login', phone: v.phone, pass: v.pass }, 60000); }, onLogin);
+
+authForm($('fReg'), 'Đang kiểm tra tài khoản FUTA...', function (v) {
+  if (!/^0\d{9}$/.test(v.phone.replace(/[\s.\-]/g, ''))) return { field: 'phone', message: 'Số điện thoại phải gồm 10 số, bắt đầu bằng 0' };
+  if (!v.name) return { field: 'name', message: 'Chưa nhập họ tên' };
+  if (!okPass(v.pass)) return { field: 'pass', message: PASS_RULE };
+  if (v.pass !== v.pass2) return { field: 'pass2', message: 'Nhập lại mật khẩu không khớp' };
+  if (!v.futaUser || !v.futaPass) return { field: 'futa', message: 'Chưa nhập đủ tài khoản và mật khẩu FUTA' };
+  return null;
+}, function (v) {
+  return apiPost({ action: 'register', phone: v.phone, name: v.name, pass: v.pass, futaUser: v.futaUser, futaPass: v.futaPass }, 90000);
+}, onLogin);
+
+authForm($('fFuta'), 'Đang kiểm tra tài khoản FUTA...', function (v) {
+  return v.futaUser && v.futaPass ? null : { field: 'futa', message: 'Chưa nhập đủ tài khoản và mật khẩu FUTA' };
+}, function (v) { return apiPost({ action: 'futa', futaUser: v.futaUser, futaPass: v.futaPass }, 90000); },
+function (res) { setMe(res.user); showAuth('acc'); authOk($('fFuta'), '✅ Đã cập nhật tài khoản FUTA'); });
+
+authForm($('fPw'), 'Đang đổi...', function (v) {
+  if (!v.old) return { field: 'old', message: 'Chưa nhập mật khẩu cũ' };
+  if (!okPass(v.pass)) return { field: 'pass', message: PASS_RULE };
+  if (v.pass !== v.pass2) return { field: 'pass2', message: 'Nhập lại mật khẩu không khớp' };
+  return null;
+}, function (v) { return apiPost({ action: 'doimk', old: v.old, pass: v.pass }, 60000); },
+function () { authOk($('fPw'), '✅ Đã đổi mật khẩu'); });
+
+$('authTabs').onclick = function (ev) { const b = ev.target.closest('button[data-tab]'); if (b) showAuth(b.dataset.tab); };
+$('authX').onclick = hideAuth;
+$('btnLogout').onclick = function () {
+  apiPost({ action: 'logout' }, 30000).catch(function () {});
+  localStorage.removeItem('web_sid'); setMe(null);
+  $('out').innerHTML = ''; $('stats').innerHTML = ''; msg('Đã đăng xuất');
+  showAuth('login');
+};
