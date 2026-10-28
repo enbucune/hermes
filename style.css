@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light; /* web chỉ có giao diện sáng: máy để chế độ tối thì ô gợi ý tuyến (datalist) bị chữ trắng trên nền sáng */
   --blue-900: #12275B; --blue-700: #1F44B8; --blue-600: #2B59DB; --blue-100: #E6EDFD; --blue-50: #F3F6FE;
   --ink: #17233C; --muted: #6A7690; --line: #E1E7F2; --bg: #F4F6FB; --white: #fff;
   --ok: #138A55; --err: #C9303F; --amber: #B26A00; --violet: #6B35C9;
