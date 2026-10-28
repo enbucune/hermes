@@ -5,34 +5,7 @@ function getUrl() { return API_URL; }
 let DATA = null, CUR = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Dòng trạng thái: bỏ emoji đầu câu (chấm màu ở CSS đã thể hiện đúng/sai/đang chạy)
-function msg(t, cls) {
-  $('msg').className = cls || '';
-  $('msg').textContent = String(t || '').replace(/^(?:[✅❌⚠✔⏳⬇]|\uD83D[\uDD12\uDD13\uDCCB\uDEF0])️?\s*/, '');
-}
-
-// Dải số liệu dùng chung: [nhãn, số, tông màu, hành động]
-// tông: '' | ok | warn | bad | violet | orange. Số = 0 thì về xám. Hành động 'warn' = bấm để lọc dòng cảnh báo, 'missed' = cuộn tới bảng mất chuyến
-const TONE = { 'e-ok': 'ok', 'e-warn': 'warn', 'e-nopc': 'bad', 'e-noebms': 'orange', 'e-n': '' };
-function statsHtml(list) {
-  return list.map(function (x) {
-    const tone = TONE[x[2]] != null ? TONE[x[2]] : (x[2] || ''), v = x[1], act = x[3];
-    const zero = typeof v === 'number' && v === 0;
-    const attrs = (tone ? ' data-tone="' + tone + '"' : '') + (zero ? ' data-zero' : '');
-    if (act && !zero) {
-      const on = act === 'warn' && $('onlyWarn').checked;
-      const hint = act === 'warn' ? (on ? 'Đang lọc, bấm để bỏ' : 'Bấm để lọc') : 'Bấm để xem';
-      return '<button type="button" class="stat' + (on ? ' is-on' : '') + '" data-act="' + act + '"' + attrs + '><b>' + esc(v) + '</b>' + esc(x[0]) + '<span class="hint">' + hint + '</span></button>';
-    }
-    return '<div class="stat"' + attrs + '><b>' + esc(v) + '</b>' + esc(x[0]) + '</div>';
-  }).join('');
-}
-$('stats').addEventListener('click', function (e) {
-  const b = e.target.closest && e.target.closest('button[data-act]');
-  if (!b) return;
-  if (b.dataset.act === 'warn') { $('onlyWarn').checked = !$('onlyWarn').checked; rerender(); }
-  else if (b.dataset.act === 'missed') { const m = $('missed'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-});
+function msg(t, cls) { $('msg').className = cls || ''; $('msg').textContent = t || ''; }
 
 // ===== MÃ TRUY CẬP (khớp Script Property WEB_KEY) =====
 function getKey(reset) {
@@ -135,25 +108,15 @@ function sel() {
   return { id: String(r.id), code: r.code };
 }
 
-// Bấm vào ô là bôi đen hết, gõ đè luôn (không cần Ctrl+A).
-// Phải chặn mouseup đầu tiên: nếu không, trình duyệt bỏ bôi đen ngay khi nhả chuột.
-function selectAllOnClick(el) {
-  let fresh = false;
-  const all = function () { try { el.setSelectionRange(0, el.value.length); } catch (e) { el.select(); } };
-  el.addEventListener('focus', function () { fresh = true; all(); setTimeout(all, 0); });
-  el.addEventListener('mouseup', function (e) { if (fresh) { e.preventDefault(); all(); } fresh = false; });
-  el.addEventListener('touchend', function () { if (fresh) setTimeout(all, 0); fresh = false; });
-  el.addEventListener('blur', function () { fresh = false; });
-}
-['route', 'date', 'bt1', 'bt2', 'bt3', 'plate', 'tFrom', 'tTo', 'nguoiDo'].forEach(function (id) { if ($(id)) selectAllOnClick($(id)); });
-
+$('route').onfocus = function () { this.select(); }; // bấm vào ô là bôi đen sẵn, gõ đè luôn
 $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
+$('date').onfocus = function () { this.select(); };
 $('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
 $('btnKey').onclick = function () { getKey(true); loadRoutes(); };
 
 $('btnLoad').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: isoDate() }).then(function (res) {
     DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none'; msg('✅ Tuyến ' + s.code + ' — ' + $('date').value, 'ok'); render();
@@ -192,7 +155,7 @@ function catOf(loai) {
 }
 
 $('btnEbms').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
@@ -206,9 +169,9 @@ $('btnEbms').onclick = function () {
 function renderEbms() {
   const cnt = { ok: 0, warn: 0, plan: 0, nopc: 0, noebms: 0 };
   EB.results.forEach(function (r) { const c = catOf(r.loai); if (cnt[c] != null) cnt[c]++; });
-  const nBad = cnt.warn + cnt.plan + cnt.nopc + cnt.noebms;
-  $('stats').innerHTML = statsHtml([['Tổng dòng', EB.results.length, ''], ['Khớp', cnt.ok, 'e-ok'], ['Lệch giờ', cnt.warn + cnt.plan, 'e-warn', nBad && 'warn'],
-    ['Thiếu phân công', cnt.nopc, 'e-nopc', nBad && 'warn'], ['Thiếu EBMS', cnt.noebms, 'e-noebms', nBad && 'warn']]);
+  $('stats').innerHTML = [['Tổng dòng', EB.results.length, ''], ['Khớp', cnt.ok, 'e-ok'], ['Lệch giờ', cnt.warn + cnt.plan, 'e-warn'],
+    ['Thiếu phân công', cnt.nopc, 'e-nopc'], ['Thiếu EBMS', cnt.noebms, 'e-noebms']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 
   const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
   let html = '';
@@ -228,40 +191,25 @@ function renderEbms() {
 // ===== RENDER =====
 function render() {
   const st = DATA.stats;
-  $('stats').innerHTML = statsHtml([['Tổng chuyến', st.total, ''], ['Có cảnh báo', st.warn, 'warn', 'warn'], ['Cặp trùng giờ', st.conflicts, 'violet', 'warn'],
-    ['Mất chuyến', st.missed, 'bad', 'missed']]);
+  $('stats').innerHTML = [['Tổng chuyến', st.total], ['Có cảnh báo', st.warn], ['Cặp trùng giờ', st.conflicts], ['Mất chuyến', st.missed]]
+    .map(x => '<div class="stat"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 
-  const q = $('q').value.trim().toLowerCase().replace(/[\s.\-]/g, ''), only = $('onlyWarn').checked;
-  // số phút lệch hiện ngay trong ô (không chỉ dựa vào màu)
-  const mins = v => { const m = String(v || '').match(/^(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; };
-  const wrap = d => ((d + 720) % 1440 + 1440) % 1440 - 720;
-  const delta = d => d == null ? '' : '<small class="d">' + (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d) + "'</small>";
-  const count = {}; DATA.rows.forEach(r => { count[r.xe] = (count[r.xe] || 0) + 1; });
-  let prev = null, html = '';
+  const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
+  let band = false, prev = null, html = '';
   DATA.rows.forEach(function (r) {
-    if (q && r.xe.toLowerCase().replace(/[\s.\-]/g, '').indexOf(q) === -1) return;
+    if (r.xe !== prev) { band = !band; prev = r.xe; }
+    if (q && r.xe.toLowerCase().indexOf(q) === -1) return;
     if (only && !r.k.join('')) return;
-    const first = r.xe !== prev; prev = r.xe;
-    const start = mins(r.lich);
-    const cells = r.t.map(function (v, i) {
-      let d = null;
-      if (r.k[i] === 'red' || r.k[i] === 'yellow') {
-        if (i === 0 && start != null && mins(v) != null) d = wrap(mins(v) - start);          // điều xe so với lịch
-        if (i === 3 && mins(v) != null && mins(r.t[2]) != null) d = wrap(mins(v) - mins(r.t[2])); // về bến so với giờ đến
-      }
-      return '<td class="' + (r.k[i] || (v ? '' : 'empty')) + '"' + (r.n[i] ? ' title="' + esc(r.n[i]) + '"' : '') + '>' + (v ? esc(v) : '—') + delta(d) + '</td>';
-    }).join('');
-    const ch = r.chenh == null ? '<td class="empty">—</td>'
-      : r.chenh === 0 ? '<td class="muted">0</td>'
-      : '<td class="' + (r.k[1] === 'green' ? 'green' : '') + '">' + (r.chenh > 0 ? '+' : '−') + Math.abs(r.chenh) + '</td>';
-    html += '<tr class="' + (first ? 'grp' : '') + '"><td class="xe' + (first ? '' : ' xe-cont') + '">' + esc(r.xe) +
-      (first ? '<span class="n">' + count[r.xe] + ' chuyến</span>' : '') + '</td><td class="lich">' + esc(r.lich) + '</td>' + cells + ch + '</tr>';
+    const cells = r.t.map((v, i) => '<td class="' + r.k[i] + '"' + (r.n[i] ? ' title="' + esc(r.n[i]) + '"' : '') + '>' + esc(v) + '</td>').join('');
+    const ch = r.chenh == null ? '' : (r.chenh > 0 ? '+' : '') + r.chenh + ' phút';
+    html += '<tr class="' + (band ? 'bandB' : '') + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.lich) + '</td>' + cells +
+      '<td class="' + (r.k[1] === 'green' ? 'green' : '') + '">' + ch + '</td></tr>';
   });
-  let out = '<table><thead><tr><th style="text-align:left">Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Lệch giờ đi (phút)</th></tr></thead><tbody>' +
+  let out = '<table><thead><tr><th>Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Chênh lệch giờ đi</th></tr></thead><tbody>' +
     (html || '<tr><td colspan="7">Không có dòng nào</td></tr>') + '</tbody></table>';
 
   if (DATA.missed.length) {
-    out += '<h3 id="missed">Chuyến mất / đề xuất mất (' + DATA.missed.length + ')</h3><table><thead><tr><th>Mã chuyến</th><th>Lịch chạy</th><th>Bến</th><th>Xe</th><th>Loại</th><th>Tài xế</th><th>Tiếp viên</th><th>Trạng thái</th></tr></thead><tbody>' +
+    out += '<h3>⚠️ Chuyến mất / đề xuất mất (' + DATA.missed.length + ')</h3><table><thead><tr><th>Mã chuyến</th><th>Lịch chạy</th><th>Bến</th><th>Xe</th><th>Loại</th><th>Tài xế</th><th>Tiếp viên</th><th>Trạng thái</th></tr></thead><tbody>' +
       DATA.missed.map(m => '<tr><td>' + esc(m.maChuyen) + '</td><td>' + esc(m.lichChay) + '</td><td>' + esc(m.benXuatPhat) + '</td><td>' + esc(m.xe) +
         '</td><td>' + esc(m.loaiChuyen) + '</td><td>' + esc(m.taiXe) + '</td><td>' + esc(m.tiepVien) + '</td><td class="red">' + esc(m.trangThai) + '</td></tr>').join('') +
       '</tbody></table>';
@@ -272,14 +220,9 @@ function render() {
 
 // ===== TRÍCH XUẤT NHÂN VIÊN =====
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
-// Đổi người đo: cập nhật luôn bảng đang xem, không cần tải lại
-$('nguoiDo').oninput = function () {
-  const nd = this.value.trim(); try { localStorage.setItem('nguoi_do', nd); } catch (e) {}
-  if (MODE === 'nv' && NV) { NV.rows.forEach(function (r) { r.nguoiDo = nd; }); renderNv(); }
-};
 
 $('btnNv').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   const nd = $('nguoiDo').value.trim(); localStorage.setItem('nguoi_do', nd);
   $('btnNv').disabled = true; msg('Đang trích xuất nhân viên...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'nv', routeId: s.id, label: s.code, date: isoDate(), nguoiDo: nd }).then(function (res) {
@@ -298,15 +241,16 @@ function nvVisible() {
 
 function renderNv() {
   const st = NV.stats;
-  $('stats').innerHTML = statsHtml([['Tổng nhân viên', st.total, ''], ['Lái xe', st.drivers, ''], ['Tiếp viên', st.attendants, ''], ['Trùng tên khác SĐT', st.ambiguous, 'warn']]);
+  $('stats').innerHTML = [['Tổng nhân viên', st.total], ['Lái xe', st.drivers], ['Tiếp viên', st.attendants], ['Trùng tên khác SĐT', st.ambiguous]]
+    .map(x => '<div class="stat"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
   const body = nvVisible().map(r => '<tr class="' + (r.isAmbiguous ? 'e-amb' : '') + '"><td>' + esc(r.ngay) + '</td><td>' + esc(r.tuyen) + '</td><td>' + esc(r.gioDi) +
     '</td><td>' + esc(r.gioXuatBen) + '</td><td>' + esc(r.thoiGianDo) + '</td><td class="left">' + esc(r.ten) + '</td><td>' + esc(r.chucVu) +
     '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
   // nút mở file báo cáo đo nồng độ cồn của tuyến (đọc từ tab DS của file tổng, xem Con.gs)
-  const con = (NV.con || []).map(x => '<a class="link-btn" href="' + esc(x.url) + '" target="_blank" rel="noopener">Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
+  const con = (NV.con || []).map(x => '<a class="link-btn" href="' + esc(x.url) + '" target="_blank" rel="noopener">📝 Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
     (NV.conAll ? '<span class="edit-hint">Chưa thấy file đo cồn của tuyến ' + esc(NV.tuyen || '') + ' trong tab DS.</span>' : '');
   const bar = con || NV.conAll ? '<div class="panel-bar"><div class="pb-left">' + con + '</div>' +
-    (NV.conAll ? '<a class="link-btn soft" href="' + esc(NV.conAll) + '" target="_blank" rel="noopener">File tổng đo cồn</a>' : '') + '</div>' : '';
+    (NV.conAll ? '<a class="link-btn soft" href="' + esc(NV.conAll) + '" target="_blank" rel="noopener">📊 File tổng đo cồn</a>' : '') + '</div>' : '';
   $('out').innerHTML = bar + '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
     .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="10">Không có nhân viên nào</td></tr>') + '</tbody></table>';
 }
@@ -327,7 +271,7 @@ function copyText(text, okMsg) {
 
 // ===== KIỂM TRA LỆNH VẬN CHUYỂN (chỉ tuyến + ngày đang chọn) =====
 $('btnLvc').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển tuyến ' + s.code + ' (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'lvc', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
@@ -342,10 +286,11 @@ $('btnLvc').onclick = function () {
 function renderLvc() {
   const c = { ok: 0, warn: 0, bad: 0 };
   LV.rows.forEach(function (r) { c[r.level]++; });
-  $('stats').innerHTML = statsHtml([['Tổng lệnh', LV.rows.length, ''], ['Đạt', c.ok, 'e-ok'], ['Cảnh báo', c.warn, 'e-warn', 'warn'], ['Lỗi', c.bad, 'e-nopc', 'warn']]);
+  $('stats').innerHTML = [['Tổng lệnh', LV.rows.length, ''], ['Đạt', c.ok, 'e-ok'], ['Cảnh báo', c.warn, 'e-warn'], ['Lỗi', c.bad, 'e-nopc']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 
   const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
-  const tag = { ok: '<span class="pill ok">Đạt</span>', warn: '<span class="pill warn">Cảnh báo</span>', bad: '<span class="pill bad">Lỗi</span>' }, cls = { ok: 'e-ok', warn: 'e-warn', bad: 'e-nopc' };
+  const tag = { ok: '✅ ĐẠT', warn: '🟠 CẢNH BÁO', bad: '🔴 LỖI' }, cls = { ok: 'e-ok', warn: 'e-warn', bad: 'e-nopc' };
   let html = '';
   LV.rows.forEach(function (r) {
     if (only && r.level === 'ok') return;
@@ -366,7 +311,6 @@ function setUnlocked(on) {
   $('fFrom').hidden = !on; $('fTo').hidden = !on;
   $('actions').classList.toggle('has-edit', on);
   if (!on && (MODE === 'edit' || MODE === 'auto')) { MODE = 'trips'; ED = null; AU = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
-  if (!on && document.querySelector('.act-edit.is-on')) setTab('btnLoad');
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -412,10 +356,11 @@ function loadEdit(s, plate) {
 const hm5 = v => String(v || '').slice(-5);
 function renderEdit() {
   let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
-  $('stats').innerHTML = statsHtml([['Biển số', ED.plate, ''], ['Lệnh', ED.orders.length, ''], ['Chuyến', nTrips, '']]);
+  $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
+    .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
   // (nút "Điền Giờ về bến = Giờ đến" đã bỏ: theo luật mới, bình thường về bến = đến + 1 phút -> dùng "⚡ Tự chỉnh theo luật")
   let out = '<div class="edit-bar">' +
-    '<button class="edit-btn big" data-act="saveAll">Lưu tất cả thay đổi</button>' +
+    '<button class="edit-btn big" data-act="saveAll">💾 Lưu tất cả thay đổi</button>' +
     '<span class="edit-hint">Chỉ tính các chuyến đang hiện (trong khoảng giờ). Có xác nhận trước khi lưu.</span></div>';
   ED.orders.forEach(function (o) {
     out += '<div class="ord-h">Lệnh ' + esc(o.lenh) + '<small>' + esc(o.code) + '</small></div>';
@@ -578,37 +523,8 @@ $('btnNext').onclick = function () { shiftDay(1); };
 // ===== KHUNG TIÊU CHÍ: hiện ngay khi bấm "Kiểm tra lệnh", ẩn khi bấm nút khác =====
 $('actions').addEventListener('click', function (e) {
   const b = e.target.closest && e.target.closest('button');
-  if (!b) return; // (nút vừa bị disabled vì đang tải vẫn phải được tô sáng)
-  $('lvcRules').hidden = (b.id !== 'btnLvc');
-  if (b.id !== 'btnBtTab') $('btnXlsx').style.display = 'none';
-  setTab(b.id);
+  if (b) { $('lvcRules').hidden = (b.id !== 'btnLvc'); $('btnXlsx').style.display = 'none'; }
 });
-
-// ===== TAB ĐANG CHỌN: tô sáng nút, chỉ hiện ô cần cho chế độ đó =====
-function setTab(id) {
-  $('actions').querySelectorAll('.act').forEach(function (x) {
-    const on = x.id === id; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
-  $('btBox').hidden = id !== 'btnBtTab';
-  $('fNguoiDo').hidden = id !== 'btnNv';
-}
-// Tab "Bảng tài" chỉ mở khung nhập tuyến; đã ghép rồi thì hiện lại kết quả
-$('btnBtTab').onclick = function () {
-  if (BT) { MODE = 'bt'; $('btnCopy').style.display = ''; $('btnXlsx').style.display = ''; renderBt(); }
-  setTimeout(function () { const f = BT_IDS.map($).find(x => !x.value.trim()) || $('bt1'); f.focus(); }, 0);
-};
-setTab('btnLoad');
-
-// ===== THỨ TRONG TUẦN cạnh ô ngày =====
-function updDow() {
-  const v = isoDate(); let t = '';
-  if (v) { const p = v.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); t = d === 0 ? 'CN' : 'Thứ ' + (d + 1); }
-  $('dow').textContent = t;
-}
-$('date').addEventListener('input', updDow);
-$('btnPrev').addEventListener('click', updDow);
-$('btnNext').addEventListener('click', updDow);
-updDow();
 
 // ===== TỰ CHỈNH THEO LUẬT (gọi autoplan / autosave trong edit.gs) =====
 // Hiện cùng nút "✏️ Sửa lệnh" sau khi mở khoá. Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
@@ -641,8 +557,9 @@ function autoPlan(prefix) {
 
 function renderAuto() {
   const st = AU.stats;
-  $('stats').innerHTML = statsHtml([['Xe', st.xe, ''], ['Sẽ sửa', st.sua, 'e-warn'], ['Đã đúng', st.dung, 'e-ok'],
-    ['Cần xem / lỗi', st.canXem + st.loi, 'e-nopc']]);
+  $('stats').innerHTML = [['Xe', st.xe, ''], ['Sẽ sửa', st.sua, 'e-warn'], ['Đã đúng', st.dung, 'e-ok'],
+    ['Cần xem / lỗi', st.canXem + st.loi, 'e-nopc']]
+    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>'; }).join('');
 
   const q = $('q').value.trim().toLowerCase();
   const hit = function (r) { return !q || (r.plate + ' ' + r.code + ' ' + r.sched).toLowerCase().indexOf(q) !== -1; };
@@ -660,7 +577,7 @@ function renderAuto() {
   }
   if (AU.warns.length) out += '<div class="ord-warn">' + AU.warns.map(function (w) { return '<div>⚠️ ' + esc(w) + '</div>'; }).join('') + '</div>';
   if (AU.planId) {
-    out += '<div class="edit-bar"><button class="edit-btn big" data-auto="save">Lưu ' + st.sua + ' chuyến theo luật</button>' +
+    out += '<div class="edit-bar"><button class="edit-btn big" data-auto="save">💾 Lưu ' + st.sua + ' chuyến theo luật</button>' +
       '<span class="edit-hint">Lưu xong tự đọc lại để kiểm. Dòng nào vừa bị đổi kể từ lúc xem sẽ KHÔNG lưu. Kế hoạch giữ 15 phút.</span></div>';
   }
   let body = '', band = false, prev = null;
@@ -702,12 +619,13 @@ $('out').addEventListener('click', function (ev) {
 const BT_IDS = ['bt1', 'bt2', 'bt3'];
 BT_IDS.forEach(function (id) {
   const v = localStorage.getItem('bt_' + id); if (v) $(id).value = v;
+  $(id).onfocus = function () { this.select(); };
   $(id).onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnBt').click(); } };
 });
 
 $('btnBt').onclick = function () {
   if (!isoDate()) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
-  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   const list = [], bad = [];
   BT_IDS.forEach(function (id, i) {
     const v = $(id).value.trim(); localStorage.setItem('bt_' + id, v);
@@ -727,7 +645,7 @@ $('btnBt').onclick = function () {
     $('btnCopy').style.display = ''; $('btnXlsx').style.display = '';
     const empty = res.filter(r => !r.ben.length).map(r => r.tuyen);
     msg((empty.length ? '⚠️ Tuyến ' + empty.join(', ') + ' không có chuyến nào. ' : '✅ ') + 'Bảng tài ' + res.map(r => r.tuyen).join(' + ') + ' — ' + BT.ngay +
-      '. Bấm "Tải Excel" hoặc "Copy sang Sheet".', empty.length ? 'err' : 'ok');
+      '. Bấm "⬇️ Tải Excel" hoặc "📋 Copy".', empty.length ? 'err' : 'ok');
     renderBt();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnBt').disabled = false; });
@@ -764,7 +682,7 @@ function btGrid() {
 
 function renderBt() {
   const bl = btBlocks();
-  $('stats').innerHTML = statsHtml(BT.routes.map(r => ['Chuyến tuyến ' + r.tuyen, r.ben.reduce((s, b) => s + b.rows.length, 0), '']));
+  $('stats').innerHTML = BT.routes.map(r => '<div class="stat e-n"><b>' + r.ben.reduce((s, b) => s + b.rows.length, 0) + '</b>Chuyến tuyến ' + esc(r.tuyen) + '</div>').join('');
   const q = $('q').value.trim().toLowerCase().replace(/[\s.\-]/g, '');
   const gap = '<th class="bt-gap"></th>', gapd = '<td class="bt-gap"></td>';
   let head1 = '', head2 = '';
@@ -850,14 +768,14 @@ $('btnXlsx').onclick = function () {
 // Bấm nút: liệt kê chuyến có tài xế / tiếp viên / trạng thái "mất chuyến" của tuyến + ngày đang chọn (chưa chụp).
 // Tick chọn chuyến, bấm "Chụp": GitHub chụp lộ trình, ảnh lên Drive, link ghi vào Google Sheet như chay.command trên Mac.
 $('btnGps').onclick = function () {
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "Đổi mã" nếu sai mã.', 'err'); return; }
+  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong. Bấm "🔑 Đổi mã" nếu sai mã.', 'err'); return; }
   $('btnGps').disabled = true; msg('Đang tìm chuyến mất chuyến tuyến ' + s.code + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'gps', dry: '1', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
     GP = res; GP.sel = s; GP.iso = isoDate(); GP.run = null; MODE = 'gps'; $('btnCopy').style.display = 'none';
     GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo).map(t => t.key)); // tick sẵn chuyến chưa có ảnh
     if (!res.trips.length) msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ' không có chuyến mất nào.', 'ok');
-    else msg('Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.trips.length + ' chuyến mất. Tick chọn chuyến cần chụp rồi bấm "Chụp".', 'ok');
+    else msg('Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.trips.length + ' chuyến mất. Tick chọn chuyến cần chụp rồi bấm "🛰 Chụp".', 'ok');
     renderGps();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnGps').disabled = false; });
@@ -866,13 +784,14 @@ $('btnGps').onclick = function () {
 const MAT_CHUYEN_URL = 'https://docs.google.com/spreadsheets/d/1ysOVfyktQ5p-zlI0L2ZduG8uPneZkJZ3ZHoI7ZZ1KBg/edit?gid=1226700115#gid=1226700115'; // báo cáo mất chuyến
 function renderGps() {
   const daCo = GP.trips.filter(t => t.daCo).length, khongXe = GP.trips.filter(t => !t.chup).length;
-  $('stats').innerHTML = statsHtml([['Chuyến mất', GP.trips.length, 'bad'], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, ''], ['Không có xe', khongXe, 'e-nopc']]);
+  $('stats').innerHTML = [['Chuyến mất', GP.trips.length, 'e-n'], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, 'e-warn'], ['Không có xe', khongXe, 'e-nopc']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
   const r = GP.run, sheet = GP.sheet || (r && r.sheet);
   const canGo = (!r || r.status === 'completed') && GP.trips.some(t => t.chup);
   let out = '<div class="panel-bar"><div class="pb-left">' +
-    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">Sheet GPS</a>' : '') +
-    '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">Báo cáo mất chuyến</a></div>' +
-    (canGo ? '<button class="edit-btn big" data-gps="go"' + (GP.pick.size ? '' : ' disabled') + '>Chụp ' + GP.pick.size + ' chuyến đã chọn</button>' : '') + '</div>';
+    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS</a>' : '') +
+    '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a></div>' +
+    (canGo ? '<button class="edit-btn big" data-gps="go"' + (GP.pick.size ? '' : ' disabled') + '>🛰 Chụp ' + GP.pick.size + ' chuyến đã chọn</button>' : '') + '</div>';
   if (r && r.status === 'completed') {
     out += '<div class="panel-note ' + (r.conclusion === 'success' ? 'ok' : 'err') + '">' + (r.conclusion === 'success' ? '✅ Chụp xong, link ảnh đã ghi vào Google Sheet.' : '⚠️ Có chuyến chụp lỗi, xem Google Sheet.') + '</div>';
   } else if (r) {
@@ -911,9 +830,9 @@ $('out').addEventListener('click', function (ev) {
         g.run = st; if (MODE === 'gps' && GP === g) renderGps();
         if (st.status === 'completed') {
           msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
-        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 15000);
+        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 5000);
         else msg('⚠️ Đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err');
-      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 20000); });
+      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 8000); });
     })();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
 });
