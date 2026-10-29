@@ -110,13 +110,14 @@ function isoDate() { // dd/mm/yyyy -> yyyy-mm-dd cho server, rỗng nếu gõ sa
 $('date').value = vnToday();
 
 let ROUTES = [];
+let FAV_CODES = []; // tuyến cụm (Script Property FB_ROUTES)
 const routeText = r => r.code + (r.name ? ' — ' + r.name : '');
 
 function loadRoutes() {
   if (USER_MODE && !getSid()) { showAuth('login'); return; }
   api({ action: 'routes' }).then(function (res) {
     setMe(res.me);
-    const favSet = new Set(res.fav);
+    const favSet = new Set(res.fav); FAV_CODES = (res.fav || []).slice();
     // tuyến "Hay dùng" lên đầu danh sách gợi ý
     ROUTES = res.routes.filter(r => favSet.has(r.code)).concat(res.routes.filter(r => !favSet.has(r.code)));
     $('routeList').innerHTML = ROUTES.map(r => '<option value="' + esc(routeText(r)) + '"></option>').join('');
@@ -664,13 +665,18 @@ $('out').addEventListener('click', function (ev) {
 let VB = null;
 
 $('btnVeben').onclick = function () { vebenCall({}); };
+$('out').addEventListener('change', function (ev) {
+  const c = ev.target.getAttribute && ev.target.getAttribute('data-vbc');
+  if (!c || MODE !== 'veben' || !VB) return;
+  if (ev.target.checked) VB.pick.add(c); else VB.pick.delete(c);
+});
 
 function vebenCall(extra) {
   $('btnVeben').disabled = true;
   msg(extra.set === 'on' ? 'Đang bật và quét xác nhận về bến lần đầu (có thể mất ~30 giây)...' : 'Đang đọc trạng thái tự xác nhận về bến...');
   return api(Object.assign({ action: 'veben', ekey: getEkey() }, extra), 180000, extra.set ? 0 : 1).then(function (res) {
     if (!res.log) throw new Error('Server chưa có action "veben". Dán veben.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
-    VB = res; MODE = 'veben'; $('btnCopy').style.display = 'none';
+    VB = res; VB.fav = FAV_CODES; MODE = 'veben'; $('btnCopy').style.display = 'none';
     renderVeben();
     msg(res.on ? '🟢 Đang BẬT tự xác nhận về bến: tuyến ' + res.tuyen.join(', ') + (res.sau ? ' — lượt quét sau lúc ' + res.sau : '') + (res.lich ? '' : ' — ⚠️ CHƯA CÀI LỊCH: chạy veben_cai_dat() trong Apps Script')
                : '⚪ Đang TẮT tự xác nhận về bến', res.on && res.lich ? 'ok' : (res.on ? 'err' : ''));
@@ -683,10 +689,22 @@ function renderVeben() {
   $('stats').innerHTML = [['Trạng thái', VB.on ? 'BẬT' : 'TẮT', VB.on ? 'e-ok' : ''], ['Tuyến', VB.tuyen.join(', ') || '—', ''],
     ['Đã bấm (gần nhất)', ok, 'e-ok'], ['Lỗi', VB.log.length - ok, 'e-nopc']]
     .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
-  const cur = VB.tuyen.join(', ') || (sel().code || '');
-  let out = '<div class="edit-bar">' +
-    '<input type="text" id="vbTuyen" value="' + esc(cur) + '" placeholder="vd: 31, 30" style="height:34px;padding:0 10px;border:1px solid #CBD3E3;border-radius:9px;width:150px;font-size:14px"> ' +
-    '<button class="edit-btn big" data-vb="on">🟢 ' + (VB.on ? 'Lưu tuyến' : 'Bật') + '</button> ' +
+  // Ô tick: tuyến cụm (FB_ROUTES) + tuyến đã chọn + tuyến đang mở ở ô Tuyến. Tuyến khác gõ thêm ở ô bên cạnh.
+  if (!VB.pick) VB.pick = new Set(VB.tuyen.length ? VB.tuyen : (sel().code ? [sel().code] : []));
+  const fav = (VB.fav || []).concat(VB.tuyen, sel().code ? [sel().code] : [], Array.from(VB.pick));
+  const codes = fav.filter(function (c, i) { return c && fav.indexOf(c) === i; });
+  const box = codes.map(function (c) {
+    const r = ROUTES.find(function (x) { return x.code === c; });
+    return '<label style="display:inline-flex;align-items:center;gap:5px;margin:4px 12px 4px 0;font-size:14px;cursor:pointer">' +
+      '<input type="checkbox" data-vbc="' + esc(c) + '"' + (VB.pick.has(c) ? ' checked' : '') + '> <b>' + esc(c) + '</b>' +
+      (r && r.name ? ' <span style="color:#6B7590">' + esc(r.name.slice(0, 32)) + '</span>' : '') + '</label>';
+  }).join('');
+  let out = '<div class="ord-warn" style="background:#fff"><div><b>Chọn tuyến được tự xác nhận về bến</b> (chỉ tuyến được tick, tuyến khác không bấm):</div>' +
+    '<div>' + (box || '<i>Chưa có tuyến nào, gõ mã tuyến ở ô bên dưới</i>') + '</div>' +
+    '<div style="margin-top:6px"><input type="text" id="vbAdd" placeholder="thêm tuyến khác, vd: 152" style="height:32px;padding:0 10px;border:1px solid #CBD3E3;border-radius:9px;width:190px;font-size:14px"> ' +
+    '<button class="edit-btn" data-vb="add">➕ Thêm</button></div></div>' +
+    '<div class="edit-bar">' +
+    '<button class="edit-btn big" data-vb="on">🟢 ' + (VB.on ? 'Lưu tuyến đã chọn' : 'Bật cho tuyến đã chọn') + '</button> ' +
     (VB.on ? '<button class="edit-btn" data-vb="off">⚪ Tắt</button> ' : '') +
     '<button class="edit-btn" data-vb="reload">🔄 Tải lại</button>' +
     '<span class="edit-hint">Bật = quét ngay 1 lần, sau đó máy chủ tự quét mỗi 1 giờ 30 phút (đóng web vẫn chạy), hết ca (không còn xe chạy) thì tự tắt, ca sau bật lại. Chỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến + chưa có giờ về bến. ' +
@@ -709,10 +727,15 @@ $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-vb]');
   if (!b || MODE !== 'veben') return;
   const act = b.getAttribute('data-vb');
-  if (act === 'reload') { vebenCall({}); return; }
+  if (act === 'reload') { VB.pick = null; vebenCall({}); return; }
   if (act === 'off') { if (confirm('Tắt tự xác nhận về bến?')) vebenCall({ set: 'off' }); return; }
-  const tuyen = ($('vbTuyen').value || '').trim();
-  if (!tuyen) { msg('❌ Nhập tuyến, vd: 31 hoặc 31, 30', 'err'); return; }
+  if (act === 'add') {
+    const v = ($('vbAdd').value || '').trim(), r = v && findRoute(v);
+    if (!r) { msg('❌ Không thấy tuyến "' + v + '"', 'err'); return; }
+    VB.pick.add(r.code); renderVeben(); return;
+  }
+  const tuyen = Array.from(VB.pick).join(', ');
+  if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
   if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ 30 phút quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
                'Đã xác nhận thì không huỷ kết thúc chuyến được nữa.')) return;
   vebenCall({ set: 'on', tuyen: tuyen });
