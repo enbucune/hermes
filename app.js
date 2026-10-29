@@ -964,9 +964,9 @@ $('out').addEventListener('click', function (ev) {
         if (st.status === 'completed') {
           GPS_RUN = null;
           gpsReport(g, picked, title, st);
-        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 5000);
+        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 10000);
         else { GPS_RUN = null; msg('⚠️ Chụp GPS đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err'); }
-      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 8000); else GPS_RUN = null; });
+      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 15000); else GPS_RUN = null; });
     })();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
 });
