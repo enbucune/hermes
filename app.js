@@ -801,7 +801,9 @@ $('btnXlsx').onclick = function () {
 // ===== CHỤP GPS MẤT CHUYẾN (gọi gps / gpsstatus trong gps.gs -> GitHub Actions) =====
 // Bấm nút: liệt kê chuyến có tài xế / tiếp viên / trạng thái "mất chuyến" của tuyến + ngày đang chọn (chưa chụp).
 // Tick chọn chuyến, bấm "Chụp": GitHub chụp lộ trình, ảnh lên Drive, link ghi vào Google Sheet như chay.command trên Mac.
+let GPS_RUN = null; // lần chụp GPS đang chạy ngầm (GitHub), xong báo ở dòng thông báo
 $('btnGps').onclick = function () {
+  if (GPS_RUN) { GP = GPS_RUN; MODE = 'gps'; $('btnCopy').style.display = 'none'; renderGps(); msg('🛰 Đang chụp GPS tuyến ' + GP.sel.code + ', xem tiến độ bên dưới. Xong sẽ báo ở đây.', ''); return; }
   const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnGps').disabled = true; msg('Đang tìm chuyến mất chuyến tuyến ' + s.code + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   gToken(50).then(function (gtok) { // xin token Google ngay lúc bấm (đủ dài cho cả lần chụp sau)
@@ -859,18 +861,19 @@ $('out').addEventListener('click', function (ev) {
     return apiPost({ action: 'gps', gtok: gtok, routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
   }).then(function (res) {
     if (!res.started) { msg('⚠️ Không có chuyến nào để chụp.', 'err'); return; }
-    g.run = { status: 'queued' }; renderGps();
-    msg('🛰 Đã gửi ' + res.nChup + ' chuyến, đang chụp...', 'ok');
+    g.run = { status: 'queued' }; renderGps(); GPS_RUN = g;
+    msg('🛰 Đã gửi ' + res.nChup + ' chuyến, đang chụp ngầm (vẫn bấm được nút khác). Xong sẽ báo ở đây.', 'ok');
     const title = g.sel.code + ' ' + res.ngay, t0 = Date.now();
     (function poll() {
-      if (GP !== g) return; // đã bấm sang việc khác thì thôi theo dõi
+      // chạy ngầm: bấm sang việc khác vẫn theo dõi tới khi xong, chỉ vẽ bảng khi đang xem bảng GPS
       api({ action: 'gpsstatus', since: res.since, title: title }, 60000).then(function (st) {
         g.run = st; if (MODE === 'gps' && GP === g) renderGps();
         if (st.status === 'completed') {
+          GPS_RUN = null;
           msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
         } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 5000);
-        else msg('⚠️ Đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err');
-      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 8000); });
+        else { GPS_RUN = null; msg('⚠️ Chụp GPS đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err'); }
+      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 8000); else GPS_RUN = null; });
     })();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
 });
@@ -993,3 +996,29 @@ $('btnLogout').onclick = function () {
   $('out').innerHTML = ''; $('stats').innerHTML = ''; msg('Đã đăng xuất');
   showAuth('login');
 };
+
+// ===== KHOÁ NÚT: đang chạy 1 thao tác thì khoá các nút khác (bấm nhiều nút cùng lúc dễ quá tải máy chủ / FUTA) =====
+(function () {
+  const FREE = { gpsstatus: 1, editauth: 1 }; // chạy nền (hỏi tiến độ GPS, kiểm tra mã): không khoá
+  const BTN = '.act, .edit-btn, [data-gps="go"]';
+  let n = 0, timer = null;
+  const mark = function () {
+    clearTimeout(timer);
+    if (n > 0) document.body.classList.add('is-busy');
+    else timer = setTimeout(function () { document.body.classList.remove('is-busy'); }, 400); // giữa 2 bước của 1 thao tác không mở khoá
+  };
+  const wrap = function (fn) {
+    return function (params) {
+      const track = !(params && FREE[params.action]);
+      if (track) { n++; mark(); }
+      return Promise.resolve(fn.apply(this, arguments)).finally(function () { if (track) { n--; mark(); } });
+    };
+  };
+  api = wrap(api); apiPost = wrap(apiPost);
+  // chặn cả bấm chuột lẫn Enter (Enter gọi .click() nên cũng đi qua đây)
+  document.addEventListener('click', function (ev) {
+    const b = ev.target.closest && ev.target.closest(BTN);
+    if (!b || !document.body.classList.contains('is-busy')) return;
+    ev.preventDefault(); ev.stopImmediatePropagation();
+  }, true);
+})();
