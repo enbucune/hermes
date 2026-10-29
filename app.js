@@ -24,7 +24,16 @@ function getKey(reset) {
   }
   return k || '';
 }
-function authParam() { return USER_MODE ? { sid: getSid() } : { key: getKey() }; }
+// Tên người dùng (khi dùng mã truy cập chung): hỏi 1 lần, gửi kèm để log biết ai dùng
+function getWho(reset) {
+  let w = localStorage.getItem('web_who');
+  if (!w || reset) {
+    const input = prompt('Tên của bạn (để ghi nhận hoạt động, vd: Nguyễn Văn A):', w || '');
+    if (input !== null && input.trim()) { w = input.trim().slice(0, 60); localStorage.setItem('web_who', w); }
+  }
+  return w || '';
+}
+function authParam() { return USER_MODE ? { sid: getSid(), src: 'web' } : { key: getKey(), who: getWho(), src: 'web' }; }
 
 // ===== ĐĂNG NHẬP (tài khoản web, gắn tài khoản FUTA riêng) =====
 function getSid() { try { return localStorage.getItem('web_sid') || ''; } catch (e) { return ''; } }
@@ -145,7 +154,7 @@ $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(
 $('date').onfocus = function () { this.select(); };
 $('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
 
-$('btnUser').onclick = function () { if (!USER_MODE) { getKey(true); loadRoutes(); return; } showAuth(ME ? 'acc' : 'login'); };
+$('btnUser').onclick = function () { if (!USER_MODE) { getKey(true); getWho(true); loadRoutes(); return; } showAuth(ME ? 'acc' : 'login'); };
 
 $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
@@ -173,6 +182,7 @@ function rerender() {
   else if (MODE === 'auto') { if (AU) renderAuto(); }
   else if (MODE === 'bt' && BT) renderBt();
   else if (MODE === 'gps' && GP) renderGps();
+  else if (MODE === 'veben') { if (VB) renderVeben(); }
   else if (DATA) render();
 }
 
@@ -341,10 +351,10 @@ function renderLvc() {
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
-  $('btnEdit').hidden = !on; $('btnAuto').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
+  $('btnEdit').hidden = !on; $('btnAuto').hidden = !on; $('btnVeben').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
   $('fFrom').hidden = !on; $('fTo').hidden = !on;
   $('actions').classList.toggle('has-edit', on);
-  if (!on && (MODE === 'edit' || MODE === 'auto')) { MODE = 'trips'; ED = null; AU = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben')) { MODE = 'trips'; ED = null; AU = null; VB = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -648,6 +658,66 @@ $('out').addEventListener('click', function (ev) {
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
 });
 
+// ===== TỰ XÁC NHẬN XE VỀ BẾN (gọi veben trong veben.gs) =====
+// Bật = quét + xác nhận ngay 1 lần, rồi máy chủ Google tự quét mỗi 1h30 (không cần mở web), hết ca thì tự tắt.
+// Chỉ bấm chuyến đã Kết thúc + tiếp viên đã bấm giờ đến + chưa có giờ về bến. Xe đang chạy không bao giờ bị bấm.
+let VB = null;
+
+$('btnVeben').onclick = function () { vebenCall({}); };
+
+function vebenCall(extra) {
+  $('btnVeben').disabled = true;
+  msg(extra.set === 'on' ? 'Đang bật và quét xác nhận về bến lần đầu (có thể mất ~30 giây)...' : 'Đang đọc trạng thái tự xác nhận về bến...');
+  return api(Object.assign({ action: 'veben', ekey: getEkey() }, extra), 180000, extra.set ? 0 : 1).then(function (res) {
+    if (!res.log) throw new Error('Server chưa có action "veben". Dán veben.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
+    VB = res; MODE = 'veben'; $('btnCopy').style.display = 'none';
+    renderVeben();
+    msg(res.on ? '🟢 Đang BẬT tự xác nhận về bến: tuyến ' + res.tuyen.join(', ') + (res.sau ? ' — lượt quét sau lúc ' + res.sau : '') + (res.lich ? '' : ' — ⚠️ CHƯA CÀI LỊCH: chạy veben_cai_dat() trong Apps Script')
+               : '⚪ Đang TẮT tự xác nhận về bến', res.on && res.lich ? 'ok' : (res.on ? 'err' : ''));
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { $('btnVeben').disabled = false; });
+}
+
+function renderVeben() {
+  const ok = VB.log.filter(function (x) { return x.kq === 'OK'; }).length;
+  $('stats').innerHTML = [['Trạng thái', VB.on ? 'BẬT' : 'TẮT', VB.on ? 'e-ok' : ''], ['Tuyến', VB.tuyen.join(', ') || '—', ''],
+    ['Đã bấm (gần nhất)', ok, 'e-ok'], ['Lỗi', VB.log.length - ok, 'e-nopc']]
+    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
+  const cur = VB.tuyen.join(', ') || (sel().code || '');
+  let out = '<div class="edit-bar">' +
+    '<input type="text" id="vbTuyen" value="' + esc(cur) + '" placeholder="vd: 31, 30" style="height:34px;padding:0 10px;border:1px solid #CBD3E3;border-radius:9px;width:150px;font-size:14px"> ' +
+    '<button class="edit-btn big" data-vb="on">🟢 ' + (VB.on ? 'Lưu tuyến' : 'Bật') + '</button> ' +
+    (VB.on ? '<button class="edit-btn" data-vb="off">⚪ Tắt</button> ' : '') +
+    '<button class="edit-btn" data-vb="reload">🔄 Tải lại</button>' +
+    '<span class="edit-hint">Bật = quét ngay 1 lần, sau đó máy chủ tự quét mỗi 1 giờ 30 phút (đóng web vẫn chạy), hết ca (không còn xe chạy) thì tự tắt, ca sau bật lại. Chỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến + chưa có giờ về bến. ' +
+    'Xe đang chạy, chưa chạy, đề xuất mất chuyến: không bấm. Giờ về bến = lúc bấm, muốn chỉnh theo luật thì dùng ⚡ Tự chỉnh theo luật.</span></div>';
+  if (VB.last) out += '<div class="ord-warn"><div>🕒 Lượt quét gần nhất ' + esc(VB.last.at) + ': ' + esc((VB.last.sum || []).join(' | ') || 'không có tuyến') +
+    (VB.on && VB.sau ? ' — lượt sau lúc ' + esc(VB.sau) : '') + '</div></div>';
+  let body = '';
+  VB.log.forEach(function (x) {
+    body += '<tr class="' + (x.kq === 'OK' ? '' : 'e-nopc') + '"><td>' + esc(x.at) + '</td><td>' + esc(x.tuyen) + '</td><td>' + esc(x.lich) + '</td><td>' + esc(x.xe) +
+      '</td><td>' + esc(x.code) + '</td><td class="left">' + esc(x.chieu) + '</td><td>' + esc(x.di) + '</td><td>' + esc(x.den) + '</td><td>' + esc(x.ve || '') +
+      '</td><td class="notes">' + esc(x.kq) + '</td></tr>';
+  });
+  out += '<table><thead><tr>' + ['Lúc bấm', 'Tuyến', 'Lịch', 'Xe', 'Mã chuyến', 'Chiều', 'Đi', 'Đến', 'Về bến', 'Kết quả']
+    .map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (body || '<tr><td colspan="10">Chưa bấm chuyến nào</td></tr>') + '</tbody></table>';
+  $('out').innerHTML = out;
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-vb]');
+  if (!b || MODE !== 'veben') return;
+  const act = b.getAttribute('data-vb');
+  if (act === 'reload') { vebenCall({}); return; }
+  if (act === 'off') { if (confirm('Tắt tự xác nhận về bến?')) vebenCall({ set: 'off' }); return; }
+  const tuyen = ($('vbTuyen').value || '').trim();
+  if (!tuyen) { msg('❌ Nhập tuyến, vd: 31 hoặc 31, 30', 'err'); return; }
+  if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ 30 phút quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
+               'Đã xác nhận thì không huỷ kết thúc chuyến được nữa.')) return;
+  vebenCall({ set: 'on', tuyen: tuyen });
+});
+
 // ===== BẢNG TÀI GHÉP TUYẾN (gọi bangtai trong bangtai.gs) =====
 // Chọn 2-3 tuyến + ngày ở trên -> ghép ngang thành 1 bảng: mỗi bến 2 cột GIỜ XB | BKS, 1 cột trống giữa các bến.
 const BT_IDS = ['bt1', 'bt2', 'bt3'];
@@ -916,7 +986,7 @@ function gToken(minLeft) {
 // ===== TÀI KHOẢN: đăng nhập / đăng ký / cập nhật FUTA / đổi mật khẩu =====
 function setMe(me) {
   ME = me || null;
-  $('btnUser').textContent = !USER_MODE ? '🔑 Đổi mã truy cập' : ME ? '👤 ' + ME.name : '👤 Đăng nhập';
+  $('btnUser').textContent = !USER_MODE ? '🔑 ' + (localStorage.getItem('web_who') || 'Đổi mã truy cập') : ME ? '👤 ' + ME.name : '👤 Đăng nhập';
 }
 setMe(null);
 function showAuth(tab) {
