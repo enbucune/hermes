@@ -811,7 +811,7 @@ $('btnGps').onclick = function () {
   }).then(function (res) {
     if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
     GP = res; GP.sel = s; GP.iso = isoDate(); GP.run = null; MODE = 'gps'; $('btnCopy').style.display = 'none';
-    GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo).map(t => t.key)); // tick sẵn chuyến chưa có ảnh
+    GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo && !t.matGps).map(t => t.key)); // tick sẵn chuyến chưa có ảnh (bỏ xe mất GPS)
     if (!res.trips.length) msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ' không có chuyến mất nào.', 'ok');
     else msg('Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.trips.length + ' chuyến mất. Tick chọn chuyến cần chụp rồi bấm "🛰 Chụp".', 'ok');
     renderGps();
@@ -822,7 +822,7 @@ $('btnGps').onclick = function () {
 const MAT_CHUYEN_URL = 'https://docs.google.com/spreadsheets/d/1ysOVfyktQ5p-zlI0L2ZduG8uPneZkJZ3ZHoI7ZZ1KBg/edit?gid=1226700115#gid=1226700115'; // báo cáo mất chuyến
 function renderGps() {
   const daCo = GP.trips.filter(t => t.daCo).length, khongXe = GP.trips.filter(t => !t.chup).length;
-  $('stats').innerHTML = [['Chuyến mất', GP.trips.length, 'e-n'], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, 'e-warn'], ['Không có xe', khongXe, 'e-nopc']]
+  $('stats').innerHTML = [['Chuyến mất', GP.trips.length, 'e-n'], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, 'e-warn'], ['Mất GPS', GP.trips.filter(t => t.matGps).length, 'e-noebms'], ['Không có xe', khongXe, 'e-nopc']]
     .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
   const r = GP.run, sheet = GP.sheet || (r && r.sheet);
   const canGo = (!r || r.status === 'completed') && GP.trips.some(t => t.chup);
@@ -840,7 +840,7 @@ function renderGps() {
   const q = $('q').value.trim().toLowerCase();
   const body = GP.trips.filter(t => !q || [t.xe, t.lich, t.taiXe, t.tiepVien].join(' ').toLowerCase().indexOf(q) !== -1).map(t =>
     '<tr class="' + (!t.chup ? 'e-nopc' : t.daCo ? 'e-ok' : '') + '"><td>' +
-    (t.chup ? '<input type="checkbox" class="gps-pick" data-key="' + esc(t.key) + '"' + (GP.pick.has(t.key) ? ' checked' : '') + '>' : '') + '</td><td>' + esc(t.daCo ? '✅ đã có' : t.chup ? '⏳ chưa' : '❌') + '</td><td>' + esc(t.lich) + '</td><td>' + esc(t.xe || '(không có xe)') + '</td><td class="left">' + esc(t.ben) +
+    (t.chup ? '<input type="checkbox" class="gps-pick" data-key="' + esc(t.key) + '"' + (GP.pick.has(t.key) ? ' checked' : '') + '>' : '') + '</td><td>' + esc(t.matGps ? '📡 mất GPS' : t.daCo ? '✅ đã có' : t.chup ? '⏳ chưa' : '❌') + (t.matGps ? '<br><small>' + esc(t.matGps) + '</small>' : '') + '</td><td>' + esc(t.lich) + '</td><td>' + esc(t.xe || '(không có xe)') + '</td><td class="left">' + esc(t.ben) +
     '</td><td>' + esc(t.ma) + '</td><td class="left">' + esc(t.taiXe) + '</td><td class="left">' + esc(t.tiepVien) + '</td><td>' + esc(t.trangThai) + '</td></tr>').join('');
   const all = GP.trips.filter(t => t.chup), allOn = all.length && all.every(t => GP.pick.has(t.key));
   out += '<table><thead><tr><th><input type="checkbox" class="gps-all" title="Chọn tất cả"' + (allOn ? ' checked' : '') + '></th>' + ['Ảnh GPS', 'Lịch chạy', 'Xe', 'Bến', 'Mã chuyến', 'Tài xế', 'Tiếp viên', 'Trạng thái'].map(x => '<th>' + x + '</th>').join('') +
@@ -855,7 +855,7 @@ $('out').addEventListener('click', function (ev) {
   if (!picked.length) { msg('Chưa tick chuyến nào.', 'err'); return; }
   if (!confirm('Chụp GPS ' + picked.length + ' chuyến của tuyến ' + GP.sel.code + ' · ' + GP.ngay + ':\n\n' +
     picked.map(t => '• ' + t.lich + '  ' + t.xe + (t.daCo ? '  (chụp lại)' : '')).join('\n') + '\n\nẢnh lên Drive, link ghi vào Google Sheet.')) return;
-  b.disabled = true; msg('Đang gửi lệnh chụp...');
+  b.disabled = true; msg('Đang gửi lệnh chụp...'); askNotify();
   const g = GP;
   gToken(40).then(function (gtok) {
     return apiPost({ action: 'gps', gtok: gtok, routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
@@ -870,7 +870,7 @@ $('out').addEventListener('click', function (ev) {
         g.run = st; if (MODE === 'gps' && GP === g) renderGps();
         if (st.status === 'completed') {
           GPS_RUN = null;
-          msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
+          gpsReport(g, picked, title, st);
         } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 5000);
         else { GPS_RUN = null; msg('⚠️ Chụp GPS đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err'); }
       }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 8000); else GPS_RUN = null; });
@@ -1011,7 +1011,10 @@ $('btnLogout').onclick = function () {
     return function (params) {
       const track = !(params && FREE[params.action]);
       if (track) { n++; mark(); }
-      return Promise.resolve(fn.apply(this, arguments)).finally(function () { if (track) { n--; mark(); } });
+      return Promise.resolve(fn.apply(this, arguments)).then(function (res) {
+        if (res && res.at) showDataAt(res.at);
+        return res;
+      }).finally(function () { if (track) { n--; mark(); } });
     };
   };
   api = wrap(api); apiPost = wrap(apiPost);
@@ -1022,3 +1025,43 @@ $('btnLogout').onclick = function () {
     ev.preventDefault(); ev.stopImmediatePropagation();
   }, true);
 })();
+
+// ===== GIỜ DỮ LIỆU: cho biết đang xem dữ liệu lấy lúc nào (máy chủ dùng chung kết quả tối đa 30 giây, EBMS luôn lấy mới) =====
+function showDataAt(at) {
+  const t = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(at));
+  const ago = Math.round((Date.now() - at) / 1000);
+  $('dataAt').textContent = '🕒 Dữ liệu lúc ' + t + (ago >= 5 ? ' (' + ago + ' giây trước)' : '');
+}
+
+// ===== THÔNG BÁO KHI CHỤP GPS XONG: tiếng "ting" + thông báo góc màn hình (chỉ máy người bấm chụp) =====
+function askNotify() { try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) { /* bỏ qua */ } }
+function notifyDone(title, body) {
+  try { // tiếng ting 2 nốt
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1320].forEach(function (f, i) {
+      const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime + i * 0.18;
+      o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      o.start(t0); o.stop(t0 + 0.32);
+    });
+  } catch (e) { /* không phát được tiếng thì thôi */ }
+  try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body: body }); } catch (e) { /* bỏ qua */ }
+}
+
+// ===== Chụp GPS xong: đọc lại Sheet để báo chuyến có ảnh / XE MẤT GPS (bỏ qua, không chụp được) / chuyến lỗi =====
+function gpsReport(g, picked, title, st) {
+  apiPost({ action: 'gps', dry: '1', gtok: '', routeId: g.sel.id, label: g.sel.code, date: g.iso }, 180000).then(function (res) {
+    const by = {}; res.trips.forEach(function (t) { by[t.key] = t; });
+    g.trips = res.trips;
+    const mat = [], err = []; let ok = 0;
+    picked.forEach(function (t) { const x = by[t.key] || t; if (x.matGps) mat.push(x.xe); else if (x.daCo) ok++; else err.push(x.lich + ' ' + x.xe); });
+    const text = '🛰 Chụp GPS xong tuyến ' + title + ': ' + ok + '/' + picked.length + ' chuyến có ảnh' +
+      (mat.length ? ' · 📡 Xe mất GPS (bỏ qua): ' + mat.join(', ') : '') + (err.length ? ' · ⚠️ Lỗi, tick chụp lại: ' + err.join(', ') : '');
+    msg(text, err.length ? 'err' : 'ok');
+    notifyDone(err.length ? '⚠️ Chụp GPS có chuyến lỗi' : '🛰 Chụp GPS xong', 'Tuyến ' + title + ': ' + ok + ' có ảnh' + (mat.length ? ', mất GPS: ' + mat.join(', ') : '') + (err.length ? ', lỗi ' + err.length : ''));
+    if (MODE === 'gps' && GP === g) renderGps();
+  }).catch(function () { // không đọc lại được Sheet thì báo theo kết quả GitHub như cũ
+    msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
+    notifyDone(st.conclusion === 'success' ? '🛰 Chụp GPS xong' : '⚠️ Chụp GPS có chuyến lỗi', 'Tuyến ' + title);
+  });
+}
