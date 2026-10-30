@@ -331,6 +331,7 @@ let ED = null;
 let BT = null;
 let GP = null;
 let UD = null; // màn Hoàn tác
+let KY = null; // màn Điều hành ký
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
@@ -341,6 +342,7 @@ function rerender() {
   else if (MODE === 'gps' && GP) renderGps();
   else if (MODE === 'veben') { if (VB) renderVeben(); }
   else if (MODE === 'undo') { if (UD) renderUndo(); }
+  else if (MODE === 'ky') { if (KY) renderKy(); }
   else if (DATA) render();
 }
 
@@ -516,7 +518,7 @@ function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catc
 function setUnlocked(on) {
   $('editGroup').hidden = !on; $('btnLock').hidden = !on; // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
   if (!on) hideUndo();
-  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; KY = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -841,6 +843,90 @@ $('out').addEventListener('click', function (ev) {
     }
     return autoPlan(line); // còn lỗi / còn chuyến cần sửa: lập lại kế hoạch để xem
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
+});
+
+// ===== ĐIỀU HÀNH KÝ XÁC NHẬN (gọi kyplan / kysave trong ky.gs) =====
+// = mở chi tiết lệnh trên FUTA, bấm "Điều hành ký xác nhận" rồi "Đồng ý". KHÔNG đẩy lệnh. Ký rồi KHÔNG gỡ được.
+// Chỉ ký lệnh đã edit xong (không còn chuyến cần Tự chỉnh / chuyến FUTA báo sai giờ), đủ giờ về bến, sau giờ về bến chuyến cuối.
+// Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
+$('btnKy').onclick = function () { kyPlan(''); };
+
+function kyPlan(prefix) {
+  const s = sel();
+  if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy).', 'err'); return Promise.resolve(); }
+  const plate = $('plate').value.trim().toUpperCase();
+  $('btnKy').disabled = true;
+  msg((prefix ? prefix + '\n' : '') + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'cả tuyến ' + s.code) + ' để xem lệnh nào ký được (chưa ký gì)...');
+  $('out').innerHTML = ''; $('stats').innerHTML = '';
+  return api({ action: 'kyplan', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
+    if (!res.stats) throw new Error('Server chưa có action "kyplan". Dán ky.gs + web.gs + user.gs mới, rồi Deploy lại BẢN MỚI.');
+    KY = res; KY.sel = s; MODE = 'ky'; $('btnCopy').style.display = 'none';
+    renderKy();
+    const st = res.stats;
+    msg((prefix ? prefix + '\n' : '') + (plate ? 'Xe ' + plate : 'Tuyến ' + s.code) + ' — ' + res.ngay + ': ' + st.lenh + ' lệnh · ký được ' + st.kyDuoc +
+      ' · đã ký ' + st.daKy + (st.chuaDuoc ? ' · CHƯA KÝ ĐƯỢC ' + st.chuaDuoc + ' (xem lý do bên dưới)' : '') + (prefix ? '.' : '. Chưa ký gì.'), st.chuaDuoc ? 'info' : 'ok');
+  }).catch(function (e) { msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err'); })
+    .then(function () { $('btnKy').disabled = false; });
+}
+
+function renderKy() {
+  const st = KY.stats;
+  $('stats').innerHTML = [['Lệnh', st.lenh, ''], ['Ký được', st.kyDuoc, 'e-ok'], ['Đã ký', st.daKy, ''], ['Chưa ký được', st.chuaDuoc, 'e-nopc']]
+    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>'; }).join('');
+  const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
+  let out = '';
+  if (KY.result) {
+    const r = KY.result, bad = r.failed.concat(r.verifyBad, r.skipped);
+    out += '<div class="panel-note ' + (bad.length || r.stopped ? 'err' : 'ok') + '">' + (bad.length || r.stopped ? '⚠️ ' : '✅ ') +
+      'Đã ký ' + r.signed.length + ' lệnh và đọc lại thấy chữ ký điều hành' + (r.stopped ? ' · DỪNG, còn ' + r.stopped + ' lệnh chưa ký' : '') +
+      bad.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join('') + '</div>';
+  } else if (KY.kyId) {
+    out += '<div class="edit-bar"><button class="edit-btn big" data-ky="save">✍️ Ký ' + st.kyDuoc + ' lệnh</button>' +
+      '<span class="edit-hint">Giống bấm "Điều hành ký xác nhận" → "Đồng ý" trên FUTA. Ký rồi KHÔNG gỡ được, KHÔNG đẩy lệnh. ' +
+      'Mỗi lệnh được kiểm lại ngay trước khi ký. Danh sách giữ 15 phút.</span></div>';
+  }
+  if (st.chuaDuoc && KY.rows.some(function (v) { return v.lyDo.some(function (x) { return /Tự chỉnh/.test(x); }); }))
+    out += '<div class="ord-warn"><div>⚠️ Có lệnh chưa edit xong: bấm ⚡ Tự chỉnh theo luật, lưu xong bấm ✍️ Điều hành ký lại.</div></div>';
+  let body = '';
+  KY.rows.forEach(function (v) {
+    const state = v.daKy ? 'da' : v.ok ? 'ok' : 'chua';
+    if (only && state !== 'chua') return;
+    if (q && [v.xe, v.code, v.lai, v.lyDo.join(' ')].join(' ').toLowerCase().indexOf(q) === -1) return;
+    const tag = { da: '✔ Đã ký', ok: '✅ Ký được', chua: '🔴 Chưa ký được' }[state];
+    const notes = (state === 'da' ? [] : v.lyDo.map(function (x) { return '<div>❌ ' + esc(x) + '</div>'; }))
+      .concat(v.canhBao.map(function (x) { return '<div>⚠️ ' + esc(x) + '</div>'; })).join('');
+    body += '<tr class="' + (state === 'ok' ? 'e-ok' : state === 'chua' ? 'e-nopc' : '') + '"><td>' + esc(v.xe) + '</td><td>' + esc(v.code) + '</td><td class="left">' + esc(v.lai) +
+      '</td><td>' + (v.soChuyen == null ? '' : v.soChuyen) + '</td><td>' + esc(v.cuoi) + '</td><td>' + tag + (v.daKy ? '<br><small>' + esc(v.daKy) + '</small>' : '') +
+      '</td><td class="notes">' + notes + '</td></tr>';
+  });
+  out += '<table><thead><tr>' + ['Biển số', 'Mã lệnh', 'Lái xe', 'Số chuyến', 'Về bến cuối', 'Trạng thái', 'Lý do / ghi chú']
+    .map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (body || '<tr><td colspan="7">Không có dòng nào</td></tr>') + '</tbody></table>';
+  $('out').innerHTML = out;
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-ky="save"]');
+  if (!b || MODE !== 'ky' || !KY || !KY.kyId) return;
+  const ok = KY.rows.filter(function (v) { return v.ok; });
+  const late = ok.some(function (v) { return v.canhBao.length; });
+  if (!confirm('ĐIỀU HÀNH KÝ XÁC NHẬN ' + ok.length + ' lệnh · tuyến ' + KY.sel.code + ' · ' + KY.ngay + '?\n\n' +
+               'Điều hành xác nhận đủ chuyến theo phân công trước khi ký lệnh.\n' +
+               (late ? 'Ký khác ngày vận chuyển: FUTA sẽ gắn cờ "ký lệnh trễ qua ngày".\n' : '') +
+               'Ký rồi KHÔNG gỡ được. Không đẩy lệnh.\n\n' +
+               ok.map(function (v) { return v.code; }).join('\n'))) return;
+  $('out').querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+  $('btnKy').disabled = true;
+  msg('Đang ký ' + ok.length + ' lệnh (mỗi lệnh kiểm lại trước khi ký, đừng đóng trang)...');
+  const ky = KY;
+  api({ action: 'kysave', ekey: getEkey(), kyId: ky.kyId, label: ky.sel.code, date: String(ky.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
+    const bad = r.failed.length + r.verifyBad.length + r.skipped.length;
+    const line = (bad || r.stopped ? '⚠️ ' : '✔ ') + 'Đã ký ' + r.signed.length + ' lệnh (' + r.elapsed + 's)' +
+      (r.skipped.length ? ', bỏ qua ' + r.skipped.length : '') + (r.failed.length ? ', FUTA từ chối ' + r.failed.length : '') +
+      (r.verifyBad.length ? ', ĐỌC LẠI LỆCH ' + r.verifyBad.length : '') + (r.stopped ? ', DỪNG còn ' + r.stopped + ' lệnh chưa ký' : '');
+    ky.result = r;
+    return kyPlan(line).then(function () { if (KY && KY !== ky) { KY.result = r; if (MODE === 'ky') renderKy(); } });
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnKy').disabled = false; });
 });
 
 // ===== TỰ XÁC NHẬN XE VỀ BẾN (gọi veben trong veben.gs) =====
