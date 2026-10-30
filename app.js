@@ -5,7 +5,21 @@ function getUrl() { return API_URL; }
 let DATA = null, CUR = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function msg(t, cls) { $('msg').className = cls || ''; $('msg').textContent = t || ''; }
+function msg(t, cls) { // cls: ok / err / info; trống = đang chạy (có vòng xoay)
+  const el = $('msg');
+  el.className = cls || ''; el.textContent = t || '';
+  // điện thoại: có kết quả mà dòng thông báo đang khuất dưới màn hình thì cuộn xuống cho thấy
+  if ((cls === 'ok' || cls === 'err') && t && window.innerWidth < 760) {
+    const r = el.getBoundingClientRect();
+    if (r.top > window.innerHeight - 60 || r.bottom < 0) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+}
+const hm5 = v => String(v || '').slice(-5);
+// Mất chuyến (xe KHÔNG chạy: tài xế/tiếp viên "Mất Chuyến") khác Đề xuất mất chuyến (xe CÓ chạy, có giờ đi/đến, chờ duyệt)
+const isDx = m => m.loai === 'dexuat' || /đề xuất/i.test(m.trangThai || '');
+const clip = (lines, n) => lines.length > n ? lines.slice(0, n).concat(['… và ' + (lines.length - n) + ' dòng nữa']) : lines;
+const typePill = m => isDx(m) ? '<span class="pill p-dx" title="Xe có chạy, bị đề xuất tính mất chuyến (chờ duyệt)">Đề xuất mất chuyến</span>'
+                              : '<span class="pill p-mat" title="Xe không chạy chuyến này">Mất chuyến</span>';
 
 // Google Cloud OAuth Client ID (loại Web application) để mỗi người lưu ảnh GPS vào Google của họ.
 // Để trống = ảnh GPS lưu vào Drive/Sheet chung như cũ.
@@ -111,6 +125,7 @@ $('date').value = vnToday();
 
 let ROUTES = [];
 let FAV_CODES = []; // tuyến cụm (Script Property FB_ROUTES)
+const RP = {};      // ô chọn nhiều tuyến dùng chung (GPS, về bến): tên -> { set, change }, xem rpHtml
 const routeText = r => r.code + (r.name ? ' — ' + r.name : '');
 
 function loadRoutes() {
@@ -120,25 +135,26 @@ function loadRoutes() {
     const favSet = new Set(res.fav); FAV_CODES = (res.fav || []).slice();
     // tuyến "Hay dùng" lên đầu danh sách gợi ý
     ROUTES = res.routes.filter(r => favSet.has(r.code)).concat(res.routes.filter(r => !favSet.has(r.code)));
-    $('routeList').innerHTML = ROUTES.map(r => '<option value="' + esc(routeText(r)) + '"></option>').join('');
     const last = localStorage.getItem('last_route');
     if (last && !$('route').value) $('route').value = last;
-    $('route').placeholder = 'Nhập số tuyến (vd: 30, 01, 60-1) hoặc chọn từ danh sách';
+    $('route').placeholder = 'Bấm để chọn, hoặc gõ số / tên tuyến (vd: 30, 01, cong vien)';
+    if (RB) rbDraw(); // đang mở danh sách lúc tuyến tải xong
     msg('');
   }).catch(function (e) { if (!e.login) msg('❌ ' + e.message, 'err'); });
 }
 loadRoutes();
 
 // Đổi chữ người dùng gõ thành tuyến: khớp đúng cả dòng, hoặc đúng mã tuyến (gõ "1" cũng ra "01"), hoặc chỉ có 1 tuyến chứa chữ đó
+// (không phân biệt dấu: "cong vien" = "Công viên")
 function findRoute(text) {
-  const v = String(text || '').trim().toLowerCase();
+  const v = norm(text);
   if (!v || !ROUTES.length) return null;
-  const nz = x => String(x).toLowerCase().replace(/^0+(?=\d)/, '');
-  let r = ROUTES.find(x => routeText(x).toLowerCase() === v) ||
-          ROUTES.find(x => x.code.toLowerCase() === v) ||
+  const nz = x => norm(x).replace(/^0+(?=\d)/, '');
+  let r = ROUTES.find(x => norm(routeText(x)) === v) ||
+          ROUTES.find(x => norm(x.code) === v) ||
           ROUTES.find(x => nz(x.code) === nz(v));
   if (!r) {
-    const m = ROUTES.filter(x => routeText(x).toLowerCase().indexOf(v) !== -1);
+    const m = ROUTES.filter(x => norm(routeText(x)).indexOf(v) !== -1);
     if (m.length === 1) r = m[0];
   }
   return r || null;
@@ -150,10 +166,149 @@ function sel() {
   return { id: String(r.id), code: r.code };
 }
 
-$('route').onfocus = function () { this.select(); }; // bấm vào ô là bôi đen sẵn, gõ đè luôn
 $('route').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
-$('date').onfocus = function () { this.select(); };
 $('date').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnLoad').click(); } };
+
+// ===== BẤM VÀO Ô LÀ BÔI ĐEN SẴN (gõ đè luôn, khỏi xoá từng chữ) =====
+// Chrome / Safari: select() lúc focus bị lần nhả chuột (mouseup) bỏ bôi đen -> chặn đúng lần mouseup đầu tiên sau khi focus.
+function selectAll(el) {
+  try { el.select(); } catch (e) { return; }
+  const up = function (e) { e.preventDefault(); el.removeEventListener('mouseup', up); };
+  el.addEventListener('mouseup', up);
+  setTimeout(function () {
+    el.removeEventListener('mouseup', up);
+    if (document.activeElement === el && el.selectionStart === el.selectionEnd) try { el.setSelectionRange(0, el.value.length); } catch (e) { /* iPhone */ }
+  }, 0);
+}
+const SELECT_ON_FOCUS = '#date, #plate, #tFrom, #tTo, #q, input.edit-in';
+document.addEventListener('focusin', function (e) {
+  const el = e.target;
+  if (el.matches && el.matches(SELECT_ON_FOCUS)) selectAll(el);
+});
+// Nút × trong ô: xoá sạch, giữ con trỏ trong ô (ô tuyến hiện lại danh sách, ô lọc vẽ lại bảng)
+document.addEventListener('mousedown', function (e) { if (e.target.closest && e.target.closest('.clr')) e.preventDefault(); });
+document.addEventListener('click', function (e) {
+  const b = e.target.closest && e.target.closest('.clr');
+  if (!b) return;
+  const el = $(b.dataset.clr); if (!el) return;
+  el.value = ''; el.focus();
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+// ===== Ô CHỌN TUYẾN: gõ tìm + danh sách xổ xuống (thay datalist của trình duyệt) =====
+// Dùng cho mọi ô có data-route: "Tuyến" (one), Bảng tài 1-3 (bt), "Thêm tuyến" ở GPS / về bến (multi).
+// - Bấm vào ô: bôi đen sẵn + hiện TẤT CẢ tuyến (tuyến cụm lên đầu), không bị lọc theo chữ cũ trong ô.
+// - Gõ: lọc theo mã hoặc tên, không cần dấu ("cong vien" ra "Công viên..."); mã đúng / bắt đầu bằng chữ gõ lên đầu.
+// - ↑ ↓ chọn, Enter lấy tuyến đang sáng (ô Tuyến: lấy xong tải bảng xe luôn như trước), Esc đóng, bấm chuột chọn.
+// - Ô "Thêm tuyến": chọn là thêm luôn vào danh sách tick, ô trống lại để chọn tiếp.
+const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
+function routeMatches(q) {
+  const v = norm(q), nz = x => x.replace(/^0+(?=\d)/, '');
+  if (!v) return ROUTES.slice();
+  const out = [];
+  ROUTES.forEach(function (r, i) {
+    const c = norm(r.code), n = norm(r.name), all = c + ' — ' + n;
+    const s = (c === v || nz(c) === nz(v) || all === v) ? 0 : (c.indexOf(v) === 0 || nz(c).indexOf(nz(v)) === 0) ? 1
+            : (' ' + n).indexOf(' ' + v) !== -1 ? 2 : all.indexOf(v) !== -1 ? 3 : -1;
+    if (s >= 0) out.push({ r: r, s: s, i: i });
+  });
+  out.sort((a, b) => a.s - b.s || a.i - b.i);
+  return out.map(x => x.r);
+}
+const RBL = document.createElement('div');
+RBL.className = 'rb-list'; RBL.hidden = true; RBL.setAttribute('role', 'listbox');
+document.body.appendChild(RBL);
+let RB = null; // { el, items, act, typed }
+const rbMulti = el => el.dataset.route === 'multi';
+const rbQuery = el => rbMulti(el) ? el.value.split(/[,;]/).pop() : el.value;
+function rbOpen(el, typed) {
+  const q = typed ? rbQuery(el) : '';
+  const items = routeMatches(q).slice(0, 120);
+  RB = { el: el, items: items, act: typed && q.trim() && items.length ? 0 : -1, typed: typed };
+  rbDraw();
+}
+function rbClose() { RB = null; RBL.hidden = true; RBL.innerHTML = ''; }
+function rbDraw() {
+  if (!RB || !RB.el.isConnected) { rbClose(); return; }
+  const fav = new Set(FAV_CODES), name = RB.el.dataset.rpInput;
+  const chosen = name && RP[name] ? RP[name].set() : new Set();
+  RBL.innerHTML = !ROUTES.length ? '<div class="rb-empty">Đang tải danh sách tuyến...</div>'
+    : RB.items.length ? RB.items.map((r, i) => '<div class="rb-it' + (i === RB.act ? ' on' : '') + '" data-i="' + i + '" role="option"><b>' + esc(r.code) + '</b><span>' + esc(r.name) +
+        '</span>' + (chosen.has(r.code) ? '<em class="ok">✓ đã chọn</em>' : fav.has(r.code) ? '<em>cụm</em>' : '') + '</div>').join('')
+    : '<div class="rb-empty">Không thấy tuyến "' + esc(rbQuery(RB.el).trim()) + '"</div>';
+  const b = RB.el.getBoundingClientRect(), vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const w = Math.min(Math.max(b.width, 320), window.innerWidth - 16), below = vh - b.bottom - 8, above = b.top - 8;
+  RBL.style.width = w + 'px';
+  RBL.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + 'px';
+  if (below < 200 && above > below) { RBL.style.top = ''; RBL.style.bottom = (window.innerHeight - b.top + 4) + 'px'; RBL.style.maxHeight = Math.min(380, above) + 'px'; }
+  else { RBL.style.bottom = ''; RBL.style.top = (b.bottom + 4) + 'px'; RBL.style.maxHeight = Math.min(380, Math.max(below, 140)) + 'px'; }
+  RBL.hidden = false;
+  const on = RBL.querySelector('.rb-it.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+// Lấy 1 tuyến. Trả true nếu phím Enter được làm tiếp việc cũ của ô (ô Tuyến: tải bảng xe).
+function rbPick(r, viaEnter) {
+  const el = RB && RB.el; if (!el || !r) return false;
+  if (rbMulti(el)) { // thay chữ đang gõ dở bằng mã tuyến rồi bấm ➕ Thêm (các tuyến gõ trước dấu phẩy cũng được thêm)
+    const parts = el.value.split(/[,;]/); parts[parts.length - 1] = r.code;
+    el.value = parts.map(x => x.trim()).filter(Boolean).join(', ');
+    rbClose();
+    const add = document.querySelector('[data-rp-act="add"][data-rp="' + el.dataset.rpInput + '"]');
+    if (add) add.click();
+    return false;
+  }
+  el.value = routeText(r);
+  rbClose();
+  if (el.id === 'route') { localStorage.setItem('last_route', routeText(r)); return viaEnter; }
+  if (el.dataset.route === 'bt') { // bảng tài: chọn xong nhảy sang ô tuyến kế tiếp
+    localStorage.setItem('bt_' + el.id, el.value);
+    const nx = $(BT_IDS[BT_IDS.indexOf(el.id) + 1]); if (nx && !nx.value.trim()) nx.focus();
+  }
+  return false;
+}
+document.addEventListener('focusin', function (e) {
+  const el = e.target;
+  if (!el.matches || !el.matches('input[data-route]')) return;
+  if (el._keep) { const t = el._keep.typed; delete el._keep; rbOpen(el, t); return; } // vẽ lại bảng: giữ nguyên chữ đang gõ
+  selectAll(el); rbOpen(el, false);
+});
+// Ô đang có con trỏ sẵn (vừa Enter / Esc) mà bấm lại: danh sách đang đóng thì bôi đen + mở lại
+document.addEventListener('click', function (e) {
+  const el = e.target;
+  if (!el.matches || !el.matches('input[data-route]') || (RB && RB.el === el && !RBL.hidden)) return;
+  selectAll(el); rbOpen(el, false);
+});
+document.addEventListener('input', function (e) { if (e.target.matches && e.target.matches('input[data-route]')) rbOpen(e.target, !!e.target.value.trim()); });
+document.addEventListener('focusout', function (e) {
+  if (!RB || e.target !== RB.el) return;
+  setTimeout(function () { if (RB && document.activeElement !== RB.el) rbClose(); }, 150);
+});
+RBL.addEventListener('mousedown', function (e) { e.preventDefault(); }); // bấm vào danh sách không làm ô mất con trỏ
+RBL.addEventListener('click', function (e) { const it = e.target.closest('.rb-it'); if (it && RB) rbPick(RB.items[+it.dataset.i], false); });
+document.addEventListener('keydown', function (e) {
+  if (!RB || e.target !== RB.el || RBL.hidden) return;
+  const n = RB.items.length;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (!n) return;
+    RB.act = e.key === 'ArrowDown' ? (RB.act + 1) % n : (RB.act <= 0 ? n - 1 : RB.act - 1); rbDraw();
+  } else if (e.key === 'Escape') { e.preventDefault(); rbClose(); }
+  else if (e.key === 'Enter' && RB.act >= 0 && RB.items[RB.act]) {
+    if (!rbPick(RB.items[RB.act], true)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  } else if (e.key === 'Enter') rbClose();
+}, true);
+window.addEventListener('resize', function () { if (RB) rbDraw(); });
+document.addEventListener('scroll', function (e) { if (RB && e.target !== RBL) rbDraw(); }, true);
+
+// Vẽ lại #out (GPS / về bến) mà KHÔNG làm mất chữ đang gõ trong ô "Thêm tuyến" (trước: lúc đang chụp GPS cứ 10 giây vẽ lại là mất chữ)
+function setOut(html) {
+  const a = document.activeElement, name = a && a.dataset && a.dataset.rpInput;
+  const st = name ? { v: a.value, s: a.selectionStart, e: a.selectionEnd, typed: !!(RB && RB.el === a && RB.typed) } : null;
+  $('out').innerHTML = html;
+  if (!st) return;
+  const n = document.querySelector('[data-rp-input="' + name + '"]');
+  if (!n) return;
+  n.value = st.v; n._keep = { typed: st.typed }; n.focus();
+  try { n.setSelectionRange(st.s, st.e); } catch (e) { /* bỏ qua */ }
+}
 
 $('btnUser').onclick = function () { if (!USER_MODE) { getKey(true); getWho(true); loadRoutes(); return; } showAuth(ME ? 'acc' : 'login'); };
 
@@ -175,6 +330,7 @@ let LV = null;
 let ED = null;
 let BT = null;
 let GP = null;
+let UD = null; // màn Hoàn tác
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
@@ -184,6 +340,7 @@ function rerender() {
   else if (MODE === 'bt' && BT) renderBt();
   else if (MODE === 'gps' && GP) renderGps();
   else if (MODE === 'veben') { if (VB) renderVeben(); }
+  else if (MODE === 'undo') { if (UD) renderUndo(); }
   else if (DATA) render();
 }
 
@@ -235,9 +392,10 @@ function renderEbms() {
 
 // ===== RENDER =====
 function render() {
-  const st = DATA.stats;
-  $('stats').innerHTML = [['Tổng chuyến', st.total], ['Có cảnh báo', st.warn], ['Cặp trùng giờ', st.conflicts], ['Mất chuyến', st.missed]]
-    .map(x => '<div class="stat"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  const st = DATA.stats, nDx = DATA.missed.filter(isDx).length;
+  $('stats').innerHTML = [['Tổng chuyến', st.total], ['Có cảnh báo', st.warn], ['Cặp trùng giờ', st.conflicts], ['Mất chuyến', st.missed - nDx]]
+    .concat(nDx ? [['Đề xuất mất chuyến', nDx]] : [])
+    .map(x => '<div class="stat' + (x[0] === 'Đề xuất mất chuyến' ? ' e-warn' : '') + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 
   const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
   let band = false, prev = null, html = '';
@@ -254,9 +412,13 @@ function render() {
     (html || '<tr><td colspan="7">Không có dòng nào</td></tr>') + '</tbody></table>';
 
   if (DATA.missed.length) {
-    out += '<h3>⚠️ Chuyến mất / đề xuất mất (' + DATA.missed.length + ')</h3><table><thead><tr><th>Mã chuyến</th><th>Lịch chạy</th><th>Bến</th><th>Xe</th><th>Loại</th><th>Tài xế</th><th>Tiếp viên</th><th>Trạng thái</th></tr></thead><tbody>' +
-      DATA.missed.map(m => '<tr><td>' + esc(m.maChuyen) + '</td><td>' + esc(m.lichChay) + '</td><td>' + esc(m.benXuatPhat) + '</td><td>' + esc(m.xe) +
-        '</td><td>' + esc(m.loaiChuyen) + '</td><td>' + esc(m.taiXe) + '</td><td>' + esc(m.tiepVien) + '</td><td class="red">' + esc(m.trangThai) + '</td></tr>').join('') +
+    // Mất chuyến (xe KHÔNG chạy) và Đề xuất mất chuyến (xe CÓ chạy, chờ duyệt) là 2 loại khác nhau: tách màu + có giờ đi/đến thực tế
+    const nDx2 = DATA.missed.filter(isDx).length;
+    out += '<h3>⚠️ Mất chuyến (' + (DATA.missed.length - nDx2) + ')' + (nDx2 ? ' · Đề xuất mất chuyến (' + nDx2 + ')' : '') + '</h3>' +
+      '<table><thead><tr><th>Loại</th><th>Mã chuyến</th><th>Lịch chạy</th><th>Bến</th><th>Xe</th><th>Đi → đến thực tế</th><th>Tài xế</th><th>Tiếp viên</th><th>Trạng thái</th></tr></thead><tbody>' +
+      DATA.missed.slice().sort((a, b) => (isDx(a) - isDx(b)) || String(a.lichChay).localeCompare(String(b.lichChay))).map(m =>
+        '<tr class="' + (isDx(m) ? 'gp-dx' : '') + '"><td>' + typePill(m) + '</td><td>' + esc(m.maChuyen) + '</td><td>' + esc(m.lichChay) + '</td><td>' + esc(m.benXuatPhat) + '</td><td>' + esc(m.xe) +
+        '</td><td>' + (isDx(m) ? esc(hm5(m.gioDi) || '?') + ' → ' + esc(hm5(m.gioDen) || '?') : '—') + '</td><td>' + esc(m.taiXe) + '</td><td>' + esc(m.tiepVien) + '</td><td class="' + (isDx(m) ? '' : 'red') + '">' + esc(m.trangThai) + '</td></tr>').join('') +
       '</tbody></table>';
   }
   $('out').innerHTML = out;
@@ -352,10 +514,9 @@ function renderLvc() {
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
-  $('btnEdit').hidden = !on; $('btnAuto').hidden = !on; $('btnVeben').hidden = !on; $('fPlate').hidden = !on; $('btnLock').hidden = !on;
-  $('fFrom').hidden = !on; $('fTo').hidden = !on;
-  $('actions').classList.toggle('has-edit', on);
-  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben')) { MODE = 'trips'; ED = null; AU = null; VB = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  $('editGroup').hidden = !on; $('btnLock').hidden = !on; // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
+  if (!on) hideUndo();
+  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -398,15 +559,14 @@ function loadEdit(s, plate) {
   });
 }
 
-const hm5 = v => String(v || '').slice(-5);
 function renderEdit() {
   let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
   $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
     .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
   // (nút "Điền Giờ về bến = Giờ đến" đã bỏ: theo luật mới, bình thường về bến = đến + 1 phút -> dùng "⚡ Tự chỉnh theo luật")
   let out = '<div class="edit-bar">' +
-    '<button class="edit-btn big" data-act="saveAll">💾 Lưu tất cả thay đổi</button>' +
-    '<span class="edit-hint">Chỉ tính các chuyến đang hiện (trong khoảng giờ). Có xác nhận trước khi lưu.</span></div>';
+    '<button class="edit-btn big" data-act="saveAll" id="btnSaveAll">💾 Lưu tất cả thay đổi</button>' +
+    '<span class="edit-hint">Ô đã đổi tô vàng. Chỉ tính các chuyến đang hiện (trong khoảng giờ). Lưu 1 lượt cho cả loạt, có xác nhận trước, lưu xong vẫn ↩️ Hoàn tác được.</span></div>';
   ED.orders.forEach(function (o) {
     out += '<div class="ord-h">Lệnh ' + esc(o.lenh) + '<small>' + esc(o.code) + '</small></div>';
     if (o.canhBao.length) out += '<div class="ord-warn">⚠️ Danh sách chuyến bất thường: ' + esc(o.canhBao.join('; ')) + ' — kiểm tra kỹ mã chuyến trước khi sửa.</div>';
@@ -431,6 +591,18 @@ function renderEdit() {
   $('out').innerHTML = out;
   applyRange();
 }
+// Gõ giờ: ô khác giá trị gốc tô vàng, nút "Lưu tất cả" hiện số thay đổi
+$('out').addEventListener('input', function (ev) {
+  const inp = ev.target;
+  if (MODE !== 'edit' || !inp.classList || !inp.classList.contains('edit-in')) return;
+  inp.classList.toggle('changed', (inp.value || '').trim() !== inp.dataset.orig);
+  editCount();
+});
+function editCount() {
+  const b = $('btnSaveAll'); if (!b) return;
+  const n = collectChanges().length;
+  b.textContent = n ? '💾 Lưu ' + n + ' thay đổi' : '💾 Lưu tất cả thay đổi';
+}
 
 // --- Lọc theo khoảng giờ lịch chạy (chỉ ẩn/hiện dòng, không mất giờ đang gõ) ---
 function parseHM(s) {
@@ -453,7 +625,7 @@ function applyRange() {
     tr.hidden = !show;
   });
 }
-$('tFrom').oninput = $('tTo').oninput = applyRange;
+$('tFrom').oninput = $('tTo').oninput = function () { applyRange(); editCount(); };
 
 // --- Lưu hàng loạt (có xác nhận) ---
 function collectChanges() {
@@ -471,31 +643,30 @@ function findTrip(oid, tid) {
   const order = ED.orders.find(o => String(o.id) === String(oid));
   return { order: order, trip: order && order.trips.find(t => String(t.id) === String(tid)) };
 }
+// LƯU TẤT CẢ: gửi cả loạt trong 1 lượt (editmany, POST vì dữ liệu dài). Máy chủ đọc lại 1 lần, kiểm từng ô y như lưu 1 ô,
+// 1 PUT mỗi lệnh, đọc lại kiểm, nhớ hoàn tác. Trước đây mỗi ô 1 lượt + tải lại bảng xe giữa 2 ô cùng chuyến.
 function runBatch(ch) {
   const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
-  const okN = [], bad = [];
-  let i = 0;
-  function next() {
-    if (i >= ch.length) return Promise.resolve();
-    const c = ch[i++], f = findTrip(c.oid, c.tid);
-    const name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
-    const tag = f.trip ? 'Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' · ' + name : name;
-    if (!f.trip) { bad.push(tag + ': không thấy chuyến, tải lại bảng'); return next(); }
-    msg('Đang lưu ' + i + '/' + ch.length + '...');
-    return api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, date: ED.iso, orderId: c.oid, tripId: c.tid, field: c.field, hhmm: c.hhmm, snap: f.trip.snap }, 120000, 0)
-      .then(function (r) {
-        (r.same || r.ok ? okN : bad).push(tag + ': ' + r.message);
-        const nx = ch[i];
-        if (nx && nx.tid === c.tid) return loadEdit(ED.sel, ED.plate); // cùng chuyến: nạp lại để có snap mới
-      })
-      .catch(function (e) { bad.push(tag + ': ' + e.message); })
-      .then(next);
-  }
-  return next()
-    .then(function () { return loadEdit(ED.sel, ED.plate); })
-    .then(function () {
-      msg((bad.length ? '⚠️ ' : '✅ ') + 'Đã xử lý ' + ch.length + ' thay đổi: ' + okN.length + ' thành công, ' + bad.length + ' lỗi' +
-        (bad.length ? '\n' + bad.join('\n') : ''), bad.length ? 'err' : 'ok');
+  msg('Đang lưu ' + ch.length + ' thay đổi lên FUTA (1 lượt: đọc lại → kiểm → lưu → đọc lại kiểm)...');
+  const changes = ch.map(function (c) {
+    const f = findTrip(c.oid, c.tid);
+    return { orderId: c.oid, tripId: c.tid, field: c.field, hhmm: c.hhmm, snap: f.trip ? f.trip.snap : '', stt: f.trip ? f.trip.stt : '' };
+  });
+  return apiPost({ action: 'editmany', ekey: getEkey(), routeId: ED.sel.id, label: ED.sel.code, date: ED.iso, plate: ED.plate, changes: JSON.stringify(changes) }, 300000)
+    .then(function (r) {
+      if (!r.results) throw new Error('Server chưa có action "editmany". Dán edit.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
+      const okN = [], bad = [];
+      r.results.forEach(function (x, i) {
+        const c = ch[i], f = findTrip(c.oid, c.tid), name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
+        const tag = f.trip ? 'Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' · ' + name : name;
+        (x && x.ok ? okN : bad).push(tag + ': ' + (x ? x.message : 'không có kết quả'));
+      });
+      const text = (bad.length ? '⚠️ ' : '✅ ') + 'Đã xử lý ' + ch.length + ' thay đổi: ' + okN.length + ' thành công, ' + bad.length + ' lỗi' +
+        (bad.length ? '\n' + bad.join('\n') : '');
+      return loadEdit(ED.sel, ED.plate).then(function () {
+        msg(text, bad.length ? 'err' : 'ok');
+        showUndo(r.undoId, 'Đã lưu xe ' + ED.plate + '. Lỡ tay?');
+      });
     })
     .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
 }
@@ -515,7 +686,8 @@ $('out').addEventListener('click', function (ev) {
       return '• Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' (' + f.trip.code + ') · ' + name + ': ' + c.input.dataset.orig + ' → ' + c.hhmm;
     });
     const range = ($('tFrom').value.trim() || $('tTo').value.trim()) ? '\nKhoảng giờ lịch chạy: ' + ($('tFrom').value.trim() || '…') + ' – ' + ($('tTo').value.trim() || '…') : '';
-    if (!confirm('Xe ' + ED.plate + ' · ' + ED.ngay + range + '\nSẽ lưu ' + ch.length + ' thay đổi lên hệ thống FUTA:\n\n' + lines.join('\n') + '\n\nXác nhận lưu?')) return;
+    if (!confirm('Xe ' + ED.plate + ' · ' + ED.ngay + range + '\nSẽ lưu ' + ch.length + ' thay đổi lên hệ thống FUTA:\n\n' + clip(lines, 40).join('\n') +
+                 '\n\nXác nhận lưu? (lưu xong vẫn hoàn tác được)')) return;
     runBatch(ch);
   }
 });
@@ -536,11 +708,14 @@ $('out').addEventListener('click', function (ev) {
 
   const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
   msg('Đang lưu...');
-  api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, date: ED.iso, orderId: oid, tripId: tid, field: field, hhmm: hhmm, snap: trip.snap }, 120000, 0)
+  api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, label: ED.sel.code, plate: ED.plate, stt: trip.stt, date: ED.iso, orderId: oid, tripId: tid, field: field, hhmm: hhmm, snap: trip.snap }, 120000, 0)
     .then(function (r) {
       const cls = r.same || r.ok ? 'ok' : 'err';
       msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls);
-      return loadEdit(ED.sel, ED.plate).then(function () { msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls); }); // nạp lại bảng, giữ thông báo
+      return loadEdit(ED.sel, ED.plate).then(function () { // nạp lại bảng, giữ thông báo
+        msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls);
+        showUndo(r.undoId, 'Đã lưu ' + name + ' chuyến ' + trip.stt + '. Lỡ tay?');
+      });
     })
     .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
 });
@@ -560,16 +735,14 @@ $('btnNext').onclick = function () { shiftDay(1); };
   const sync = function () {
     lg.style.display = (MODE === 'trips' && $('out').children.length) ? '' : 'none';
     document.body.dataset.mode = MODE; // CSS ẩn/hiện ô "Chỉ hiện dòng cảnh báo" theo màn đang xem
+    $('q').placeholder = { gps: 'Lọc theo tuyến, xe, lịch, bến, tài xế...', undo: 'Lọc theo người lưu, tuyến, xe...', nv: 'Lọc theo tên, chức vụ...',
+      auto: 'Lọc theo xe, mã chuyến, lịch...', bt: 'Tìm biển số xe...' }[MODE] || 'Lọc theo xe, tên, bến...';
   };
   new MutationObserver(sync).observe($('out'), { childList: true });
   sync();
 })();
 
-// ===== KHUNG TIÊU CHÍ: hiện ngay khi bấm "Kiểm tra lệnh", ẩn khi bấm nút khác =====
-$('actions').addEventListener('click', function (e) {
-  const b = e.target.closest && e.target.closest('button');
-  if (b) { $('lvcRules').hidden = (b.id !== 'btnLvc'); $('btnXlsx').style.display = 'none'; }
-});
+// (Khung tiêu chí kiểm tra lệnh: ẩn/hiện ở listener chung "NÚT TÁC VỤ" bên dưới)
 
 // ===== TỰ CHỈNH THEO LUẬT (gọi autoplan / autosave trong edit.gs) =====
 // Hiện cùng nút "✏️ Sửa lệnh" sau khi mở khoá. Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
@@ -587,7 +760,7 @@ function autoPlan(prefix) {
   $('btnAuto').disabled = true;
   msg((prefix ? prefix + '\n' : '') + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'cả tuyến ' + s.code) + ' và lập kế hoạch (chưa ghi gì)...');
   $('out').innerHTML = ''; $('stats').innerHTML = '';
-  return api({ action: 'autoplan', ekey: getEkey(), routeId: s.id, date: isoDate(), plate: plate }, 180000).then(function (res) {
+  return api({ action: 'autoplan', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
     if (!res.stats) throw new Error('Server chưa có action "autoplan". Dán edit.gs mới, thêm router vào web.gs, rồi Deploy lại BẢN MỚI.');
     AU = res; AU.sel = s; MODE = 'auto'; $('btnCopy').style.display = 'none';
     renderAuto();
@@ -621,9 +794,11 @@ function renderAuto() {
       '</div>';
   }
   if (AU.warns.length) out += '<div class="ord-warn">' + AU.warns.map(function (w) { return '<div>⚠️ ' + esc(w) + '</div>'; }).join('') + '</div>';
-  if (AU.planId) {
+  if (AU.done) {
+    out += '<div class="panel-note ok">✅ Đã lưu các chuyến dưới đây lên FUTA và đọc lại kiểm khớp' + (AU.undoId ? ' — lỡ tay thì bấm ↩️ Hoàn tác ở trên.' : '.') + '</div>';
+  } else if (AU.planId) {
     out += '<div class="edit-bar"><button class="edit-btn big" data-auto="save">💾 Lưu ' + st.sua + ' chuyến theo luật</button>' +
-      '<span class="edit-hint">Lưu xong tự đọc lại để kiểm. Dòng nào vừa bị đổi kể từ lúc xem sẽ KHÔNG lưu. Kế hoạch giữ 15 phút.</span></div>';
+      '<span class="edit-hint">Lưu xong tự đọc lại để kiểm. Dòng nào vừa bị đổi kể từ lúc xem sẽ KHÔNG lưu. Kế hoạch giữ 15 phút. Lưu xong vẫn ↩️ Hoàn tác được.</span></div>';
   }
   let body = '', band = false, prev = null;
   AU.changes.forEach(function (r) {
@@ -649,13 +824,22 @@ $('out').addEventListener('click', function (ev) {
   $('out').querySelectorAll('button').forEach(function (x) { x.disabled = true; });
   $('btnAuto').disabled = true;
   msg('Đang lưu ' + AU.stats.sua + ' chuyến (có thể mất 1-3 phút, đừng đóng trang)...');
-  api({ action: 'autosave', ekey: getEkey(), planId: AU.planId }, 360000, 0).then(function (r) {
+  const au = AU;
+  api({ action: 'autosave', ekey: getEkey(), planId: au.planId, label: au.sel.code, date: String(au.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
     const bad = r.verifyBad.concat(r.failed, r.skipped);
     const line = (bad.length || r.stopped ? '⚠️ ' : '✔ ') + 'Đã lưu + kiểm khớp ' + r.saved + ' chuyến (' + r.elapsed + 's)' +
       (r.verifyBad.length ? ', VERIFY LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi lưu ' + r.failed.length : '') +
       (r.skipped.length ? ', bỏ qua ' + r.skipped.length : '') + (r.stopped ? ', chưa kịp lưu ' + r.stopped + ' (hết giờ, bấm lại)' : '') +
       (bad.length ? '\n' + bad.join('\n') : '');
-    return autoPlan(line); // lập lại kế hoạch: bình thường còn 0 chuyến cần sửa
+    showUndo(r.undoId, 'Đã lưu ' + r.saved + ' chuyến theo luật. Lỡ tay?');
+    // Lưu khớp hết + không còn gì cần sửa: hiện luôn danh sách vừa lưu, KHỎI đọc lại cả tuyến lần nữa (đỡ tải FUTA / Apps Script)
+    if (!bad.length && !r.stopped && r.left === 0) {
+      au.done = true; au.planId = ''; au.undoId = r.undoId; $('btnAuto').disabled = false;
+      if (MODE === 'auto' && AU === au) renderAuto();
+      msg(line + '. Không còn chuyến nào cần sửa.', 'ok');
+      return;
+    }
+    return autoPlan(line); // còn lỗi / còn chuyến cần sửa: lập lại kế hoạch để xem
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
 });
 
@@ -665,18 +849,14 @@ $('out').addEventListener('click', function (ev) {
 let VB = null;
 
 $('btnVeben').onclick = function () { vebenCall({}); };
-$('out').addEventListener('change', function (ev) {
-  const c = ev.target.getAttribute && ev.target.getAttribute('data-vbc');
-  if (!c || MODE !== 'veben' || !VB) return;
-  if (ev.target.checked) VB.pick.add(c); else VB.pick.delete(c);
-});
+RP.veben = { set: () => VB.pick, change: function () { if (MODE === 'veben' && VB) renderVeben(); } }; // ô chọn tuyến dùng chung (rpHtml)
 
 function vebenCall(extra) {
   $('btnVeben').disabled = true;
   msg(extra.set === 'on' ? 'Đang bật và quét xác nhận về bến lần đầu (có thể mất ~30 giây)...' : 'Đang đọc trạng thái tự xác nhận về bến...');
   return api(Object.assign({ action: 'veben', ekey: getEkey() }, extra), 180000, extra.set ? 0 : 1).then(function (res) {
     if (!res.log) throw new Error('Server chưa có action "veben". Dán veben.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
-    VB = res; VB.fav = FAV_CODES; MODE = 'veben'; $('btnCopy').style.display = 'none';
+    VB = Object.assign(res, { pick: VB && VB.pick && extra.set !== 'on' ? VB.pick : null }); MODE = 'veben'; $('btnCopy').style.display = 'none';
     renderVeben();
     msg(res.on ? '🟢 Đang BẬT tự xác nhận về bến: tuyến ' + res.tuyen.join(', ') + (res.sau ? ' — lượt quét sau lúc ' + res.sau : '') + (res.lich ? '' : ' — ⚠️ CHƯA CÀI LỊCH: chạy veben_cai_dat() trong Apps Script')
                : '⚪ Đang TẮT tự xác nhận về bến', res.on && res.lich ? 'ok' : (res.on ? 'err' : ''));
@@ -689,20 +869,9 @@ function renderVeben() {
   $('stats').innerHTML = [['Trạng thái', VB.on ? 'BẬT' : 'TẮT', VB.on ? 'e-ok' : ''], ['Tuyến', VB.tuyen.join(', ') || '—', ''],
     ['Đã bấm (gần nhất)', ok, 'e-ok'], ['Lỗi', VB.log.length - ok, 'e-nopc']]
     .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
-  // Ô tick: tuyến cụm (FB_ROUTES) + tuyến đã chọn + tuyến đang mở ở ô Tuyến. Tuyến khác gõ thêm ở ô bên cạnh.
+  // Ô tick: tuyến cụm (FB_ROUTES) + tuyến đã chọn + tuyến đang mở ở ô Tuyến. Tuyến khác gõ thêm ở ô bên dưới.
   if (!VB.pick) VB.pick = new Set(VB.tuyen.length ? VB.tuyen : (sel().code ? [sel().code] : []));
-  const fav = (VB.fav || []).concat(VB.tuyen, sel().code ? [sel().code] : [], Array.from(VB.pick));
-  const codes = fav.filter(function (c, i) { return c && fav.indexOf(c) === i; });
-  const box = codes.map(function (c) {
-    const r = ROUTES.find(function (x) { return x.code === c; });
-    return '<label style="display:inline-flex;align-items:center;gap:5px;margin:4px 12px 4px 0;font-size:14px;cursor:pointer">' +
-      '<input type="checkbox" data-vbc="' + esc(c) + '"' + (VB.pick.has(c) ? ' checked' : '') + '> <b>' + esc(c) + '</b>' +
-      (r && r.name ? ' <span style="color:#6B7590">' + esc(r.name.slice(0, 32)) + '</span>' : '') + '</label>';
-  }).join('');
-  let out = '<div class="ord-warn" style="background:#fff"><div><b>Chọn tuyến được tự xác nhận về bến</b> (chỉ tuyến được tick, tuyến khác không bấm):</div>' +
-    '<div>' + (box || '<i>Chưa có tuyến nào, gõ mã tuyến ở ô bên dưới</i>') + '</div>' +
-    '<div style="margin-top:6px"><input type="text" id="vbAdd" placeholder="thêm tuyến khác, vd: 152" style="height:32px;padding:0 10px;border:1px solid #CBD3E3;border-radius:9px;width:190px;font-size:14px"> ' +
-    '<button class="edit-btn" data-vb="add">➕ Thêm</button></div></div>' +
+  let out = '<div class="gp-top">' + rpHtml('veben', VB.pick, VB.tuyen.concat(sel().code ? [sel().code] : []), '🅿️ Chọn tuyến được tự xác nhận về bến (chỉ tuyến được tick, tuyến khác không bấm)') + '</div>' +
     '<div class="edit-bar">' +
     '<button class="edit-btn big" data-vb="on">🟢 ' + (VB.on ? 'Lưu tuyến đã chọn' : 'Bật cho tuyến đã chọn') + '</button> ' +
     (VB.on ? '<button class="edit-btn" data-vb="off">⚪ Tắt</button> ' : '') +
@@ -720,7 +889,7 @@ function renderVeben() {
   out += '<table><thead><tr>' + ['Lúc bấm', 'Tuyến', 'Lịch', 'Xe', 'Mã chuyến', 'Chiều', 'Đi', 'Đến', 'Về bến', 'Kết quả']
     .map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' +
     (body || '<tr><td colspan="10">Chưa bấm chuyến nào</td></tr>') + '</tbody></table>';
-  $('out').innerHTML = out;
+  setOut(out); // giữ chữ đang gõ trong ô Thêm tuyến
 }
 
 $('out').addEventListener('click', function (ev) {
@@ -729,11 +898,6 @@ $('out').addEventListener('click', function (ev) {
   const act = b.getAttribute('data-vb');
   if (act === 'reload') { VB.pick = null; vebenCall({}); return; }
   if (act === 'off') { if (confirm('Tắt tự xác nhận về bến?')) vebenCall({ set: 'off' }); return; }
-  if (act === 'add') {
-    const v = ($('vbAdd').value || '').trim(), r = v && findRoute(v);
-    if (!r) { msg('❌ Không thấy tuyến "' + v + '"', 'err'); return; }
-    VB.pick.add(r.code); renderVeben(); return;
-  }
   const tuyen = Array.from(VB.pick).join(', ');
   if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
   if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ 30 phút quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
@@ -746,7 +910,6 @@ $('out').addEventListener('click', function (ev) {
 const BT_IDS = ['bt1', 'bt2', 'bt3'];
 BT_IDS.forEach(function (id) {
   const v = localStorage.getItem('bt_' + id); if (v) $(id).value = v;
-  $(id).onfocus = function () { this.select(); };
   $(id).onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnBt').click(); } };
 });
 
@@ -891,82 +1054,224 @@ $('btnXlsx').onclick = function () {
     .then(function () { $('btnXlsx').disabled = false; });
 };
 
+// ===== Ô CHỌN NHIỀU TUYẾN (dùng chung: chụp GPS, tự xác nhận về bến) =====
+// Ô tick cho tuyến cụm (FB_ROUTES) + tuyến đã chọn + tuyến đang mở; ô gõ thêm tuyến (nhiều tuyến cách nhau dấu phẩy).
+// RP[tên] = { set: () => Set mã tuyến, change: () => vẽ lại } (khai báo ở đầu file).
+const RP_SEEN = {}; // tuyến từng chọn trong lần mở web: bỏ tick vẫn giữ ô để tick lại (không biến mất)
+function rpHtml(name, set, extra, title) {
+  const seen = RP_SEEN[name] = RP_SEEN[name] || new Set();
+  set.forEach(c => seen.add(c));
+  const all = FAV_CODES.concat(extra || [], Array.from(seen));
+  const codes = all.filter((c, i) => c && all.indexOf(c) === i);
+  const chips = codes.map(function (c) {
+    const r = ROUTES.find(x => x.code === c), on = set.has(c);
+    return '<label class="rp-chip' + (on ? ' on' : '') + '" title="' + esc(r ? routeText(r) : c) + '"><input type="checkbox" data-rp="' + name + '" data-code="' + esc(c) + '"' +
+      (on ? ' checked' : '') + '><b>' + esc(c) + '</b>' + (r && r.name ? '<span>' + esc(r.name.slice(0, 30)) + '</span>' : '') + '</label>';
+  }).join('');
+  return '<div class="rp"><div class="rp-head"><b>' + title + '</b><span class="rp-n">Đã chọn ' + set.size + ' tuyến</span><span class="rp-quick">' +
+    (FAV_CODES.length ? '<button type="button" class="rp-mini" data-rp-act="fav" data-rp="' + name + '">Chọn cả cụm</button>' : '') +
+    '<button type="button" class="rp-mini" data-rp-act="none" data-rp="' + name + '">Bỏ chọn hết</button></span></div>' +
+    '<div class="rp-chips">' + (chips || '<i class="rp-empty">Chưa có tuyến nào, gõ mã tuyến ở ô bên dưới</i>') + '</div>' +
+    '<div class="rp-add"><input type="text" data-route="multi" data-rp-input="' + name + '" placeholder="Bấm để chọn, hoặc gõ tuyến (vd: 30, 55)" autocomplete="off" spellcheck="false">' +
+    '<button type="button" class="edit-btn" data-rp-act="add" data-rp="' + name + '">➕ Thêm</button></div></div>';
+}
+document.addEventListener('change', function (ev) {
+  const el = ev.target;
+  if (!el.matches || !el.matches('input[data-rp][data-code]') || !RP[el.dataset.rp]) return;
+  const set = RP[el.dataset.rp].set();
+  if (el.checked) set.add(el.dataset.code); else set.delete(el.dataset.code);
+  RP[el.dataset.rp].change();
+});
+document.addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('[data-rp-act]');
+  if (!b || !RP[b.dataset.rp]) return;
+  const set = RP[b.dataset.rp].set(), act = b.dataset.rpAct;
+  if (act === 'fav') FAV_CODES.forEach(c => set.add(c));
+  else if (act === 'none') set.clear();
+  else if (act === 'add') {
+    const inp = document.querySelector('[data-rp-input="' + b.dataset.rp + '"]');
+    const parts = String(inp ? inp.value : '').split(/[,;]+/).map(x => x.trim()).filter(Boolean), bad = [];
+    if (!parts.length) { msg('❌ Gõ mã tuyến cần thêm (nhiều tuyến cách nhau dấu phẩy)', 'err'); return; }
+    parts.forEach(function (v) {
+      const r = findRoute(v);
+      if (r) { set.add(r.code); return; }
+      const words = v.split(/\s+/), rs = words.map(findRoute); // "30 55 152" gõ cách nhau dấu cách
+      if (words.length > 1 && rs.every(Boolean)) rs.forEach(x => set.add(x.code)); else bad.push(v);
+    });
+    if (bad.length) msg('❌ Không thấy tuyến: ' + bad.join(', '), 'err');
+    else if (inp) inp.value = ''; // thêm xong: ô trống lại, danh sách hiện lại để chọn tiếp
+  }
+  RP[b.dataset.rp].change();
+});
+document.addEventListener('keydown', function (ev) { // Enter trong ô thêm tuyến = bấm ➕ Thêm
+  const el = ev.target;
+  if (ev.key !== 'Enter' || !el.matches || !el.matches('input[data-rp-input]')) return;
+  ev.preventDefault();
+  const b = document.querySelector('[data-rp-act="add"][data-rp="' + el.dataset.rpInput + '"]');
+  if (b) b.click();
+});
+
 // ===== CHỤP GPS MẤT CHUYẾN (gọi gps / gpsstatus trong gps.gs -> GitHub Actions) =====
-// Bấm nút: liệt kê chuyến có tài xế / tiếp viên / trạng thái "mất chuyến" của tuyến + ngày đang chọn (chưa chụp).
-// Tick chọn chuyến, bấm "Chụp": GitHub chụp lộ trình, ảnh lên Drive, link ghi vào Google Sheet như chay.command trên Mac.
+// Chọn 1 hoặc NHIỀU tuyến (ô tick, nhớ lại lần sau) -> liệt kê chuyến mất của mọi tuyến đã chọn trong ngày, gom theo tuyến.
+// 2 loại khác nhau: MẤT CHUYẾN (xe không chạy) tick sẵn; ĐỀ XUẤT MẤT CHUYẾN (xe có chạy, chờ duyệt) không tick sẵn.
+// Bấm "Chụp": gửi GitHub 1 LẦN cho tất cả tuyến (đăng nhập GPS 1 lần), ảnh lên Drive, link ghi vào Google Sheet.
 let GPS_RUN = null; // lần chụp GPS đang chạy ngầm (GitHub), xong báo ở dòng thông báo
+const GPSR = new Set((function () { try { return JSON.parse(localStorage.getItem('gps_routes') || '[]'); } catch (e) { return []; } })());
+RP.gps = { set: () => GPSR, change: function () { localStorage.setItem('gps_routes', JSON.stringify(Array.from(GPSR))); if (MODE === 'gps') renderGps(); } };
+function gpsRoutes() { // tuyến đã chọn -> [{id, code}] (bỏ mã không còn trong danh sách tuyến)
+  return Array.from(GPSR).map(c => ROUTES.find(r => r.code === c)).filter(Boolean).map(r => ({ id: String(r.id), code: r.code }));
+}
+const gpsCodes = list => list.map(r => r.code).join(', ');
+
 $('btnGps').onclick = function () {
-  if (GPS_RUN) { GP = GPS_RUN; MODE = 'gps'; $('btnCopy').style.display = 'none'; renderGps(); msg('🛰 Đang chụp GPS tuyến ' + GP.sel.code + ', xem tiến độ bên dưới. Xong sẽ báo ở đây.', ''); return; }
-  const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
-  $('btnGps').disabled = true; msg('Đang tìm chuyến mất chuyến tuyến ' + s.code + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  gToken(50).then(function (gtok) { // xin token Google ngay lúc bấm (đủ dài cho cả lần chụp sau)
-    return apiPost({ action: 'gps', dry: '1', gtok: gtok, routeId: s.id, label: s.code, date: isoDate() }, 180000);
-  }).then(function (res) {
-    if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
-    GP = res; GP.sel = s; GP.iso = isoDate(); GP.run = null; MODE = 'gps'; $('btnCopy').style.display = 'none';
-    GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo && !t.matGps).map(t => t.key)); // tick sẵn chuyến chưa có ảnh (bỏ xe mất GPS)
-    if (!res.trips.length) msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ' không có chuyến mất nào.', 'ok');
-    else msg('Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.trips.length + ' chuyến mất. Tick chọn chuyến cần chụp rồi bấm "🛰 Chụp".', 'ok');
-    renderGps();
-  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
-    .then(function () { $('btnGps').disabled = false; });
+  if (GPS_RUN) { GP = GPS_RUN; MODE = 'gps'; $('btnCopy').style.display = 'none'; renderGps(); msg('🛰 Đang chụp GPS tuyến ' + GP.sent.codes + ', xem tiến độ bên dưới. Xong sẽ báo ở đây.', 'info'); return; }
+  if (!isoDate()) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
+  if (!ROUTES.length) { msg('❌ Danh sách tuyến chưa tải xong.', 'err'); return; }
+  const s = sel();
+  if (s.code && !GPSR.has(s.code)) { GPSR.add(s.code); RP.gps.change(); } // tuyến đang mở luôn được chọn thêm
+  MODE = 'gps'; $('btnCopy').style.display = 'none';
+  if (GP && GP.iso !== isoDate()) GP = null;
+  if (!GPSR.size) { GP = null; renderGps(); msg('Tick chọn tuyến cần chụp GPS rồi bấm 🔎 Tìm chuyến mất.', 'info'); return; }
+  gpsFind();
 };
 
+function gpsFind() {
+  const list = gpsRoutes(), iso = isoDate();
+  if (!iso) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
+  if (!list.length) { msg('❌ Chưa chọn tuyến nào để chụp GPS.', 'err'); return; }
+  MODE = 'gps'; $('btnCopy').style.display = 'none';
+  if (!GP || GP.iso !== iso) { GP = null; $('stats').innerHTML = ''; }
+  GPS_FINDING = true; renderGps();
+  msg('Đang tìm chuyến mất chuyến ' + list.length + ' tuyến (' + gpsCodes(list) + ') ngày ' + $('date').value + '...');
+  gToken(50).then(function (gtok) { // xin token Google ngay lúc bấm (đủ dài cho cả lần chụp sau)
+    return apiPost({ action: 'gps', dry: '1', gtok: gtok, routes: JSON.stringify(list), routeId: list[0].id, label: list.map(r => r.code).join('+'), date: iso }, 180000);
+  }).then(function (res) {
+    if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
+    if (!res.routes) throw new Error('Máy chủ chưa có bản chụp GPS nhiều tuyến. Dán gps.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
+    const old = GP && GP.iso === iso ? GP : null;
+    GP = res; GP.iso = iso; GP.list = list; GP.run = null; GP.filter = old ? old.filter : 'all';
+    GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo && !t.matGps && !t.dangChup && !isDx(t)).map(t => t.key)); // tick sẵn: mất chuyến chưa có ảnh
+    const nDx = res.trips.filter(isDx).length;
+    if (!res.trips.length) msg('✅ ' + list.length + ' tuyến (' + gpsCodes(list) + ') — ' + res.ngay + ' không có chuyến mất nào.', 'ok');
+    else msg(res.ngay + ' · ' + list.length + ' tuyến: ' + (res.trips.length - nDx) + ' mất chuyến' + (nDx ? ', ' + nDx + ' đề xuất mất chuyến' : '') +
+      '. Đã tick sẵn ' + GP.pick.size + ' chuyến mất chưa có ảnh, kiểm lại rồi bấm "🛰 Chụp".', 'ok');
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
+    .then(function () { GPS_FINDING = false; if (MODE === 'gps') renderGps(); });
+}
+let GPS_FINDING = false;
+
 const MAT_CHUYEN_URL = 'https://docs.google.com/spreadsheets/d/1ysOVfyktQ5p-zlI0L2ZduG8uPneZkJZ3ZHoI7ZZ1KBg/edit?gid=1226700115#gid=1226700115'; // báo cáo mất chuyến
-function renderGps() {
-  const daCo = GP.trips.filter(t => t.daCo).length, khongXe = GP.trips.filter(t => !t.chup).length;
-  $('stats').innerHTML = [['Chuyến mất', GP.trips.length, 'e-n'], ['Đã có ảnh trên Sheet', daCo, 'e-ok'], ['Đã chọn để chụp', GP.pick.size, 'e-warn'], ['Mất GPS', GP.trips.filter(t => t.matGps).length, 'e-noebms'], ['Không có xe', khongXe, 'e-nopc']]
-    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
-  const r = GP.run, sheet = GP.sheet || (r && r.sheet);
-  const canGo = (!r || r.status === 'completed') && GP.trips.some(t => t.chup);
-  let out = '<div class="panel-bar"><div class="pb-left">' +
-    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS' + (GP.rieng ? ' của bạn' : '') + '</a>' : '') +
-    '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a></div>' +
-    (canGo ? '<button class="edit-btn big" data-gps="go"' + (GP.pick.size ? '' : ' disabled') + '>🛰 Chụp ' + GP.pick.size + ' chuyến đã chọn</button>' : '') + '</div>';
-  if (r && r.status === 'completed') {
-    out += '<div class="panel-note ' + (r.conclusion === 'success' ? 'ok' : 'err') + '">' + (r.conclusion === 'success' ? '✅ Chụp xong, link ảnh đã ghi vào Google Sheet.' : '⚠️ Có chuyến chụp lỗi, xem Google Sheet.') + '</div>';
-  } else if (r) {
-    out += '<div class="panel-note busy">⏳ Đang chụp... có thể mất vài phút, cứ để trang mở.</div>';
-  } else if (canGo) {
-    out += '<div class="panel-note">Tick chọn chuyến cần chụp. Chuyến ✅ đã có ảnh mà tick lại thì chụp lại (link mới ghi đè).</div>';
-  }
+function gpsVisible(t) {
   const q = $('q').value.trim().toLowerCase();
-  const body = GP.trips.filter(t => !q || [t.xe, t.lich, t.taiXe, t.tiepVien].join(' ').toLowerCase().indexOf(q) !== -1).map(t =>
-    '<tr class="' + (!t.chup ? 'e-nopc' : t.daCo ? 'e-ok' : '') + '"><td>' +
-    (t.chup ? '<input type="checkbox" class="gps-pick" data-key="' + esc(t.key) + '"' + (GP.pick.has(t.key) ? ' checked' : '') + '>' : '') + '</td><td>' + esc(t.matGps ? '📡 mất GPS' : t.daCo ? '✅ đã có' : t.chup ? '⏳ chưa' : '❌') + (t.matGps ? '<br><small>' + esc(t.matGps) + '</small>' : '') + '</td><td>' + esc(t.lich) + '</td><td>' + esc(t.xe || '(không có xe)') + '</td><td class="left">' + esc(t.ben) +
-    '</td><td>' + esc(t.ma) + '</td><td class="left">' + esc(t.taiXe) + '</td><td class="left">' + esc(t.tiepVien) + '</td><td>' + esc(t.trangThai) + '</td></tr>').join('');
-  const all = GP.trips.filter(t => t.chup), allOn = all.length && all.every(t => GP.pick.has(t.key));
-  out += '<table><thead><tr><th><input type="checkbox" class="gps-all" title="Chọn tất cả"' + (allOn ? ' checked' : '') + '></th>' + ['Ảnh GPS', 'Lịch chạy', 'Xe', 'Bến', 'Mã chuyến', 'Tài xế', 'Tiếp viên', 'Trạng thái'].map(x => '<th>' + x + '</th>').join('') +
-    '</tr></thead><tbody>' + (body || '<tr><td colspan="9">Không có chuyến mất nào</td></tr>') + '</tbody></table>';
-  $('out').innerHTML = out;
+  if (GP.filter === 'mat' && isDx(t)) return false;
+  if (GP.filter === 'dexuat' && !isDx(t)) return false;
+  return !q || [t.tuyen, t.xe, t.lich, t.ben, t.ma, t.taiXe, t.tiepVien].join(' ').toLowerCase().indexOf(q) !== -1;
+}
+function renderGps() {
+  // 1) ô chọn tuyến + nút Tìm
+  const searched = GP && GP.list ? GP.list.map(r => r.code).sort().join(',') : '';
+  const changed = GP && searched !== Array.from(GPSR).sort().join(',');
+  let out = '<div class="gp-top">' + rpHtml('gps', GPSR, sel().code ? [sel().code] : [], '🛰 Chọn tuyến cần chụp GPS — chụp nhiều tuyến 1 lần') +
+    '<div class="rp-go"><button class="edit-btn big" data-gps="find"' + (GPSR.size ? '' : ' disabled') + '>' + (GPS_FINDING ? '⏳ Đang tìm...' : '🔎 Tìm chuyến mất ' + GPSR.size + ' tuyến') + '</button>' +
+    '<span class="edit-hint">' + (changed ? '⚠️ Đã đổi tuyến, bấm Tìm để cập nhật danh sách bên dưới. ' : '') + 'Ngày ' + esc($('date').value) +
+    '. <b class="t-mat">Mất chuyến</b> = xe không chạy (tick sẵn). <b class="t-dx">Đề xuất mất chuyến</b> = xe có chạy, chờ duyệt (tự tick nếu cần ảnh làm bằng chứng).</span></div></div>';
+  if (!GP) { $('stats').innerHTML = ''; setOut(out); return; }
+
+  // 2) số liệu
+  const T = GP.trips, nDx = T.filter(isDx).length, daCo = T.filter(t => t.daCo).length;
+  $('stats').innerHTML = [['Tuyến', GP.routes.length, 'e-n'], ['Mất chuyến', T.length - nDx, 'e-nopc'], ['Đề xuất mất chuyến', nDx, 'e-warn'],
+    ['Đã có ảnh', daCo, 'e-ok'], ['Mất GPS', T.filter(t => t.matGps).length, 'e-noebms'], ['Đã chọn để chụp', GP.pick.size, 'e-n']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+
+  // 3) thanh nút: link Sheet + lọc loại + nút Chụp
+  const r = GP.run, sheet = GP.sheet || (r && r.sheet), other = GPS_RUN && GPS_RUN !== GP;
+  const picked = T.filter(t => t.chup && GP.pick.has(t.key)), nR = new Set(picked.map(t => t.tuyen)).size;
+  const canGo = (!r || r.status === 'completed') && !other && T.some(t => t.chup);
+  const fb = (k, label, n) => '<button type="button" class="gp-f' + (GP.filter === k ? ' on' : '') + '" data-gpf="' + k + '">' + label + ' <b>' + n + '</b></button>';
+  out += '<div class="panel-bar"><div class="pb-left">' +
+    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS' + (GP.rieng ? ' của bạn' : '') + '</a>' : '') +
+    '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a>' +
+    '<span class="gp-fs">' + fb('all', 'Tất cả', T.length) + fb('mat', '🔴 Mất chuyến', T.length - nDx) + fb('dexuat', '🟠 Đề xuất', nDx) + '</span></div>' +
+    (canGo ? '<button class="edit-btn big" data-gps="go"' + (picked.length ? '' : ' disabled') + '>🛰 Chụp ' + picked.length + ' chuyến' + (nR > 1 ? ' · ' + nR + ' tuyến 1 lần' : '') + '</button>' : '') + '</div>';
+  if (r && r.status === 'completed') {
+    out += '<div class="panel-note ' + (r.conclusion === 'success' ? 'ok' : 'err') + '">' + (r.conclusion === 'success' ? '✅ Chụp xong, link ảnh đã ghi vào Google Sheet.' : '⚠️ Có chuyến chụp lỗi, xem Google Sheet (hoặc tick chụp lại).') + '</div>';
+  } else if (r) {
+    out += '<div class="panel-note busy">⏳ Đang chụp ' + esc(GP.sent ? GP.sent.n + ' chuyến · tuyến ' + GP.sent.codes : '') + (r.n > 1 ? ' — xong ' + (r.xong || 0) + '/' + r.n + ' phần' : '') +
+      '... có thể mất vài phút. Vẫn bấm được nút khác, xong sẽ báo.' + (r.url ? ' <a href="' + esc(r.url) + '" target="_blank" rel="noopener">Xem trên GitHub</a>' : '') + '</div>';
+  } else if (other) {
+    out += '<div class="panel-note busy">⏳ Đang có 1 lần chụp khác chạy (tuyến ' + esc(GPS_RUN.sent ? GPS_RUN.sent.codes : '') + '). Chờ xong rồi chụp tiếp, để khỏi quá tải GitHub / Google.</div>';
+  } else if (canGo) {
+    out += '<div class="panel-note">Tick chọn chuyến cần chụp. Chuyến ✅ đã có ảnh mà tick lại thì chụp lại (link mới ghi đè). Ảnh chuyến đề xuất có đuôi _DE_XUAT.</div>';
+  }
+
+  // 4) bảng gom theo tuyến
+  const COLS = 9, vis = T.filter(gpsVisible), allChup = vis.filter(t => t.chup);
+  const allOn = allChup.length && allChup.every(t => GP.pick.has(t.key));
+  let body = '';
+  GP.routes.forEach(function (rt) {
+    const rows = vis.filter(t => t.tuyen === rt.code), mine = T.filter(t => t.tuyen === rt.code);
+    if (!rows.length && (GP.filter !== 'all' || $('q').value.trim()) && mine.length) return;
+    const ch = rows.filter(t => t.chup), on = ch.length && ch.every(t => GP.pick.has(t.key));
+    body += '<tr class="gp-grp"><td>' + (ch.length ? '<input type="checkbox" class="gps-grp" data-tuyen="' + esc(rt.code) + '" title="Chọn cả tuyến"' + (on ? ' checked' : '') + '>' : '') +
+      '</td><td colspan="' + (COLS - 1) + '" class="left"><b>Tuyến ' + esc(rt.code) + '</b>' + (rt.ten ? ' <span class="muted">' + esc(rt.ten) + '</span>' : '') +
+      ' · <span class="pill p-mat">' + rt.mat + ' mất chuyến</span>' + (rt.dexuat ? ' <span class="pill p-dx">' + rt.dexuat + ' đề xuất</span>' : '') +
+      ' · ' + mine.filter(t => t.daCo).length + ' đã có ảnh</td></tr>';
+    if (!mine.length) body += '<tr><td></td><td colspan="' + (COLS - 1) + '" class="left muted">Không có chuyến mất nào</td></tr>';
+    rows.forEach(function (t) {
+      const anh = t.matGps ? '📡 mất GPS' : t.daCo ? '✅ đã có' : t.dangChup ? '⏳ đang chụp' : t.chup ? '⬜ chưa' : '❌ không có xe';
+      body += '<tr class="' + (!t.chup ? 'e-nopc' : t.daCo ? 'e-ok' : isDx(t) ? 'gp-dx' : '') + '"><td>' +
+        (t.chup ? '<input type="checkbox" class="gps-pick" data-key="' + esc(t.key) + '"' + (GP.pick.has(t.key) ? ' checked' : '') + '>' : '') + '</td><td>' + anh +
+        (t.matGps ? '<br><small>' + esc(t.matGps) + '</small>' : '') + '</td><td>' + typePill(t) + '</td><td>' + esc(t.lich) + '</td><td>' + esc(t.xe || '(không có xe)') +
+        '</td><td>' + (isDx(t) ? esc(t.di || '?') + ' → ' + esc(t.den || '?') : '—') + '</td><td class="left">' + esc(t.ben) + '</td><td>' + esc(t.ma) +
+        '</td><td class="left">' + (isDx(t) ? esc([t.taiXe, t.tiepVien].filter(Boolean).join(' / ')) : '<span class="muted">—</span>') + '</td></tr>'; // mất chuyến: tài xế/tiếp viên là "Mất Chuyến", khỏi lặp
+    });
+  });
+  out += '<table class="gp-tb"><thead><tr><th><input type="checkbox" class="gps-all" title="Chọn tất cả chuyến đang hiện"' + (allOn ? ' checked' : '') + '></th>' +
+    ['Ảnh GPS', 'Loại', 'Lịch chạy', 'Xe', 'Đi → đến thực tế', 'Bến', 'Mã chuyến', 'Tài xế / Tiếp viên'].map(x => '<th>' + x + '</th>').join('') +
+    '</tr></thead><tbody>' + (body || '<tr><td colspan="' + COLS + '">Không có chuyến nào</td></tr>') + '</tbody></table>';
+  setOut(out); // giữ chữ đang gõ trong ô Thêm tuyến
 }
 
+// Tìm / lọc loại / Chụp
 $('out').addEventListener('click', function (ev) {
-  const b = ev.target.closest && ev.target.closest('button[data-gps="go"]');
-  if (!b || MODE !== 'gps' || !GP) return;
-  const picked = GP.trips.filter(t => GP.pick.has(t.key));
+  if (MODE !== 'gps') return;
+  const f = ev.target.closest && ev.target.closest('[data-gpf]');
+  if (f && GP) { GP.filter = f.dataset.gpf; renderGps(); return; }
+  const b = ev.target.closest && ev.target.closest('button[data-gps]');
+  if (!b) return;
+  if (b.dataset.gps === 'find') { gpsFind(); return; }
+  if (b.dataset.gps !== 'go' || !GP) return;
+  const picked = GP.trips.filter(t => t.chup && GP.pick.has(t.key));
   if (!picked.length) { msg('Chưa tick chuyến nào.', 'err'); return; }
-  if (!confirm('Chụp GPS ' + picked.length + ' chuyến của tuyến ' + GP.sel.code + ' · ' + GP.ngay + ':\n\n' +
-    picked.map(t => '• ' + t.lich + '  ' + t.xe + (t.daCo ? '  (chụp lại)' : '')).join('\n') + '\n\nẢnh lên Drive, link ghi vào Google Sheet.')) return;
-  b.disabled = true; msg('Đang gửi lệnh chụp...'); askNotify();
+  const routes = GP.list.filter(r => picked.some(t => t.tuyen === r.code)), lines = [];
+  routes.forEach(function (r) {
+    const ts = picked.filter(t => t.tuyen === r.code), dx = ts.filter(isDx).length;
+    lines.push('Tuyến ' + r.code + ': ' + ts.length + ' chuyến' + (dx ? ' (' + dx + ' đề xuất mất chuyến)' : ''));
+    ts.forEach(t => lines.push('   • ' + t.lich + '  ' + t.xe + (isDx(t) ? '  [đề xuất]' : '') + (t.daCo ? '  (chụp lại)' : '')));
+  });
+  if (!confirm('Chụp GPS ' + picked.length + ' chuyến · ' + routes.length + ' tuyến · ngày ' + GP.ngay + ' (gửi 1 lần):\n\n' + clip(lines, 45).join('\n') +
+    '\n\nẢnh lên Drive, link ghi vào Google Sheet.')) return;
+  b.disabled = true; msg('Đang gửi lệnh chụp ' + picked.length + ' chuyến (' + routes.length + ' tuyến)...'); askNotify();
   const g = GP;
   gToken(40).then(function (gtok) {
-    return apiPost({ action: 'gps', gtok: gtok, routeId: g.sel.id, label: g.sel.code, date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
+    return apiPost({ action: 'gps', gtok: gtok, routes: JSON.stringify(routes), routeId: routes[0].id, label: routes.map(r => r.code).join('+'),
+                     date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
   }).then(function (res) {
-    if (!res.started) { msg('⚠️ Không có chuyến nào để chụp.', 'err'); return; }
-    g.run = { status: 'queued' }; renderGps(); GPS_RUN = g;
-    msg('🛰 Đã gửi ' + res.nChup + ' chuyến, đang chụp ngầm (vẫn bấm được nút khác). Xong sẽ báo ở đây.', 'ok');
-    const title = g.sel.code + ' ' + res.ngay, t0 = Date.now();
+    if (!res.started) { msg('⚠️ Không có chuyến nào để chụp (danh sách vừa đổi, bấm 🔎 Tìm lại).', 'err'); b.disabled = false; return; }
+    g.sent = { n: res.nChup, codes: gpsCodes(routes), routes: routes, picked: picked };
+    g.run = { status: 'queued', n: res.runs || 1 }; GPS_RUN = g;
+    picked.forEach(t => { if (!t.daCo) t.dangChup = true; });
+    if (MODE === 'gps' && GP === g) renderGps();
+    msg('🛰 Đã gửi ' + res.nChup + ' chuyến (' + routes.length + ' tuyến), đang chụp ngầm (vẫn bấm được nút khác). Xong sẽ báo ở đây.', 'ok');
+    const title = res.title || (routes.map(r => r.code).join('+') + ' ' + res.ngay), t0 = Date.now();
     (function poll() {
       // chạy ngầm: bấm sang việc khác vẫn theo dõi tới khi xong, chỉ vẽ bảng khi đang xem bảng GPS
-      api({ action: 'gpsstatus', since: res.since, title: title }, 60000).then(function (st) {
+      api({ action: 'gpsstatus', since: res.since, title: title, n: res.runs || 1 }, 60000).then(function (st) {
         g.run = st; if (MODE === 'gps' && GP === g) renderGps();
-        if (st.status === 'completed') {
-          GPS_RUN = null;
-          gpsReport(g, picked, title, st);
-        } else if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 10000);
-        else { GPS_RUN = null; msg('⚠️ Chụp GPS đã chờ 60 phút chưa xong, mở Google Sheet để kiểm tra.', 'err'); }
-      }).catch(function () { if (Date.now() - t0 < 60 * 60000) setTimeout(poll, 15000); else GPS_RUN = null; });
+        if (st.status === 'completed') { GPS_RUN = null; gpsReport(g, st); }
+        else if (Date.now() - t0 < 90 * 60000) setTimeout(poll, 10000);
+        else { GPS_RUN = null; msg('⚠️ Chụp GPS đã chờ 90 phút chưa xong, mở Google Sheet để kiểm tra.', 'err'); }
+      }).catch(function () { if (Date.now() - t0 < 90 * 60000) setTimeout(poll, 15000); else GPS_RUN = null; });
     })();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); b.disabled = false; });
 });
@@ -974,12 +1279,130 @@ $('out').addEventListener('click', function (ev) {
 // Tick chọn chuyến GPS (giữ lựa chọn khi lọc / vẽ lại bảng)
 $('out').addEventListener('change', function (ev) {
   if (MODE !== 'gps' || !GP) return;
-  const el = ev.target;
+  const el = ev.target, set = (t, on) => { if (t.chup) { if (on) GP.pick.add(t.key); else GP.pick.delete(t.key); } };
   if (el.classList.contains('gps-pick')) { if (el.checked) GP.pick.add(el.dataset.key); else GP.pick.delete(el.dataset.key); }
-  else if (el.classList.contains('gps-all')) GP.trips.forEach(function (t) { if (t.chup) { if (el.checked) GP.pick.add(t.key); else GP.pick.delete(t.key); } });
+  else if (el.classList.contains('gps-grp')) GP.trips.filter(t => t.tuyen === el.dataset.tuyen && gpsVisible(t)).forEach(t => set(t, el.checked));
+  else if (el.classList.contains('gps-all')) GP.trips.filter(gpsVisible).forEach(t => set(t, el.checked));
   else return;
   renderGps();
 });
+
+// ===== HOÀN TÁC (gọi undo trong edit.gs) =====
+// Mỗi lần lưu lên FUTA (sửa 1 ô, Lưu tất cả, Tự chỉnh theo luật) máy chủ nhớ giá trị TRƯỚC khi lưu, giữ tới 23:55 ngày lưu.
+// Hoàn tác = ghi lại giá trị cũ; ô nào đã bị đổi tiếp sau lần lưu đó thì không đụng. Hoàn tác nhầm thì "Làm lại".
+// "Xác nhận về bến" không hoàn tác được (FUTA không cho huỷ kết thúc chuyến).
+$('btnUndo').onclick = function () { undoList(); };
+
+function undoList(note, cls) {
+  msg(note ? note + '\nĐang tải danh sách lần lưu...' : 'Đang tải danh sách lần lưu...');
+  return api({ action: 'undo', op: 'list', ekey: getEkey() }, 60000).then(function (res) {
+    if (!res.list) throw new Error('Server chưa có action "undo". Dán edit.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
+    UD = res; MODE = 'undo'; $('btnCopy').style.display = 'none';
+    renderUndo();
+    msg(note || '↩️ ' + res.list.length + ' lần lưu hôm nay (hoàn tác được tới 23:55, quá giờ tự xoá). Bấm "↩️ Hoàn tác" ở lần lưu cần trả lại giá trị cũ.', cls || 'info');
+  }).catch(function (e) { msg((note ? note + '\n' : '') + '❌ ' + e.message, 'err'); });
+}
+
+function renderUndo() {
+  const L = UD.list, done = L.filter(x => x.done).length;
+  $('stats').innerHTML = [['Lần lưu', L.length, 'e-n'], ['Hoàn tác được', L.length - done, 'e-warn'], ['Đã hoàn tác', done, 'e-ok']]
+    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  const q = $('q').value.trim().toLowerCase();
+  let body = '';
+  L.forEach(function (x) {
+    if (q && [x.who, x.kind, x.tuyen, x.ngay, x.xe, x.of].join(' ').toLowerCase().indexOf(q) === -1) return;
+    const st = x.done ? '✅ Đã hoàn tác ' + x.done + (x.doneWho ? ' (' + x.doneWho + ')' : '') : x.of ? '↩️ Là lần hoàn tác của: ' + x.of : 'Có thể hoàn tác';
+    body += '<tr class="' + (x.done ? 'e-ok' : '') + '"><td>' + esc(x.at) + '<br><small class="muted">hạn ' + esc(x.het || '23:55') + '</small></td><td class="left">' + esc(x.who) + '</td><td class="left">' + esc(x.kind) +
+      '</td><td>' + esc(x.tuyen) + '</td><td>' + esc(x.ngay) + '</td><td class="left">' + esc(x.xe) + '</td><td>' + esc(x.nTrip) + ' chuyến · ' + esc(x.nField) + ' ô' +
+      '</td><td class="notes">' + esc(st) + '</td><td class="edcell"><button class="edit-btn soft" data-undo-view="' + esc(x.id) + '">👁 Xem</button>' +
+      (x.done ? '' : '<button class="edit-btn red" data-undo="' + esc(x.id) + '">' + (x.of ? '↪️ Làm lại' : '↩️ Hoàn tác') + '</button>') + '</td></tr>';
+    if (UD.view && UD.view.entry.id === x.id) {
+      body += '<tr class="ud-detail"><td colspan="9" class="left"><div class="ud-list">' + UD.view.items.map(function (it) {
+        return '<div>• <b>' + esc([it.xe, it.lenh && 'lệnh ' + it.lenh, it.stt && 'chuyến ' + it.stt].filter(Boolean).join(' · ')) + '</b> (' + esc(it.code) + '): ' +
+          it.f.map(f => esc(f.label) + ' <span class="ud-now">' + esc(f.now) + '</span> → hoàn tác về <span class="ud-back">' + esc(f.back) + '</span>').join(', ') + '</div>';
+      }).join('') + '</div></td></tr>';
+    }
+  });
+  $('out').innerHTML = '<div class="panel-note">↩️ Hoàn tác = ghi lại giá trị <b>trước</b> lần lưu, làm được tới <b>23:55</b> của ngày lưu (lưu sau 23:55 thì tới 23:55 hôm sau). Máy chủ đọc lại ngay trước khi ghi: ô nào đã bị đổi tiếp sau lần lưu đó ' +
+    '(tiếp viên bấm, người khác sửa) thì <b>không đụng</b> và báo ra. Hoàn tác nhầm thì bấm ↪️ Làm lại. <b>Xác nhận về bến không hoàn tác được</b> (FUTA không cho huỷ kết thúc chuyến).</div>' +
+    '<table><thead><tr>' + ['Lúc lưu', 'Người lưu', 'Loại', 'Tuyến', 'Ngày', 'Xe', 'Số lượng', 'Trạng thái', ''].map(x => '<th>' + x + '</th>').join('') +
+    '</tr></thead><tbody>' + (body || '<tr><td colspan="9">Hôm nay chưa có lần lưu nào (mỗi lần lưu sửa lệnh / tự chỉnh sẽ hiện ở đây tới 23:55)</td></tr>') + '</tbody></table>';
+}
+
+// 👁 Xem chi tiết 1 lần lưu (bấm lại thì ẩn)
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('[data-undo-view]');
+  if (!b || MODE !== 'undo' || !UD) return;
+  const id = b.dataset.undoView;
+  if (UD.view && UD.view.entry.id === id) { UD.view = null; renderUndo(); return; }
+  api({ action: 'undo', op: 'view', id: id, ekey: getEkey() }, 60000).then(function (v) { UD.view = v; renderUndo(); msg('', ''); })
+    .catch(function (e) { msg('❌ ' + e.message, 'err'); });
+});
+
+// ↩️ Hoàn tác / ↪️ Làm lại (ở màn Hoàn tác hoặc thanh "Lỡ tay?" ngay sau khi lưu)
+document.addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('[data-undo]');
+  if (!b || document.body.classList.contains('is-busy')) return;
+  undoRun(b.dataset.undo);
+});
+function undoRun(id) {
+  msg('Đang đọc chi tiết lần lưu...');
+  api({ action: 'undo', op: 'view', id: id, ekey: getEkey() }, 60000).then(function (v) {
+    const e = v.entry;
+    if (e.done) { msg('Lần lưu này đã được hoàn tác lúc ' + e.done + (e.doneWho ? ' (' + e.doneWho + ')' : '') + '.', 'err'); return; }
+    const lines = v.items.map(it => '• ' + [it.xe, it.lenh && 'lệnh ' + it.lenh, it.stt && 'chuyến ' + it.stt].filter(Boolean).join(' · ') + ' (' + it.code + '): ' +
+      it.f.map(f => f.label + ' ' + f.now + ' → ' + f.back).join(', '));
+    if (!confirm((e.of ? 'LÀM LẠI (huỷ lần hoàn tác)' : 'HOÀN TÁC') + ': ' + e.kind + ' lúc ' + e.at + ' (' + e.who + ')\nTuyến ' + e.tuyen + ' · ' + e.ngay + (e.xe ? ' · ' + e.xe : '') +
+      '\n\nSẽ ghi lại giá trị cũ cho ' + v.items.length + ' chuyến lên FUTA:\n\n' + clip(lines, 40).join('\n') +
+      '\n\nÔ nào đã bị đổi tiếp sau lần lưu này sẽ KHÔNG đụng tới. Xác nhận?')) { msg('Đã huỷ, chưa ghi gì.', 'info'); return; }
+    msg('Đang hoàn tác ' + v.items.length + ' chuyến (đọc lại → ghi giá trị cũ → đọc lại kiểm, đừng đóng trang)...');
+    return api({ action: 'undo', op: 'run', id: id, ekey: getEkey() }, 360000, 0).then(function (r) {
+      const bad = r.verifyBad.concat(r.failed, r.skipped);
+      const line = (bad.length || r.stopped ? '⚠️ ' : '✅ ') + (e.of ? 'Đã làm lại ' : 'Đã hoàn tác ') + r.restored + '/' + r.total + ' chuyến (' + r.elapsed + 's)' +
+        (r.verifyBad.length ? ', KIỂM LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi ghi ' + r.failed.length : '') +
+        (r.skipped.length ? ', không khôi phục ' + r.skipped.length : '') + (r.stopped ? ', chưa kịp ' + r.stopped + ' (hết giờ, bấm lại)' : '') +
+        (bad.length ? '\n' + bad.join('\n') : '');
+      const cls = bad.length || r.stopped ? 'err' : 'ok';
+      if (r.redoId) showUndo(r.redoId, e.of ? 'Đã làm lại. Đổi ý?' : 'Đã hoàn tác. Hoàn tác nhầm?', e.of ? '↩️ Hoàn tác lại' : '↪️ Làm lại (ghi lại giá trị vừa bỏ)');
+      else hideUndo();
+      if (MODE === 'edit' && ED) return loadEdit(ED.sel, ED.plate).then(function () { msg(line, cls); });
+      if (MODE === 'auto' && AU) return autoPlan(line);
+      return undoList(line, cls);
+    });
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
+}
+
+// Thanh "Lỡ tay?" hiện ngay dưới dòng thông báo sau mỗi lần lưu; ẩn khi bấm sang tác vụ khác hoặc bấm ×
+function showUndo(id, text, label) {
+  if (!id) return;
+  $('undoBar').innerHTML = '<span>↩️ ' + esc((text || 'Lỡ tay?') + ' (được tới 23:55)') + '</span><button class="edit-btn red" data-undo="' + esc(id) + '">' + esc(label || '↩️ Hoàn tác lần lưu vừa rồi') +
+    '</button><button type="button" class="ub-x" title="Ẩn" aria-label="Ẩn">×</button>';
+  $('undoBar').hidden = false;
+}
+function hideUndo() { $('undoBar').hidden = true; $('undoBar').innerHTML = ''; }
+$('undoBar').addEventListener('click', function (ev) { if (ev.target.closest('.ub-x')) hideUndo(); });
+
+// ===== NÚT TÁC VỤ: vòng xoay trên nút đang chạy, ẩn khung tiêu chí / Excel / "Lỡ tay?" khi đổi tác vụ, nhớ tác vụ để "🔄 Lấy mới" =====
+let LAST_BTN = null, LAST_RO = null, FRESH_UNTIL = 0;
+const RO_BTN = { btnLoad: 1, btnEbms: 1, btnNv: 1, btnLvc: 1, btnGps: 1, btnBt: 1 };   // tác vụ chỉ đọc (máy chủ dùng chung kết quả 30–60 giây)
+const RO_ACT = { load: 1, ebms: 1, nv: 1, lvc: 1, bangtai: 1, gps: 1 };
+document.addEventListener('click', function (e) {
+  if (!e.target.closest || document.body.classList.contains('is-busy')) return;
+  const nb = e.target.closest('.act, .edit-btn.big, [data-undo]');
+  if (nb) LAST_BTN = nb;
+  const b = e.target.closest('.act');
+  if (!b) return;
+  $('lvcRules').hidden = (b.id !== 'btnLvc'); $('btnXlsx').style.display = 'none';
+  if (b.id !== 'btnUndo') hideUndo();
+  if (!RO_BTN[b.id]) { $('dataAt').textContent = ''; $('btnFresh').hidden = true; }
+  else LAST_RO = b.id;
+}, true);
+$('btnFresh').onclick = function () {
+  if (document.body.classList.contains('is-busy')) return;
+  FRESH_UNTIL = Date.now() + 3000; // các lượt gọi trong 3 giây tới bỏ cache (nocache=1)
+  if (MODE === 'gps' && LAST_RO === 'btnGps') gpsFind();
+  else if (LAST_RO && $(LAST_RO)) $(LAST_RO).click();
+};
 
 // ===== GOOGLE: lưu ảnh GPS vào Drive / Sheet của chính người dùng (quyền drive.file: chỉ file do web tạo) =====
 let GTOK = null, GCLIENT = null, GWAIT = null;
@@ -1095,16 +1518,25 @@ $('btnLogout').onclick = function () {
   const FREE = { gpsstatus: 1, editauth: 1 }; // chạy nền (hỏi tiến độ GPS, kiểm tra mã): không khoá
   const BTN = '.act, .edit-btn, [data-gps="go"]';
   let n = 0, timer = null;
+  let runBtn = null;
   const mark = function () {
     clearTimeout(timer);
-    if (n > 0) document.body.classList.add('is-busy');
-    else timer = setTimeout(function () { document.body.classList.remove('is-busy'); }, 400); // giữa 2 bước của 1 thao tác không mở khoá
+    if (n > 0) {
+      document.body.classList.add('is-busy');
+      if (!runBtn && LAST_BTN) { runBtn = LAST_BTN; runBtn.classList.add('is-run'); } // vòng xoay trên nút vừa bấm
+    } else timer = setTimeout(function () { // giữa 2 bước của 1 thao tác không mở khoá
+      document.body.classList.remove('is-busy');
+      if (runBtn) { runBtn.classList.remove('is-run'); runBtn = null; }
+      LAST_BTN = null;
+    }, 200);
   };
   const wrap = function (fn) {
     return function (params) {
       const track = !(params && FREE[params.action]);
       if (track) { n++; mark(); }
-      return Promise.resolve(fn.apply(this, arguments)).then(function (res) {
+      const args = Array.prototype.slice.call(arguments);
+      if (params && RO_ACT[params.action] && Date.now() < FRESH_UNTIL) args[0] = Object.assign({}, params, { nocache: '1' }); // 🔄 Lấy mới
+      return Promise.resolve(fn.apply(this, args)).then(function (res) {
         if (res && res.at) showDataAt(res.at);
         return res;
       }).finally(function () { if (track) { n--; mark(); } });
@@ -1114,16 +1546,17 @@ $('btnLogout').onclick = function () {
   // chặn cả bấm chuột lẫn Enter (Enter gọi .click() nên cũng đi qua đây)
   document.addEventListener('click', function (ev) {
     const b = ev.target.closest && ev.target.closest(BTN);
-    if (!b || !document.body.classList.contains('is-busy')) return;
+    if (!b || b.hasAttribute('data-rp-act') || !document.body.classList.contains('is-busy')) return; // nút chọn tuyến chỉ đổi lựa chọn trên máy, không khoá
     ev.preventDefault(); ev.stopImmediatePropagation();
   }, true);
 })();
 
-// ===== GIỜ DỮ LIỆU: cho biết đang xem dữ liệu lấy lúc nào (máy chủ dùng chung kết quả tối đa 30 giây, EBMS luôn lấy mới) =====
+// ===== GIỜ DỮ LIỆU: cho biết đang xem dữ liệu lấy lúc nào (máy chủ dùng chung kết quả 30 giây, EBMS 60 giây; "🔄 Lấy mới" để đọc mới) =====
 function showDataAt(at) {
   const t = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(at));
   const ago = Math.round((Date.now() - at) / 1000);
   $('dataAt').textContent = '🕒 Dữ liệu lúc ' + t + (ago >= 5 ? ' (' + ago + ' giây trước)' : '');
+  $('btnFresh').hidden = !LAST_RO;
 }
 
 // ===== THÔNG BÁO KHI CHỤP GPS XONG: tiếng "ting" + thông báo góc màn hình (chỉ máy người bấm chụp) =====
@@ -1142,19 +1575,27 @@ function notifyDone(title, body) {
 }
 
 // ===== Chụp GPS xong: đọc lại Sheet để báo chuyến có ảnh / XE MẤT GPS (bỏ qua, không chụp được) / chuyến lỗi =====
-function gpsReport(g, picked, title, st) {
-  apiPost({ action: 'gps', dry: '1', gtok: '', routeId: g.sel.id, label: g.sel.code, date: g.iso }, 180000).then(function (res) {
+function gpsReport(g, st) {
+  const sent = g.sent || { routes: g.list || [], picked: [], codes: '' }, routes = sent.routes, picked = sent.picked;
+  const gt = GTOK && GTOK.exp > Date.now() + 60000 ? GTOK.t : '';
+  apiPost({ action: 'gps', dry: '1', gtok: gt, routes: JSON.stringify(routes), routeId: routes[0].id, label: routes.map(r => r.code).join('+'), date: g.iso }, 180000).then(function (res) {
     const by = {}; res.trips.forEach(function (t) { by[t.key] = t; });
-    g.trips = res.trips;
+    // cập nhật lại danh sách (tuyến chụp có thể chỉ là 1 phần các tuyến đang xem)
+    const keep = (g.trips || []).filter(t => !routes.some(r => r.code === t.tuyen));
+    g.trips = keep.concat(res.trips).sort((a, b) => g.routes.findIndex(r => r.code === a.tuyen) - g.routes.findIndex(r => r.code === b.tuyen));
     const mat = [], err = []; let ok = 0;
-    picked.forEach(function (t) { const x = by[t.key] || t; if (x.matGps) mat.push(x.xe); else if (x.daCo) ok++; else err.push(x.lich + ' ' + x.xe); });
-    const text = '🛰 Chụp GPS xong tuyến ' + title + ': ' + ok + '/' + picked.length + ' chuyến có ảnh' +
+    picked.forEach(function (t) {
+      const x = by[t.key] || t;
+      if (x.matGps) mat.push(x.tuyen + ' ' + x.xe); else if (x.daCo) ok++; else err.push(x.tuyen + ' ' + x.lich + ' ' + x.xe);
+      if (x.daCo || x.matGps) g.pick.delete(t.key);
+    });
+    const text = '🛰 Chụp GPS xong ' + routes.length + ' tuyến (' + sent.codes + ') ' + res.ngay + ': ' + ok + '/' + picked.length + ' chuyến có ảnh' +
       (mat.length ? ' · 📡 Xe mất GPS (bỏ qua): ' + mat.join(', ') : '') + (err.length ? ' · ⚠️ Lỗi, tick chụp lại: ' + err.join(', ') : '');
     msg(text, err.length ? 'err' : 'ok');
-    notifyDone(err.length ? '⚠️ Chụp GPS có chuyến lỗi' : '🛰 Chụp GPS xong', 'Tuyến ' + title + ': ' + ok + ' có ảnh' + (mat.length ? ', mất GPS: ' + mat.join(', ') : '') + (err.length ? ', lỗi ' + err.length : ''));
+    notifyDone(err.length ? '⚠️ Chụp GPS có chuyến lỗi' : '🛰 Chụp GPS xong', 'Tuyến ' + sent.codes + ': ' + ok + ' có ảnh' + (mat.length ? ', mất GPS: ' + mat.length : '') + (err.length ? ', lỗi ' + err.length : ''));
     if (MODE === 'gps' && GP === g) renderGps();
   }).catch(function () { // không đọc lại được Sheet thì báo theo kết quả GitHub như cũ
-    msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + title + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
-    notifyDone(st.conclusion === 'success' ? '🛰 Chụp GPS xong' : '⚠️ Chụp GPS có chuyến lỗi', 'Tuyến ' + title);
+    msg(st.conclusion === 'success' ? '✅ Chụp GPS xong tuyến ' + sent.codes + '. Mở Google Sheet để xem link ảnh.' : '⚠️ Có chuyến chụp lỗi, mở Google Sheet xem chuyến nào ghi "LỖI" rồi tick chụp lại.', st.conclusion === 'success' ? 'ok' : 'err');
+    notifyDone(st.conclusion === 'success' ? '🛰 Chụp GPS xong' : '⚠️ Chụp GPS có chuyến lỗi', 'Tuyến ' + sent.codes);
   });
 }

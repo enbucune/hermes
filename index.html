@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -32,8 +32,7 @@
     <div class="fields">
       <div class="field field-route">
         <label for="route">Tuyến</label>
-        <input type="text" id="route" list="routeList" placeholder="Đang tải tuyến..." autocomplete="off">
-<datalist id="routeList"></datalist>
+        <div class="inbox"><input type="text" id="route" data-route="one" placeholder="Đang tải tuyến..." autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="route" tabindex="-1" aria-label="Xoá">×</button></div>
       </div>
       <div class="field">
         <label for="date">Ngày (dd/mm/yyyy)</label>
@@ -47,18 +46,6 @@
         <label for="nguoiDo">Người đo nồng độ cồn</label>
         <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam">
       </div>
-      <div class="field" id="fPlate" hidden>
-        <label for="plate">Biển số xe (trống = cả tuyến khi tự chỉnh)</label>
-        <input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off">
-      </div>
-      <div class="field" id="fFrom" hidden>
-        <label for="tFrom">Sửa từ giờ (lịch chạy)</label>
-        <input type="text" id="tFrom" placeholder="vd: 14:00" maxlength="5" autocomplete="off">
-      </div>
-      <div class="field" id="fTo" hidden>
-        <label for="tTo">Đến giờ</label>
-        <input type="text" id="tTo" placeholder="vd: 22:00" maxlength="5" autocomplete="off">
-      </div>
     </div>
 
     <div class="actions" id="actions">
@@ -67,30 +54,54 @@
       <button id="btnNv" class="act act-nv">👥 Trích xuất nhân viên</button>
       <button id="btnLvc" class="act act-lvc">📋 Kiểm tra lệnh</button>
       <button id="btnGps" class="act act-gps">🛰 Chụp GPS<span class="hide-sm"> mất chuyến</span></button>
-      <button id="btnEdit" class="act act-edit" hidden>✏️ Sửa lệnh</button>
-      <button id="btnAuto" class="act act-edit" hidden>⚡ Tự chỉnh theo luật</button>
-      <button id="btnVeben" class="act act-edit" hidden>🅿️ Tự xác nhận về bến</button>
+    </div>
+
+    <!-- Nhóm SỬA LỆNH: chỉ hiện sau khi mở khoá (5 lần bấm 🚌 + mã sửa lệnh). Tách riêng khung đỏ để khỏi bấm nhầm. -->
+    <div class="edit-group" id="editGroup" hidden>
+      <div class="eg-head"><span class="eg-ico">🔓</span><div><b>Sửa lệnh vận chuyển</b><small>Ghi thẳng lên FUTA · luôn hỏi xác nhận trước khi ghi · lỡ tay thì bấm ↩️ Hoàn tác</small></div></div>
+      <div class="eg-fields">
+        <div class="field" id="fPlate">
+          <label for="plate">Biển số xe (trống = cả tuyến khi tự chỉnh)</label>
+          <div class="inbox"><input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div>
+        </div>
+        <div class="field" id="fFrom">
+          <label for="tFrom">Sửa từ giờ (lịch chạy)</label>
+          <input type="text" id="tFrom" placeholder="vd: 14:00" maxlength="5" autocomplete="off">
+        </div>
+        <div class="field" id="fTo">
+          <label for="tTo">Đến giờ</label>
+          <input type="text" id="tTo" placeholder="vd: 22:00" maxlength="5" autocomplete="off">
+        </div>
+      </div>
+      <div class="actions eg-actions">
+        <button id="btnEdit" class="act act-edit">✏️ Sửa lệnh</button>
+        <button id="btnAuto" class="act act-edit">⚡ Tự chỉnh theo luật</button>
+        <button id="btnVeben" class="act act-edit">🅿️ Tự xác nhận về bến</button>
+        <button id="btnUndo" class="act act-undo">↩️ Hoàn tác</button>
+      </div>
     </div>
 
     <div class="bt-box">
       <div class="bt-title"><span class="bt-ico">🗂</span><div><b>Bảng tài ghép tuyến</b><small>Chọn 2–3 tuyến, dùng ngày ở trên, ghép thành 1 file Excel</small></div></div>
       <div class="bt-row">
-        <div class="field"><label for="bt1">Tuyến 1</label><input type="text" id="bt1" list="routeList" placeholder="vd: 161" autocomplete="off"></div>
-        <div class="field"><label for="bt2">Tuyến 2</label><input type="text" id="bt2" list="routeList" placeholder="vd: 157" autocomplete="off"></div>
-        <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><input type="text" id="bt3" list="routeList" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off"></div>
+        <div class="field"><label for="bt1">Tuyến 1</label><div class="inbox"><input type="text" id="bt1" data-route="bt" placeholder="vd: 161" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt1" tabindex="-1" aria-label="Xoá">×</button></div></div>
+        <div class="field"><label for="bt2">Tuyến 2</label><div class="inbox"><input type="text" id="bt2" data-route="bt" placeholder="vd: 157" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt2" tabindex="-1" aria-label="Xoá">×</button></div></div>
+        <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><div class="inbox"><input type="text" id="bt3" data-route="bt" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt3" tabindex="-1" aria-label="Xoá">×</button></div></div>
         <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
       </div>
     </div>
   </section>
 
   <div id="msg"></div>
+  <div id="undoBar" hidden></div>
   <div class="stats" id="stats"></div>
 
   <div class="toolbar">
-    <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..."></div>
+    <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..." autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="q" tabindex="-1" aria-label="Xoá">×</button></div>
     <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ hiện dòng cảnh báo hoặc lệch</label>
     <div class="tb-right">
       <span class="data-at" id="dataAt"></span>
+      <button class="btn-soft btn-fresh" id="btnFresh" hidden title="Bỏ dữ liệu dùng chung (máy chủ nhớ 30–60 giây), đọc mới từ hệ thống">🔄 Lấy mới</button>
       <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy dán vào Sheet</button>
       <button class="btn-soft btn-solid" id="btnXlsx" style="display:none">⬇️ Tải Excel</button>
     </div>
@@ -171,6 +182,6 @@
   </div>
 </div>
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
