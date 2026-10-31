@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=29">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -90,6 +90,11 @@
         <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><div class="inbox"><input type="text" id="bt3" data-route="bt" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt3" tabindex="-1" aria-label="Xoá">×</button></div></div>
         <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
       </div>
+    </div>
+
+    <div class="ca2-box" id="ca2Group" hidden>
+      <div class="bt-title"><span class="bt-ico">🌙</span><div><b>Ca 2 tự động</b><small>Theo mốc 22:30 → 23:45: xác nhận về bến → edit lệnh → ký điều hành xe đã về bến. Chạy trên máy chủ, đóng web vẫn chạy</small></div></div>
+      <div class="ca2-row"><button id="btnCa2" class="act act-ca2">🌙 Mở Ca 2</button><span class="ca2-mini" id="ca2Mini"></span></div>
     </div>
   </section>
 
@@ -183,6 +188,6 @@
   </div>
 </div>
 
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

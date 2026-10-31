@@ -332,6 +332,7 @@ let BT = null;
 let GP = null;
 let UD = null; // màn Hoàn tác
 let KY = null; // màn Điều hành ký
+let C2 = null; // màn Ca 2 tự động
 function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
@@ -343,6 +344,7 @@ function rerender() {
   else if (MODE === 'veben') { if (VB) renderVeben(); }
   else if (MODE === 'undo') { if (UD) renderUndo(); }
   else if (MODE === 'ky') { if (KY) renderKy(); }
+  else if (MODE === 'ca2') { if (C2) renderCa2(); }
   else if (DATA) render();
 }
 
@@ -516,9 +518,10 @@ function renderLvc() {
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
-  $('editGroup').hidden = !on; $('btnLock').hidden = !on; // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
+  $('editGroup').hidden = !on; $('btnLock').hidden = !on; $('ca2Group').hidden = !on; // Ca 2: mục riêng, cũng cần mã sửa lệnh
+  if (on && !C2) setTimeout(function () { ca2Call({}, true); }, 1500); // đọc trạng thái ca 2 để hiện dòng nhỏ dưới nút // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
   if (!on) hideUndo();
-  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; KY = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -989,6 +992,124 @@ $('out').addEventListener('click', function (ev) {
   if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ 30 phút quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
                'Đã xác nhận thì không huỷ kết thúc chuyến được nữa.')) return;
   vebenCall({ set: 'on', tuyen: tuyen });
+});
+
+// ===== CA 2 TỰ ĐỘNG (gọi ca2 trong ca2.gs) — MỤC RIÊNG, không chung nhóm nút Sửa lệnh =====
+// Máy chủ tự chạy theo mốc (mặc định 22:30 22:45 23:10 23:20 23:30 23:40 23:45): mỗi mốc EDIT TRƯỚC (về bến + Tự chỉnh mọi tuyến)
+// rồi KÝ SAU (chỉ xe đã về bến, sau về bến chuyến cuối ≥ 5 phút). Xe chưa xuất bến trễ ≥ 5 phút: BÁO. Đóng web vẫn chạy.
+const C2_NHOM = [['tre', 'c2-tre'], ['chay', 'c2-chay'], ['chua_chay', 'c2-chua'], ['veben', 'c2-veben'], ['xong', 'c2-xong'], ['seky', 'c2-xong'], ['loi', 'c2-loi'], ['ky', 'c2-ky']];
+const C2_TEN = { seky: 'SẼ KÝ (xem thử)', loi: 'ĐÃ VỀ BẾN, chưa ký được' };
+let C2_TIMER = null;
+RP.ca2 = { set: () => C2.pick, change: function () { if (MODE === 'ca2' && C2) renderCa2(); } };
+$('btnCa2').onclick = function () { askNotify(); ca2Call({}); };
+
+function ca2Call(extra, bg) {
+  const op = extra.op || 'status';
+  if (!bg) msg({ on: 'Đang bật ca 2 và xem tình trạng xe...', off: 'Đang tắt ca 2...', xem: 'Đang xem thử: về bến / edit / ký gì (KHÔNG ghi gì, có thể mất 1 phút)...',
+                 run: 'Đang chạy ngay 1 lượt: về bến → edit → ký (có thể mất 1–3 phút, đừng đóng trang)...' }[op] || 'Đang đọc trạng thái ca 2...');
+  return api(Object.assign({ action: 'ca2', ekey: getEkey() }, extra, bg ? { bg: '1' } : {}), op === 'run' || op === 'xem' ? 360000 : 120000, op === 'status' ? 1 : 0)
+    .then(function (res) {
+      if (!res.moc) throw new Error('Server chưa có action "ca2". Dán ca2.gs + web.gs + user.gs mới, chạy ca2_cai_dat() 1 lần, rồi Deploy lại BẢN MỚI.');
+      const keep = C2 && C2.pick && op !== 'on' ? C2.pick : null, keepXem = op === 'status' && C2 ? C2.xem : null;
+      C2 = Object.assign(res, { pick: keep }); if (keepXem && !C2.xem) C2.xem = keepXem;
+      if (bg && MODE !== 'ca2') { ca2Mini(); ca2Bao(); ca2Poll(); return; }   // đang ở màn khác: chỉ cập nhật dòng nhỏ + báo trễ
+      MODE = 'ca2'; $('btnCopy').style.display = 'none';
+      renderCa2(); ca2Mini(); ca2Bao(); ca2Poll();
+      if (!bg) msg({ on: '🟢 Đã BẬT ca 2 — tuyến ' + res.tuyen.join(', ') + '. Máy chủ tự chạy ở mốc ' + (res.sau || '—') + ' và các mốc sau.',
+                     off: '⚪ Đã TẮT ca 2.', xem: '👀 Xem thử xong — CHƯA ghi gì lên FUTA.', run: '▶️ Đã chạy xong 1 lượt, xem bảng và nhật ký bên dưới.' }[op] ||
+                   ('🌙 Ca 2 đang ' + (res.on ? 'BẬT' : 'TẮT') + '.'), res.on || op === 'xem' ? 'ok' : 'info');
+    }).catch(function (e) { if (!bg) msg('❌ ' + e.message, 'err'); });
+}
+
+// Màn Ca 2 đang mở + đang bật: tự hỏi trạng thái mỗi 60 giây (không khoá nút), có xe trễ mới thì kêu ting + thông báo
+function ca2Poll() {
+  clearTimeout(C2_TIMER);
+  if (C2 && C2.on && !$('ca2Group').hidden) C2_TIMER = setTimeout(function () { if (C2 && C2.on && !document.hidden) ca2Call({}, true); else ca2Poll(); }, MODE === 'ca2' ? 60000 : 120000);
+}
+function ca2Mini() {
+  const el = $('ca2Mini'); if (!el || !C2) return;
+  el.textContent = C2.on ? '🟢 ĐANG BẬT · ' + C2.tuyen.join(', ') + (C2.sau ? ' · mốc tới ' + C2.sau : ' · đã qua mốc cuối') : '⚪ Đang tắt';
+}
+function ca2Bao() {   // xe CHƯA XUẤT BẾN mới (so với lần trước trên máy này) -> ting + thông báo
+  if (!C2 || !C2.board) return;
+  let seen = []; try { seen = JSON.parse(localStorage.getItem('ca2_bao') || '[]'); } catch (e) { seen = []; }
+  const moi = [];
+  (C2.board.routes || []).forEach(function (b) {
+    ((b.nhom || {}).tre || []).forEach(function (x) { const k = C2.ngay + ' ' + b.code + ' ' + x.replace(/\(trễ \d+ phút\)/, ''); if (seen.indexOf(k) < 0) { seen.push(k); moi.push(b.code + ' ' + x); } });
+  });
+  if (moi.length) { localStorage.setItem('ca2_bao', JSON.stringify(seen.slice(-100))); notifyDone('⚠️ Ca 2: xe CHƯA XUẤT BẾN', moi.join('\n')); }
+}
+
+function ca2Board(board, title) {
+  if (!board || !board.routes) return '';
+  let out = '<div class="c2-board"><div class="c2-bhead">' + esc(title) + ' — lúc ' + esc(board.at || '') + (board.head ? ' · ' + esc(board.head) : '') + '</div>';
+  board.routes.forEach(function (b) {
+    const nh = b.nhom || {}, nKy = (nh.ky || []).length;
+    out += '<div class="c2-route"><div class="c2-rhead"><b>Tuyến ' + esc(b.code) + '</b>' + (b.loi ? ' <span class="c2-loi-t">' + esc(b.loi) + '</span>'
+      : ' · ' + (b.n || 0) + ' xe · <span class="c2-ok-t">đã ký ' + nKy + '</span>') + '</div>';
+    C2_NHOM.forEach(function (g) {
+      const list = nh[g[0]] || [];
+      if (!list.length) return;
+      const ten = C2_TEN[g[0]] || (C2.nhom && C2.nhom[g[0]]) || g[0];
+      out += '<div class="c2-grp ' + g[1] + '"><span class="c2-tag">' + esc(ten) + ' ' + list.length + '</span>' +
+        (g[0] === 'ky' ? '<span class="c2-list">' + esc(list.join(', ')) + '</span>' : list.map(function (x) { return '<span class="c2-chip">' + esc(x) + '</span>'; }).join('')) + '</div>';
+    });
+    out += '</div>';
+  });
+  return out + '</div>';
+}
+
+function renderCa2() {
+  const nChua = (C2.board && C2.board.routes || []).reduce(function (n, b) {
+    return n + ['tre', 'chay', 'chua_chay', 'veben', 'xong', 'loi'].reduce(function (m, k) { return m + ((b.nhom || {})[k] || []).length; }, 0);
+  }, 0);
+  const nTre = (C2.board && C2.board.routes || []).reduce(function (n, b) { return n + ((b.nhom || {}).tre || []).length; }, 0);
+  $('stats').innerHTML = [['Ca 2', C2.on ? 'BẬT' : 'TẮT', C2.on ? 'e-ok' : ''], ['Mốc tới', C2.on ? (C2.sau || 'đã qua mốc cuối') : '—', ''],
+    ['Xe chưa ký', nChua, nChua ? 'e-warn' : 'e-ok'], ['Chưa xuất bến (trễ)', nTre, nTre ? 'e-nopc' : '']]
+    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
+  if (!C2.pick) C2.pick = new Set(C2.tuyen.length ? C2.tuyen : (sel().code ? [sel().code] : []));
+  let out = '';
+  if (!C2.lich) out += '<div class="panel-note err">⚠️ Máy chủ CHƯA CÀI LỊCH ca 2: mở Apps Script, chọn hàm <b>ca2_cai_dat</b> rồi bấm Chạy 1 lần. Chưa cài thì bật lên cũng không tự chạy.</div>';
+  if (C2.stopKy) out += '<div class="panel-note err">⛔ FUTA đã TỪ CHỐI KÝ 1 lệnh nên ca 2 đã DỪNG KÝ cả buổi (vẫn về bến + edit). Xem nhật ký, ký tay trên FUTA.</div>';
+  out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(sel().code ? [sel().code] : []), '🌙 Chọn tuyến chạy ca 2 (chỉ tuyến được tick)') + '</div>';
+  out += '<div class="c2-cfg"><label for="ca2Moc">Mốc giờ (mốc cuối = mốc chốt, phải edit + ký xong)</label>' +
+    '<input type="text" id="ca2Moc" value="' + esc(C2.moc.join(', ')) + '" autocomplete="off" spellcheck="false">' +
+    '<div class="c2-mocs">' + C2.moc.map(function (m, i) {
+      const done = C2.done.indexOf(m) >= 0, next = C2.on && m === C2.sau;
+      return '<span class="c2-moc' + (done ? ' done' : '') + (next ? ' next' : '') + (i === C2.moc.length - 1 ? ' last' : '') + '">' + (done ? '✓ ' : next ? '⏰ ' : '') + esc(m) + (i === C2.moc.length - 1 ? ' (cuối)' : '') + '</span>';
+    }).join('') + '<span class="c2-now">bây giờ ' + esc(C2.bayGio || '') + ' · ngày ' + esc(C2.ngay || '') + '</span></div></div>';
+  out += '<div class="edit-bar">' +
+    '<button class="edit-btn big" data-c2="on">🟢 ' + (C2.on ? 'Lưu tuyến + mốc' : 'Bật ca 2') + '</button> ' +
+    (C2.on ? '<button class="edit-btn" data-c2="off">⚪ Tắt</button> <button class="edit-btn" data-c2="run">▶️ Chạy ngay 1 lượt</button> ' : '') +
+    '<button class="edit-btn" data-c2="xem">👀 Xem thử ngay (không ghi)</button> <button class="edit-btn" data-c2="reload">🔄 Tải lại</button>' +
+    '<span class="edit-hint">Mỗi mốc: <b>EDIT TRƯỚC</b> (xác nhận về bến + Tự chỉnh mọi tuyến; xe chưa về vẫn edit chuyến đã chạy; dòng FUTA từ chối thì bỏ qua) → ' +
+    '<b>KÝ SAU</b> (chỉ xe ĐÃ VỀ BẾN, sau về bến chuyến cuối ≥ 5 phút). ĐANG CHẠY / CHƯA CHẠY / CHƯA XUẤT BẾN: không ký. Quá lịch ≥ 5 phút chưa xuất bến: BÁO. ' +
+    'Chuyến "Mất Chuyến": bỏ qua. Xe về sát mốc cuối: ký bù (muộn nhất 23:58). Không đẩy lệnh. Edit có ↩️ Hoàn tác; ký thì không gỡ được.</span></div>';
+  if (C2.xem) {
+    out += ca2Board({ at: C2.xem.at, routes: C2.xem.routes }, '👀 XEM THỬ (chưa ghi gì)');
+    if (C2.xem.log && C2.xem.log.length) out += '<div class="ord-warn">' + C2.xem.log.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
+  }
+  out += ca2Board(C2.board, '🚌 Tình trạng xe');
+  out += '<h3>📜 Nhật ký ca 2 (mới nhất trên cùng)</h3><div class="c2-log">' +
+    (C2.log.length ? C2.log.map(function (l) { return '<div class="' + (/✘|⚠️|⛔/.test(l) ? 'bad' : /✍️|✅/.test(l) ? 'good' : /⏰|LƯỢT/.test(l) ? 'head' : '') + '">' + esc(l) + '</div>'; }).join('') : '<div>Chưa có gì</div>') + '</div>';
+  setOut(out);
+}
+
+$('out').addEventListener('click', function (ev) {
+  const b = ev.target.closest && ev.target.closest('button[data-c2]');
+  if (!b || MODE !== 'ca2' || !C2) return;
+  const act = b.getAttribute('data-c2'), tuyen = Array.from(C2.pick || []).join(', '), moc = ($('ca2Moc') || {}).value || '';
+  if (act === 'reload') { C2.pick = null; ca2Call({}); return; }
+  if (act === 'off') { if (confirm('Tắt ca 2 tự động?')) ca2Call({ op: 'off' }); return; }
+  if (act === 'xem') { if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; } ca2Call({ op: 'xem', tuyen: tuyen, moc: moc }); return; }
+  if (act === 'run') {
+    if (!confirm('CHẠY NGAY 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\n\nXác nhận về bến → edit lệnh mọi tuyến → ký điều hành xe đã về bến (sau về bến chuyến cuối ≥ 5 phút).\nKý rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
+    ca2Call({ op: 'run' }); return;
+  }
+  if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
+  if (!confirm('BẬT ca 2 tự động cho tuyến ' + tuyen + '?\n\nMốc: ' + moc + '\nMỗi mốc máy chủ tự: xác nhận về bến → edit lệnh → KÝ ĐIỀU HÀNH xe đã về bến (sau về bến chuyến cuối ≥ 5 phút).\n' +
+               'Đóng web vẫn chạy. Ký rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
+  ca2Call({ op: 'on', tuyen: tuyen, moc: moc });
 });
 
 // ===== BẢNG TÀI GHÉP TUYẾN (gọi bangtai trong bangtai.gs) =====
@@ -1618,7 +1739,7 @@ $('btnLogout').onclick = function () {
   };
   const wrap = function (fn) {
     return function (params) {
-      const track = !(params && FREE[params.action]);
+      const track = !(params && (FREE[params.action] || params.bg)); // bg: hỏi trạng thái chạy nền (Ca 2)
       if (track) { n++; mark(); }
       const args = Array.prototype.slice.call(arguments);
       if (params && RO_ACT[params.action] && Date.now() < FRESH_UNTIL) args[0] = Object.assign({}, params, { nocache: '1' }); // 🔄 Lấy mới
