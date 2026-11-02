@@ -439,3 +439,7 @@ tr.ud-detail td { background: #FFFBEA !important; white-space: normal; font-weig
 .c2-log { padding: 8px 18px 16px; font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; background: var(--white); max-height: 420px; overflow: auto; }
 .c2-log div { padding: 2px 0; border-bottom: 1px dotted #EEF1F7; } .c2-log .bad { color: #A0202D; } .c2-log .good { color: #0E6B3A; } .c2-log .head { font-weight: 700; color: #3B2A8C; }
 @media (max-width: 760px) { .act-ca2 { flex: 1 1 100%; } .ca2-box { padding: 14px; } }
+
+/* ===================== v32 (31/10/2026): bảng xe chưa về bến ở màn 🅿️ Tự xác nhận về bến ===================== */
+.vb-chay-t { color: #1F44B8; font-weight: 800; }
+.vb-cho-t { color: #8A5A00; font-weight: 800; }

@@ -933,29 +933,52 @@ $('out').addEventListener('click', function (ev) {
 });
 
 // ===== TỰ XÁC NHẬN XE VỀ BẾN (gọi veben trong veben.gs) =====
-// Bật = quét + xác nhận ngay 1 lần, rồi máy chủ Google tự quét mỗi 1h30 (không cần mở web), hết ca thì tự tắt.
+// Bật = quét + xác nhận ngay 1 lần, rồi máy chủ Google tự quét mỗi 1 giờ (không cần mở web), hết ca thì tự tắt.
 // Chỉ bấm chuyến đã Kết thúc + tiếp viên đã bấm giờ đến + chưa có giờ về bến. Xe đang chạy không bao giờ bị bấm.
 let VB = null;
 
-$('btnVeben').onclick = function () { vebenCall({}); };
-RP.veben = { set: () => VB.pick, change: function () { if (MODE === 'veben' && VB) renderVeben(); } }; // ô chọn tuyến dùng chung (rpHtml)
+$('btnVeben').onclick = function () { vebenCall({ fresh: '1' }); };
+// ô chọn tuyến dùng chung (rpHtml). Đổi tuyến tick -> bảng xe tự đọc lại theo tuyến mới (đợi 1 giây cho tick xong nhiều ô)
+let VB_TIMER = null, VB_XEM = null;
+RP.veben = { set: () => VB.pick, change: function () {
+  if (MODE !== 'veben' || !VB) return;
+  renderVeben();
+  clearTimeout(VB_XEM); VB_XEM = setTimeout(function () { if (MODE === 'veben' && VB) vebenCall({}, true); }, 1000);
+} };
+// Đang ở màn về bến: 2 phút tự cập nhật bảng xe 1 lần (chạy nền, không khoá nút; máy chủ nhớ 30 giây dùng chung)
+function vebenPoll() {
+  clearTimeout(VB_TIMER);
+  if (MODE === 'veben' && VB) VB_TIMER = setTimeout(function () { if (MODE === 'veben' && VB && !document.hidden) vebenCall({}, true); else vebenPoll(); }, 120000);
+}
 
-function vebenCall(extra) {
+function vebenCall(extra, bg) {
+  const xem = VB && VB.pick ? Array.from(VB.pick).join(',') : '';   // tuyến đang tick -> bảng xe của các tuyến đó
+  const q = Object.assign({ action: 'veben', ekey: getEkey(), label: sel().code || '' }, xem ? { xem: xem } : {}, extra, bg ? { bg: '1' } : {});
+  if (bg) {
+    return api(q, 120000, 1).then(function (res) {
+      if (MODE !== 'veben' || !VB || !res.log) return;
+      VB.on = res.on; VB.sau = res.sau; VB.last = res.last; VB.log = res.log; VB.tuyen = res.tuyen; VB.xe = res.xe;
+      renderVeben();
+    }).catch(function () { /* lỗi mạng: lần sau đọc lại */ }).then(vebenPoll);
+  }
   $('btnVeben').disabled = true;
-  msg(extra.set === 'on' ? 'Đang bật và quét xác nhận về bến lần đầu (có thể mất ~30 giây)...' : 'Đang đọc trạng thái tự xác nhận về bến...');
-  return api(Object.assign({ action: 'veben', ekey: getEkey() }, extra), 180000, extra.set ? 0 : 1).then(function (res) {
+  msg(extra.set === 'on' ? 'Đang bật và quét xác nhận về bến lần đầu (có thể mất ~30 giây)...' : 'Đang đọc trạng thái tự xác nhận về bến + xe đang chạy...');
+  return api(q, 180000, extra.set ? 0 : 1).then(function (res) {
     if (!res.log) throw new Error('Server chưa có action "veben". Dán veben.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
     VB = Object.assign(res, { pick: VB && VB.pick && extra.set !== 'on' ? VB.pick : null }); MODE = 'veben'; $('btnCopy').style.display = 'none';
-    renderVeben();
+    renderVeben(); vebenPoll();
     msg(res.on ? '🟢 Đang BẬT tự xác nhận về bến: tuyến ' + res.tuyen.join(', ') + (res.sau ? ' — lượt quét sau lúc ' + res.sau : '') + (res.lich ? '' : ' — ⚠️ CHƯA CÀI LỊCH: chạy veben_cai_dat() trong Apps Script')
-               : '⚪ Đang TẮT tự xác nhận về bến', res.on && res.lich ? 'ok' : (res.on ? 'err' : ''));
+               : '⚪ Đang TẮT tự xác nhận về bến', res.on && res.lich ? 'ok' : (res.on ? 'err' : 'info'));
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnVeben').disabled = false; });
 }
 
+const VB_TEN = { xong: 'ĐÃ VỀ BẾN', veben: 'ĐÃ VỀ, chờ xác nhận về bến', chay: 'ĐANG CHẠY (chưa về bến)' };
+function vbDem(k) { return ((VB.xe && VB.xe.routes) || []).reduce(function (n, b) { return n + (((b.nhom || {})[k]) || []).length; }, 0); }
 function renderVeben() {
-  const ok = VB.log.filter(function (x) { return x.kq === 'OK'; }).length;
+  const ok = VB.log.filter(function (x) { return x.kq === 'OK'; }).length, nChay = vbDem('chay'), nCho = vbDem('veben');
   $('stats').innerHTML = [['Trạng thái', VB.on ? 'BẬT' : 'TẮT', VB.on ? 'e-ok' : ''], ['Tuyến', VB.tuyen.join(', ') || '—', ''],
+    ['Xe đang chạy (chưa về bến)', VB.xe ? nChay : '—', nChay ? 'e-n' : ''], ['Đã về, chờ xác nhận về bến', VB.xe ? nCho : '—', nCho ? 'e-warn' : ''],
     ['Đã bấm (gần nhất)', ok, 'e-ok'], ['Lỗi', VB.log.length - ok, 'e-nopc']]
     .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
   // Ô tick: tuyến cụm (FB_ROUTES) + tuyến đã chọn + tuyến đang mở ở ô Tuyến. Tuyến khác gõ thêm ở ô bên dưới.
@@ -965,8 +988,15 @@ function renderVeben() {
     '<button class="edit-btn big" data-vb="on">🟢 ' + (VB.on ? 'Lưu tuyến đã chọn' : 'Bật cho tuyến đã chọn') + '</button> ' +
     (VB.on ? '<button class="edit-btn" data-vb="off">⚪ Tắt</button> ' : '') +
     '<button class="edit-btn" data-vb="reload">🔄 Tải lại</button>' +
-    '<span class="edit-hint">Bật = quét ngay 1 lần, sau đó máy chủ tự quét mỗi 1 giờ 30 phút (đóng web vẫn chạy), hết ca (không còn xe chạy) thì tự tắt, ca sau bật lại. Chỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến + chưa có giờ về bến. ' +
+    '<span class="edit-hint">Bật = quét ngay 1 lần, sau đó máy chủ tự quét mỗi 1 giờ (đóng web vẫn chạy). Bật 🌙 Ca 2 cũng tự bật mục này, hết ca (không còn xe chạy) thì tự tắt, ca sau bật lại. Chỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến + chưa có giờ về bến. ' +
     'Xe đang chạy, chưa chạy, đề xuất mất chuyến: không bấm. Giờ về bến = lúc bấm, muốn chỉnh theo luật thì dùng ⚡ Tự chỉnh theo luật.</span></div>';
+  if (VB.xe) out += ca2Board(VB.xe, '🚌 Xe chưa về bến (' + nChay + ' xe đang chạy' + (nCho ? ', ' + nCho + ' xe đã về chờ xác nhận' : '') + ')',
+    { ten: VB_TEN, gon: { xong: 1 }, head: function (b) {
+      const nh = b.nhom || {}, c = (nh.chay || []).length, v = (nh.veben || []).length;
+      return ' · ' + (b.n || 0) + ' xe · ' + (c ? '<span class="vb-chay-t">🔵 ' + c + ' xe đang chạy</span>' : '<span class="c2-ok-t">không còn xe đang chạy</span>') +
+        (v ? ' · <span class="vb-cho-t">🟡 ' + v + ' chờ xác nhận</span>' : '');
+    } }) + '<div class="panel-note">Bảng xe tự cập nhật 2 phút 1 lần khi đang mở màn này (chỉ đọc, không bấm gì). Đổi tuyến tick thì bảng đọc lại theo tuyến mới. Bấm 🔄 Tải lại để đọc ngay.</div>';
+  else out += '<div class="panel-note">Tick tuyến ở trên để xem xe nào đang chạy / chưa về bến.</div>';
   if (VB.last) out += '<div class="ord-warn"><div>🕒 Lượt quét gần nhất ' + esc(VB.last.at) + ': ' + esc((VB.last.sum || []).join(' | ') || 'không có tuyến') +
     (VB.on && VB.sau ? ' — lượt sau lúc ' + esc(VB.sau) : '') + '</div></div>';
   let body = '';
@@ -985,18 +1015,19 @@ $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-vb]');
   if (!b || MODE !== 'veben') return;
   const act = b.getAttribute('data-vb');
-  if (act === 'reload') { VB.pick = null; vebenCall({}); return; }
+  if (act === 'reload') { vebenCall({ fresh: '1' }); return; }   // giữ tuyến đang tick, đọc mới
   if (act === 'off') { if (confirm('Tắt tự xác nhận về bến?')) vebenCall({ set: 'off' }); return; }
   const tuyen = Array.from(VB.pick).join(', ');
   if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
-  if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ 30 phút quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
+  if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\n\nQuét ngay 1 lần, sau đó cứ 1 giờ quét lại, hết ca thì tự tắt.\nChỉ bấm chuyến ĐÃ KẾT THÚC + tiếp viên đã bấm giờ đến.\n' +
                'Đã xác nhận thì không huỷ kết thúc chuyến được nữa.')) return;
   vebenCall({ set: 'on', tuyen: tuyen });
 });
 
 // ===== CA 2 TỰ ĐỘNG (gọi ca2 trong ca2.gs) — MỤC RIÊNG, không chung nhóm nút Sửa lệnh =====
-// Máy chủ tự chạy theo mốc (mặc định 22:30 22:45 23:10 23:20 23:30 23:40 23:45): mỗi mốc EDIT TRƯỚC (về bến + Tự chỉnh mọi tuyến)
-// rồi KÝ SAU (chỉ xe đã về bến, sau về bến chuyến cuối ≥ 5 phút). Xe chưa xuất bến trễ ≥ 5 phút: BÁO. Đóng web vẫn chạy.
+// ☀️ Ca 1 (14:00): về bến + edit LỆNH CA 1 (mọi chuyến lịch trước 14:00) 1 lần, không ký. 🌙 Ca 2 ký từ 22:00: lệnh ca 1 không đỏ thì ký luôn, đỏ mới edit.
+// Bật ca 1 / ca 2 = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Máy chủ quét: từ 22:00 mỗi 20 phút, từ 23:00 mỗi 10 phút, từ 23:30 mỗi 5 phút.
+// Mỗi lượt: xác nhận về bến -> XE NÀO VỀ HẾT thì edit lệnh ca 2 (+ lệnh ca 1 bị đỏ) rồi ký; xe đang chạy để yên. Ký hết thì tự tắt.
 const C2_NHOM = [['tre', 'c2-tre'], ['chay', 'c2-chay'], ['chua_chay', 'c2-chua'], ['veben', 'c2-veben'], ['xong', 'c2-xong'], ['seky', 'c2-xong'], ['loi', 'c2-loi'], ['ky', 'c2-ky']];
 const C2_TEN = { seky: 'SẼ KÝ (xem thử)', loi: 'ĐÃ VỀ BẾN, chưa ký được' };
 let C2_TIMER = null;
@@ -1005,19 +1036,21 @@ $('btnCa2').onclick = function () { askNotify(); ca2Call({}); };
 
 function ca2Call(extra, bg) {
   const op = extra.op || 'status';
-  if (!bg) msg({ on: 'Đang bật ca 2 và xem tình trạng xe...', off: 'Đang tắt ca 2...', xem: 'Đang xem thử: về bến / edit / ký gì (KHÔNG ghi gì, có thể mất 1 phút)...',
+  if (!bg) msg({ on1: 'Đang bật ca 1...', off1: 'Đang tắt ca 1...', xem1: 'Đang xem thử ca 1: về bến / edit lệnh ca 1 (KHÔNG ghi gì)...', on: 'Đang bật ca 2 và xem tình trạng xe...', off: 'Đang tắt ca 2...', xem: 'Đang xem thử: về bến / edit / ký gì (KHÔNG ghi gì, có thể mất 1 phút)...',
                  run: 'Đang chạy ngay 1 lượt: về bến → edit → ký (có thể mất 1–3 phút, đừng đóng trang)...' }[op] || 'Đang đọc trạng thái ca 2...');
-  return api(Object.assign({ action: 'ca2', ekey: getEkey() }, extra, bg ? { bg: '1' } : {}), op === 'run' || op === 'xem' ? 360000 : 120000, op === 'status' ? 1 : 0)
+  return api(Object.assign({ action: 'ca2', ekey: getEkey() }, extra, bg ? { bg: '1' } : {}), op === 'run' || op === 'xem' || op === 'xem1' ? 360000 : 120000, op === 'status' ? 1 : 0)
     .then(function (res) {
       if (!res.moc) throw new Error('Server chưa có action "ca2". Dán ca2.gs + web.gs + user.gs mới, chạy ca2_cai_dat() 1 lần, rồi Deploy lại BẢN MỚI.');
-      const keep = C2 && C2.pick && op !== 'on' ? C2.pick : null, keepXem = op === 'status' && C2 ? C2.xem : null;
-      C2 = Object.assign(res, { pick: keep }); if (keepXem && !C2.xem) C2.xem = keepXem;
+      const keep = C2 && C2.pick && op !== 'on' && op !== 'on1' ? C2.pick : null, keepXem = op === 'status' && C2 ? C2.xem : null, keepXem1 = op === 'status' && C2 ? C2.xem1 : null;
+      C2 = Object.assign(res, { pick: keep }); if (keepXem && !C2.xem) C2.xem = keepXem; if (keepXem1 && !C2.xem1) C2.xem1 = keepXem1;
       if (bg && MODE !== 'ca2') { ca2Mini(); ca2Bao(); ca2Poll(); return; }   // đang ở màn khác: chỉ cập nhật dòng nhỏ + báo trễ
       MODE = 'ca2'; $('btnCopy').style.display = 'none';
       renderCa2(); ca2Mini(); ca2Bao(); ca2Poll();
-      if (!bg) msg({ on: '🟢 Đã BẬT ca 2 — tuyến ' + res.tuyen.join(', ') + '. Máy chủ tự chạy ở mốc ' + (res.sau || '—') + ' và các mốc sau.',
+      if (!bg) msg({ on1: '☀️ Đã BẬT ca 1 — tuyến ' + ((res.ca1 || {}).tuyen || []).join(', ') + '. ' + ((res.ca1 || {}).gio || '14:00') + ' máy chủ tự về bến + edit lệnh ca 1 (không ký).',
+                     off1: '⚪ Đã TẮT ca 1.', xem1: '👀 Xem thử ca 1 xong — CHƯA ghi gì lên FUTA.',
+                     on: '🟢 Đã BẬT ca 2 — tuyến ' + res.tuyen.join(', ') + (res.veben ? ' + 🅿️ tự xác nhận về bến (1 giờ/lần)' : '') + '. Máy chủ quét lần tới lúc ' + (res.sau || '—') + '.',
                      off: '⚪ Đã TẮT ca 2.', xem: '👀 Xem thử xong — CHƯA ghi gì lên FUTA.', run: '▶️ Đã chạy xong 1 lượt, xem bảng và nhật ký bên dưới.' }[op] ||
-                   ('🌙 Ca 2 đang ' + (res.on ? 'BẬT' : 'TẮT') + '.'), res.on || op === 'xem' ? 'ok' : 'info');
+                   ('🌙 Ca 2 đang ' + (res.on ? 'BẬT' : 'TẮT') + ' · ☀️ Ca 1 đang ' + ((res.ca1 || {}).on ? 'BẬT' : 'TẮT') + '.'), res.on || (res.ca1 || {}).on || /xem/.test(op) ? 'ok' : 'info');
     }).catch(function (e) { if (!bg) msg('❌ ' + e.message, 'err'); });
 }
 
@@ -1028,7 +1061,8 @@ function ca2Poll() {
 }
 function ca2Mini() {
   const el = $('ca2Mini'); if (!el || !C2) return;
-  el.textContent = C2.on ? '🟢 ĐANG BẬT · ' + C2.tuyen.join(', ') + (C2.sau ? ' · mốc tới ' + C2.sau : ' · đã qua mốc cuối') : '⚪ Đang tắt';
+  const c1 = C2.ca1 && C2.ca1.on ? '☀️ Ca 1 bật (' + C2.ca1.tuyen.join(', ') + ', ' + C2.ca1.gio + ') · ' : '';
+  el.textContent = c1 + (C2.on ? '🌙 Ca 2 BẬT · ' + C2.tuyen.join(', ') + (C2.sau ? ' · quét tới ' + C2.sau : ' · đã qua mốc cuối, chờ ký bù') : (c1 ? '🌙 Ca 2 tắt' : '⚪ Đang tắt'));
 }
 function ca2Bao() {   // xe CHƯA XUẤT BẾN mới (so với lần trước trên máy này) -> ting + thông báo
   if (!C2 || !C2.board) return;
@@ -1040,19 +1074,23 @@ function ca2Bao() {   // xe CHƯA XUẤT BẾN mới (so với lần trước tr
   if (moi.length) { localStorage.setItem('ca2_bao', JSON.stringify(seen.slice(-100))); notifyDone('⚠️ Ca 2: xe CHƯA XUẤT BẾN', moi.join('\n')); }
 }
 
-function ca2Board(board, title) {
+// Bảng tình trạng xe theo nhóm, dùng chung cho 🌙 Ca 2 và 🅿️ Tự xác nhận về bến.
+// o (tuỳ chọn): { ten: nhãn nhóm, head: b -> html sau "Tuyến X", gon: nhóm hiện gọn 1 dòng chữ }
+function ca2Board(board, title, o) {
   if (!board || !board.routes) return '';
+  o = o || {};
+  const gon = o.gon || { ky: 1 };
   let out = '<div class="c2-board"><div class="c2-bhead">' + esc(title) + ' — lúc ' + esc(board.at || '') + (board.head ? ' · ' + esc(board.head) : '') + '</div>';
   board.routes.forEach(function (b) {
     const nh = b.nhom || {}, nKy = (nh.ky || []).length;
     out += '<div class="c2-route"><div class="c2-rhead"><b>Tuyến ' + esc(b.code) + '</b>' + (b.loi ? ' <span class="c2-loi-t">' + esc(b.loi) + '</span>'
-      : ' · ' + (b.n || 0) + ' xe · <span class="c2-ok-t">đã ký ' + nKy + '</span>') + '</div>';
+      : o.head ? o.head(b) : ' · ' + (b.n || 0) + ' xe · <span class="c2-ok-t">đã ký ' + nKy + '</span>') + '</div>';
     C2_NHOM.forEach(function (g) {
       const list = nh[g[0]] || [];
       if (!list.length) return;
-      const ten = C2_TEN[g[0]] || (C2.nhom && C2.nhom[g[0]]) || g[0];
+      const ten = (o.ten && o.ten[g[0]]) || C2_TEN[g[0]] || (C2 && C2.nhom && C2.nhom[g[0]]) || g[0];
       out += '<div class="c2-grp ' + g[1] + '"><span class="c2-tag">' + esc(ten) + ' ' + list.length + '</span>' +
-        (g[0] === 'ky' ? '<span class="c2-list">' + esc(list.join(', ')) + '</span>' : list.map(function (x) { return '<span class="c2-chip">' + esc(x) + '</span>'; }).join('')) + '</div>';
+        (gon[g[0]] ? '<span class="c2-list">' + esc(list.join(', ')) + '</span>' : list.map(function (x) { return '<span class="c2-chip">' + esc(x) + '</span>'; }).join('')) + '</div>';
     });
     out += '</div>';
   });
@@ -1064,15 +1102,25 @@ function renderCa2() {
     return n + ['tre', 'chay', 'chua_chay', 'veben', 'xong', 'loi'].reduce(function (m, k) { return m + ((b.nhom || {})[k] || []).length; }, 0);
   }, 0);
   const nTre = (C2.board && C2.board.routes || []).reduce(function (n, b) { return n + ((b.nhom || {}).tre || []).length; }, 0);
-  $('stats').innerHTML = [['Ca 2', C2.on ? 'BẬT' : 'TẮT', C2.on ? 'e-ok' : ''], ['Mốc tới', C2.on ? (C2.sau || 'đã qua mốc cuối') : '—', ''],
+  const c1 = C2.ca1 || { on: false, tuyen: [], gio: '14:00' };
+  $('stats').innerHTML = [['Ca 1', c1.on ? 'BẬT' : 'TẮT', c1.on ? 'e-ok' : ''], ['Ca 2', C2.on ? 'BẬT' : 'TẮT', C2.on ? 'e-ok' : ''], ['Quét tới', C2.on ? (C2.sau || 'đã qua mốc cuối') : '—', ''],
     ['Xe chưa ký', nChua, nChua ? 'e-warn' : 'e-ok'], ['Chưa xuất bến (trễ)', nTre, nTre ? 'e-nopc' : '']]
     .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + esc(String(x[1])) + '</b>' + x[0] + '</div>'; }).join('');
   if (!C2.pick) C2.pick = new Set(C2.tuyen.length ? C2.tuyen : (sel().code ? [sel().code] : []));
   let out = '';
+  if (C2.on) out += '<div class="panel-note">' + (C2.veben ? '🅿️ Tự xác nhận về bến: ĐANG BẬT (máy chủ quét mỗi 1 giờ).' : '🅿️ Tự xác nhận về bến đang tắt (đã hết ca hoặc bị tắt) — mỗi lượt ca 2 vẫn tự xác nhận về bến.') + '</div>';
   if (!C2.lich) out += '<div class="panel-note err">⚠️ Máy chủ CHƯA CÀI LỊCH ca 2: mở Apps Script, chọn hàm <b>ca2_cai_dat</b> rồi bấm Chạy 1 lần. Chưa cài thì bật lên cũng không tự chạy.</div>';
   if (C2.stopKy) out += '<div class="panel-note err">⛔ FUTA đã TỪ CHỐI KÝ 1 lệnh nên ca 2 đã DỪNG KÝ cả buổi (vẫn về bến + edit). Xem nhật ký, ký tay trên FUTA.</div>';
-  out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(sel().code ? [sel().code] : []), '🌙 Chọn tuyến chạy ca 2 (chỉ tuyến được tick)') + '</div>';
-  out += '<div class="c2-cfg"><label for="ca2Moc">Mốc giờ (mốc cuối = mốc chốt, phải edit + ký xong)</label>' +
+  out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(c1.tuyen, sel().code ? [sel().code] : []), '🌙 Chọn tuyến (dùng cho nút Bật ca 1 / Bật ca 2, chỉ tuyến được tick)') + '</div>';
+  out += '<div class="edit-bar"><b>☀️ Ca 1</b> ' + (c1.on ? '<span class="c2-ok-t">ĐANG BẬT · ' + esc(c1.tuyen.join(', ')) + '</span> ' : '<span>đang tắt</span> ') +
+    '<button class="edit-btn" data-c2="on1">☀️ ' + (c1.on ? 'Lưu tuyến ca 1' : 'Bật ca 1') + '</button> ' + (c1.on ? '<button class="edit-btn" data-c2="off1">⚪ Tắt ca 1</button> ' : '') +
+    '<button class="edit-btn" data-c2="xem1">👀 Xem thử ca 1 (không ghi)</button>' +
+    '<span class="edit-hint">' + esc(c1.gio) + ' máy chủ tự: xác nhận về bến → <b>EDIT LỆNH CA 1</b> (lệnh mà mọi chuyến có lịch chạy trước ' + esc(c1.gio) + '), <b>KHÔNG KÝ</b>, chạy 1 lần rồi tự tắt. ' +
+    'Lệnh chạy cả ngày (có chuyến từ ' + esc(c1.gio) + ') là của ca 2. Bật ca 1 = bật luôn 🅿️ tự xác nhận về bến.</span></div>';
+  if (C2.xem1) out += '<div class="ord-warn"><div><b>👀 XEM THỬ CA 1 (chưa ghi gì) — lúc ' + esc(C2.xem1.at || '') + '</b></div>' +
+    C2.xem1.sum.concat(C2.xem1.log).map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
+  out += '<div class="edit-hint"><b>🌙 Ca 2</b></div>';
+  out += '<div class="c2-cfg"><label for="ca2Moc">Giờ quét ca 2 (bắt đầu ký 22:00; mặc định 22:00→23:00 mỗi 20 phút, 23:00→23:30 mỗi 10 phút, sau 23:30 mỗi 5 phút; giờ cuối = chốt)</label>' +
     '<input type="text" id="ca2Moc" value="' + esc(C2.moc.join(', ')) + '" autocomplete="off" spellcheck="false">' +
     '<div class="c2-mocs">' + C2.moc.map(function (m, i) {
       const done = C2.done.indexOf(m) >= 0, next = C2.on && m === C2.sau;
@@ -1082,9 +1130,9 @@ function renderCa2() {
     '<button class="edit-btn big" data-c2="on">🟢 ' + (C2.on ? 'Lưu tuyến + mốc' : 'Bật ca 2') + '</button> ' +
     (C2.on ? '<button class="edit-btn" data-c2="off">⚪ Tắt</button> <button class="edit-btn" data-c2="run">▶️ Chạy ngay 1 lượt</button> ' : '') +
     '<button class="edit-btn" data-c2="xem">👀 Xem thử ngay (không ghi)</button> <button class="edit-btn" data-c2="reload">🔄 Tải lại</button>' +
-    '<span class="edit-hint">Mỗi mốc: <b>EDIT TRƯỚC</b> (xác nhận về bến + Tự chỉnh mọi tuyến; xe chưa về vẫn edit chuyến đã chạy; dòng FUTA từ chối thì bỏ qua) → ' +
-    '<b>KÝ SAU</b> (chỉ xe ĐÃ VỀ BẾN, sau về bến chuyến cuối ≥ 5 phút). ĐANG CHẠY / CHƯA CHẠY / CHƯA XUẤT BẾN: không ký. Quá lịch ≥ 5 phút chưa xuất bến: BÁO. ' +
-    'Chuyến "Mất Chuyến": bỏ qua. Xe về sát mốc cuối: ký bù (muộn nhất 23:58). Không đẩy lệnh. Edit có ↩️ Hoàn tác; ký thì không gỡ được.</span></div>';
+    '<span class="edit-hint">Bật = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Từ 22:00 mỗi lần quét: xác nhận về bến → <b>XE NÀO VỀ HẾT</b> (xe ca 1 đang chạy lệnh ca 2 thì chờ) (không còn chuyến) thì <b>EDIT lệnh ca 2</b> (Tự chỉnh; dòng FUTA từ chối thì bỏ qua) rồi <b>KÝ</b> luôn xe đó. <b>Lệnh ca 1</b>: không đỏ thì ký luôn, KHÔNG edit; đỏ (FUTA khoá ký) mới edit đúng lệnh đó rồi ký ' +
+    '(đã edit xong, sau về bến chuyến cuối ≥ 5 phút). Xe ĐANG CHẠY / CHƯA CHẠY / CHƯA XUẤT BẾN: để yên, không edit, không ký. ' +
+    'Quá lịch ≥ 5 phút chưa xuất bến: BÁO. Chuyến "Mất Chuyến": bỏ qua. Ký hết thì tự tắt. Không đẩy lệnh. Edit có ↩️ Hoàn tác; ký thì không gỡ được.</span></div>';
   if (C2.xem) {
     out += ca2Board({ at: C2.xem.at, routes: C2.xem.routes }, '👀 XEM THỬ (chưa ghi gì)');
     if (C2.xem.log && C2.xem.log.length) out += '<div class="ord-warn">' + C2.xem.log.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
@@ -1101,13 +1149,20 @@ $('out').addEventListener('click', function (ev) {
   const act = b.getAttribute('data-c2'), tuyen = Array.from(C2.pick || []).join(', '), moc = ($('ca2Moc') || {}).value || '';
   if (act === 'reload') { C2.pick = null; ca2Call({}); return; }
   if (act === 'off') { if (confirm('Tắt ca 2 tự động?')) ca2Call({ op: 'off' }); return; }
+  if (act === 'off1') { if (confirm('Tắt ca 1 tự động?')) ca2Call({ op: 'off1' }); return; }
+  if (act === 'xem1') { if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; } ca2Call({ op: 'xem1', tuyen: tuyen }); return; }
+  if (act === 'on1') {
+    if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
+    if (!confirm('BẬT ca 1 tự động cho tuyến ' + tuyen + '?\n\nBật luôn 🅿️ tự xác nhận về bến.\n14:00 máy chủ tự: xác nhận về bến → EDIT LỆNH CA 1 (mọi chuyến lịch trước 14:00). KHÔNG KÝ.\nĐóng web vẫn chạy. Edit có ↩️ Hoàn tác.')) return;
+    ca2Call({ op: 'on1', tuyen: tuyen }); return;
+  }
   if (act === 'xem') { if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; } ca2Call({ op: 'xem', tuyen: tuyen, moc: moc }); return; }
   if (act === 'run') {
-    if (!confirm('CHẠY NGAY 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\n\nXác nhận về bến → edit lệnh mọi tuyến → ký điều hành xe đã về bến (sau về bến chuyến cuối ≥ 5 phút).\nKý rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
+    if (!confirm('CHẠY NGAY 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\n\nXác nhận về bến → xe nào về hết thì edit + ký điều hành (sau về bến chuyến cuối ≥ 5 phút). Xe đang chạy để yên.\nKý rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
     ca2Call({ op: 'run' }); return;
   }
   if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
-  if (!confirm('BẬT ca 2 tự động cho tuyến ' + tuyen + '?\n\nMốc: ' + moc + '\nMỗi mốc máy chủ tự: xác nhận về bến → edit lệnh → KÝ ĐIỀU HÀNH xe đã về bến (sau về bến chuyến cuối ≥ 5 phút).\n' +
+  if (!confirm('BẬT ca 2 tự động cho tuyến ' + tuyen + '?\n\nBật luôn 🅿️ tự xác nhận về bến (quét ngay, rồi 1 giờ/lần).\nGiờ quét: ' + moc + '\nBắt đầu ký 22:00. Mỗi lần quét: xác nhận về bến → XE NÀO VỀ HẾT thì edit lệnh ca 2 (lệnh ca 1 chỉ edit khi đỏ) + KÝ ĐIỀU HÀNH luôn xe đó (sau về bến chuyến cuối ≥ 5 phút). Xe đang chạy để yên. Ký hết thì tự tắt.\n' +
                'Đóng web vẫn chạy. Ký rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
   ca2Call({ op: 'on', tuyen: tuyen, moc: moc });
 });
