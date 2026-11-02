@@ -443,3 +443,14 @@ tr.ud-detail td { background: #FFFBEA !important; white-space: normal; font-weig
 /* ===================== v32 (31/10/2026): bảng xe chưa về bến ở màn 🅿️ Tự xác nhận về bến ===================== */
 .vb-chay-t { color: #1F44B8; font-weight: 800; }
 .vb-cho-t { color: #8A5A00; font-weight: 800; }
+
+/* ⚡ Tự chỉnh theo luật (mọi người dùng, edit bằng FUTA riêng) */
+.auto-box { border: 1.5px solid #F3D9A4; background: #FFFAF0; border-radius: 16px; padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.auto-box .eg-head b { color: #8A5A00; }
+.auto-box .eg-head small { color: #9A7A3E; }
+.ag-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.ag-row .field { flex: 1 1 220px; }
+.ag-futa { font-size: 13px; color: #7A5B1E; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ag-out { border: 1px solid #E5C78A; background: #fff; color: #8A5A00; border-radius: 8px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.fu-form { max-width: 420px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1.5px solid #F3D9A4; background: #FFFAF0; border-radius: 14px; }
+.fu-form input { padding: 10px 12px; border: 1px solid #E5C78A; border-radius: 10px; font-size: 15px; }

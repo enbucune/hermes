@@ -84,6 +84,7 @@ function apiErr(data) {
   const e = new Error((data && data.error) || 'Lỗi không xác định');
   if (data && data.login && USER_MODE) { e.login = true; showAuth('login'); }
   if (data && data.futa) e.futa = true;
+  if (data && data.futaLogin) e.futaLogin = true;   // ⚡ Tự chỉnh: chưa đăng nhập FUTA riêng / hết phiên
   if (data && data.field) e.field = data.field;
   return e;
 }
@@ -521,7 +522,7 @@ function setUnlocked(on) {
   $('editGroup').hidden = !on; $('btnLock').hidden = !on; $('ca2Group').hidden = !on; // Ca 2: mục riêng, cũng cần mã sửa lệnh
   if (on && !C2) setTimeout(function () { ca2Call({}, true); }, 1500); // đọc trạng thái ca 2 để hiện dòng nhỏ dưới nút // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
   if (!on) hideUndo();
-  if (!on && (MODE === 'edit' || MODE === 'auto' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; ED = null; AU = null; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'edit' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; ED = null; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
@@ -756,16 +757,68 @@ $('btnNext').onclick = function () { shiftDay(1); };
 // Cuối ngày: về bến = đến + 1p. Về bến trống (chưa xác nhận) để nguyên. Giờ đến không bao giờ đổi.
 let AU = null;
 
-$('btnAuto').onclick = function () { autoPlan(''); };
+// ⚡ Tự chỉnh dùng TÀI KHOẢN FUTA CỦA NGƯỜI BẤM: đăng nhập 1 lần -> máy chủ giữ phiên 6 giờ (không lưu mật khẩu), web nhớ mã phiên.
+function getFs() { try { return localStorage.getItem('futa_fs') || ''; } catch (e) { return ''; } }
+function setFs(r) {
+  if (r) { localStorage.setItem('futa_fs', r.fs); localStorage.setItem('futa_user', r.futa); localStorage.setItem('futa_het', r.het || ''); }
+  else ['futa_fs', 'futa_user', 'futa_het'].forEach(function (k) { localStorage.removeItem(k); });
+  futaMe();
+}
+function futaMe() {
+  const u = localStorage.getItem('futa_user') || '';
+  $('futaMe').textContent = getFs() && u ? '🔑 Đang dùng FUTA: ' + u + ' (tới ' + (localStorage.getItem('futa_het') || '?') + ')' : '🔑 Chưa đăng nhập FUTA — bấm ⚡ để đăng nhập';
+  $('btnFutaOut').hidden = !getFs();
+}
+let FU_NEXT = null;   // việc chờ sau khi đăng nhập FUTA xong
+function futaForm(why, next) {
+  FU_NEXT = next || null;
+  MODE = 'futa'; $('btnCopy').style.display = 'none'; $('stats').innerHTML = '';
+  $('out').innerHTML = '<div class="fu-form"><b>🔑 Đăng nhập TÀI KHOẢN FUTA CỦA BẠN</b>' +
+    '<small>⚡ Tự chỉnh sẽ đọc + ghi lệnh bằng tài khoản này (không dùng tài khoản chung). Máy chủ KHÔNG lưu mật khẩu, phiên giữ 6 giờ.</small>' +
+    '<input type="text" id="fuUser" placeholder="Tài khoản FUTA" autocomplete="username" spellcheck="false">' +
+    '<input type="password" id="fuPass" placeholder="Mật khẩu FUTA" autocomplete="current-password">' +
+    '<button class="edit-btn big" data-fu="login">🔑 Đăng nhập FUTA</button></div>';
+  msg(why || '🔑 Đăng nhập tài khoản FUTA của bạn để dùng ⚡ Tự chỉnh.', 'info');
+  setTimeout(function () { const x = $('fuUser'); if (x) x.focus(); }, 50);
+}
+function futaLogin() {
+  const u = ($('fuUser') || {}).value || '', pw = ($('fuPass') || {}).value || '';
+  if (!u.trim() || !pw) { msg('❌ Nhập tài khoản và mật khẩu FUTA', 'err'); return; }
+  msg('Đang đăng nhập FUTA...');
+  apiPost({ action: 'futalogin', futaUser: u.trim(), futaPass: pw }, 60000).then(function (r) {
+    if ($('fuPass')) $('fuPass').value = '';
+    setFs(r);
+    msg('✅ Đã đăng nhập FUTA ' + r.futa + ' (giữ tới ' + r.het + ').', 'ok');
+    const next = FU_NEXT; FU_NEXT = null;
+    if (next) next();
+  }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
+}
+$('out').addEventListener('click', function (ev) { if (ev.target.closest && ev.target.closest('button[data-fu="login"]')) futaLogin(); });
+$('out').addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && MODE === 'futa' && ev.target.closest && ev.target.closest('.fu-form')) { ev.preventDefault(); futaLogin(); } });
+$('btnFutaOut').onclick = function () {
+  const fs = getFs(); setFs(null);
+  if (fs) api({ action: 'futalogout', fs: fs }, 30000, 0).catch(function () {});
+  msg('Đã đăng xuất FUTA trên máy này.', 'ok');
+};
+futaMe();
+if (getFs()) setTimeout(function () {   // phiên còn sống không (máy chủ giữ 6 giờ)
+  api({ action: 'futame', fs: getFs() }, 30000, 0).then(function (r) { if (!r.futa) setFs(null); }).catch(function () {});
+}, 1200);
+
+$('plateAuto').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnAuto').click(); } };
+$('btnAuto').onclick = function () {
+  if (!getFs()) { futaForm('', function () { autoPlan(''); }); return; }
+  autoPlan('');
+};
 
 function autoPlan(prefix) {
   const s = sel();
   if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy).', 'err'); return Promise.resolve(); }
-  const plate = $('plate').value.trim().toUpperCase();
+  const plate = $('plateAuto').value.trim().toUpperCase();
   $('btnAuto').disabled = true;
   msg((prefix ? prefix + '\n' : '') + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'cả tuyến ' + s.code) + ' và lập kế hoạch (chưa ghi gì)...');
   $('out').innerHTML = ''; $('stats').innerHTML = '';
-  return api({ action: 'autoplan', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
+  return api({ action: 'autoplan', fs: getFs(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
     if (!res.stats) throw new Error('Server chưa có action "autoplan". Dán edit.gs mới, thêm router vào web.gs, rồi Deploy lại BẢN MỚI.');
     AU = res; AU.sel = s; MODE = 'auto'; $('btnCopy').style.display = 'none';
     renderAuto();
@@ -774,8 +827,10 @@ function autoPlan(prefix) {
       (plate ? 'Xe ' + plate : 'Tuyến ' + s.code + ' (' + st.xe + ' xe)') + ' — ' + res.ngay + ': sẽ sửa ' + st.sua + ' chuyến, đã đúng ' + st.dung +
       (st.canXem ? ', CẦN XEM ' + st.canXem : '') + (st.loi ? ', LỖI ' + st.loi : '') + '. Chưa ghi gì lên hệ thống.',
       st.canXem || st.loi ? 'err' : 'ok');
-  }).catch(function (e) { msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err'); })
-    .then(function () { $('btnAuto').disabled = false; });
+  }).catch(function (e) {
+    if (e.futaLogin) { setFs(null); futaForm('🔑 ' + e.message, function () { autoPlan(prefix); }); return; }
+    msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err');
+  }).then(function () { $('btnAuto').disabled = false; });
 }
 
 function renderAuto() {
@@ -830,7 +885,7 @@ $('out').addEventListener('click', function (ev) {
   $('btnAuto').disabled = true;
   msg('Đang lưu ' + AU.stats.sua + ' chuyến (có thể mất 1-3 phút, đừng đóng trang)...');
   const au = AU;
-  api({ action: 'autosave', ekey: getEkey(), planId: au.planId, label: au.sel.code, date: String(au.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
+  api({ action: 'autosave', fs: getFs(), planId: au.planId, label: au.sel.code, date: String(au.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
     const bad = r.verifyBad.concat(r.failed, r.skipped);
     const line = (bad.length || r.stopped ? '⚠️ ' : '✔ ') + 'Đã lưu + kiểm khớp ' + r.saved + ' chuyến (' + r.elapsed + 's)' +
       (r.verifyBad.length ? ', VERIFY LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi lưu ' + r.failed.length : '') +
@@ -845,7 +900,11 @@ $('out').addEventListener('click', function (ev) {
       return;
     }
     return autoPlan(line); // còn lỗi / còn chuyến cần sửa: lập lại kế hoạch để xem
-  }).catch(function (e) { msg('❌ ' + e.message, 'err'); $('btnAuto').disabled = false; });
+  }).catch(function (e) {
+    $('btnAuto').disabled = false;
+    if (e.futaLogin) { setFs(null); futaForm('🔑 ' + e.message + ' — đăng nhập lại rồi bấm ⚡ Tự chỉnh để lập lại kế hoạch.'); return; }
+    msg('❌ ' + e.message, 'err');
+  });
 });
 
 // ===== ĐIỀU HÀNH KÝ XÁC NHẬN (gọi kyplan / kysave trong ky.gs) =====
@@ -1557,7 +1616,7 @@ $('btnUndo').onclick = function () { undoList(); };
 
 function undoList(note, cls) {
   msg(note ? note + '\nĐang tải danh sách lần lưu...' : 'Đang tải danh sách lần lưu...');
-  return api({ action: 'undo', op: 'list', ekey: getEkey() }, 60000).then(function (res) {
+  return api({ action: 'undo', op: 'list', ekey: getEkey(), fs: getFs() }, 60000).then(function (res) {
     if (!res.list) throw new Error('Server chưa có action "undo". Dán edit.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
     UD = res; MODE = 'undo'; $('btnCopy').style.display = 'none';
     renderUndo();
@@ -1597,7 +1656,7 @@ $('out').addEventListener('click', function (ev) {
   if (!b || MODE !== 'undo' || !UD) return;
   const id = b.dataset.undoView;
   if (UD.view && UD.view.entry.id === id) { UD.view = null; renderUndo(); return; }
-  api({ action: 'undo', op: 'view', id: id, ekey: getEkey() }, 60000).then(function (v) { UD.view = v; renderUndo(); msg('', ''); })
+  api({ action: 'undo', op: 'view', id: id, ekey: getEkey(), fs: getFs() }, 60000).then(function (v) { UD.view = v; renderUndo(); msg('', ''); })
     .catch(function (e) { msg('❌ ' + e.message, 'err'); });
 });
 
@@ -1609,7 +1668,7 @@ document.addEventListener('click', function (ev) {
 });
 function undoRun(id) {
   msg('Đang đọc chi tiết lần lưu...');
-  api({ action: 'undo', op: 'view', id: id, ekey: getEkey() }, 60000).then(function (v) {
+  api({ action: 'undo', op: 'view', id: id, ekey: getEkey(), fs: getFs() }, 60000).then(function (v) {
     const e = v.entry;
     if (e.done) { msg('Lần lưu này đã được hoàn tác lúc ' + e.done + (e.doneWho ? ' (' + e.doneWho + ')' : '') + '.', 'err'); return; }
     const lines = v.items.map(it => '• ' + [it.xe, it.lenh && 'lệnh ' + it.lenh, it.stt && 'chuyến ' + it.stt].filter(Boolean).join(' · ') + ' (' + it.code + '): ' +
@@ -1618,7 +1677,7 @@ function undoRun(id) {
       '\n\nSẽ ghi lại giá trị cũ cho ' + v.items.length + ' chuyến lên FUTA:\n\n' + clip(lines, 40).join('\n') +
       '\n\nÔ nào đã bị đổi tiếp sau lần lưu này sẽ KHÔNG đụng tới. Xác nhận?')) { msg('Đã huỷ, chưa ghi gì.', 'info'); return; }
     msg('Đang hoàn tác ' + v.items.length + ' chuyến (đọc lại → ghi giá trị cũ → đọc lại kiểm, đừng đóng trang)...');
-    return api({ action: 'undo', op: 'run', id: id, ekey: getEkey() }, 360000, 0).then(function (r) {
+    return api({ action: 'undo', op: 'run', id: id, ekey: getEkey(), fs: getFs() }, 360000, 0).then(function (r) {
       const bad = r.verifyBad.concat(r.failed, r.skipped);
       const line = (bad.length || r.stopped ? '⚠️ ' : '✅ ') + (e.of ? 'Đã làm lại ' : 'Đã hoàn tác ') + r.restored + '/' + r.total + ' chuyến (' + r.elapsed + 's)' +
         (r.verifyBad.length ? ', KIỂM LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi ghi ' + r.failed.length : '') +

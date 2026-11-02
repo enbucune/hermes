@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 
@@ -56,12 +56,22 @@
       <button id="btnGps" class="act act-gps">🛰 Chụp GPS<span class="hide-sm"> mất chuyến</span></button>
     </div>
 
+    <!-- ⚡ TỰ CHỈNH THEO LUẬT: ai có mã truy cập cũng dùng được, nhưng edit bằng TÀI KHOẢN FUTA CỦA CHÍNH NGƯỜI ĐÓ -->
+    <div class="auto-box" id="autoGroup">
+      <div class="eg-head"><span class="eg-ico">⚡</span><div><b>Tự chỉnh theo luật</b><small>Edit bằng TÀI KHOẢN FUTA CỦA BẠN (đăng nhập 1 lần, giữ 6 giờ, không lưu mật khẩu) · luôn xem trước rồi mới lưu · lỡ tay thì ↩️ Hoàn tác</small></div></div>
+      <div class="ag-row">
+        <div class="field"><label for="plateAuto">Biển số xe (trống = cả tuyến)</label><div class="inbox"><input type="text" id="plateAuto" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plateAuto" tabindex="-1" aria-label="Xoá">×</button></div></div>
+        <button id="btnAuto" class="act act-edit">⚡ Tự chỉnh theo luật</button>
+      </div>
+      <div class="ag-futa"><span id="futaMe">🔑 Chưa đăng nhập FUTA</span> <button type="button" id="btnFutaOut" class="ag-out" hidden>Đăng xuất FUTA</button></div>
+    </div>
+
     <!-- Nhóm SỬA LỆNH: chỉ hiện sau khi mở khoá (5 lần bấm 🚌 + mã sửa lệnh). Tách riêng khung đỏ để khỏi bấm nhầm. -->
     <div class="edit-group" id="editGroup" hidden>
       <div class="eg-head"><span class="eg-ico">🔓</span><div><b>Sửa lệnh vận chuyển</b><small>Ghi thẳng lên FUTA · luôn hỏi xác nhận trước khi ghi · lỡ tay thì bấm ↩️ Hoàn tác</small></div></div>
       <div class="eg-fields">
         <div class="field" id="fPlate">
-          <label for="plate">Biển số xe (trống = cả tuyến khi tự chỉnh)</label>
+          <label for="plate">Biển số xe</label>
           <div class="inbox"><input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div>
         </div>
         <div class="field" id="fFrom">
@@ -75,7 +85,6 @@
       </div>
       <div class="actions eg-actions">
         <button id="btnEdit" class="act act-edit">✏️ Sửa lệnh</button>
-        <button id="btnAuto" class="act act-edit">⚡ Tự chỉnh theo luật</button>
         <button id="btnKy" class="act act-edit">✍️ Điều hành ký</button>
         <button id="btnVeben" class="act act-edit">🅿️ Tự xác nhận về bến</button>
         <button id="btnUndo" class="act act-undo">↩️ Hoàn tác</button>
@@ -188,6 +197,6 @@
   </div>
 </div>
 
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>
