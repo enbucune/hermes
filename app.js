@@ -181,7 +181,7 @@ function selectAll(el) {
     if (document.activeElement === el && el.selectionStart === el.selectionEnd) try { el.setSelectionRange(0, el.value.length); } catch (e) { /* iPhone */ }
   }, 0);
 }
-const SELECT_ON_FOCUS = '#date, #plate, #tFrom, #tTo, #q, input.edit-in';
+const SELECT_ON_FOCUS = '#date, #plate, #plateAuto, #q';
 document.addEventListener('focusin', function (e) {
   const el = e.target;
   if (el.matches && el.matches(SELECT_ON_FOCUS)) selectAll(el);
@@ -328,7 +328,6 @@ $('q').oninput = $('onlyWarn').onchange = function () { rerender(); };
 let EB = null, MODE = 'trips';
 let NV = null;
 let LV = null;
-let ED = null;
 let BT = null;
 let GP = null;
 let UD = null; // màn Hoàn tác
@@ -338,7 +337,6 @@ function rerender() {
   if (MODE === 'ebms' && EB) renderEbms();
   else if (MODE === 'nv' && NV) renderNv();
   else if (MODE === 'lvc' && LV) renderLvc();
-  else if (MODE === 'edit' && ED) renderEdit();
   else if (MODE === 'auto') { if (AU) renderAuto(); }
   else if (MODE === 'bt' && BT) renderBt();
   else if (MODE === 'gps' && GP) renderGps();
@@ -515,19 +513,36 @@ function renderLvc() {
     '</tr></thead><tbody>' + (html || '<tr><td colspan="6">Không có dòng nào</td></tr>') + '</tbody></table>';
 }
 
-// ===== TÍNH NĂNG ẨN: SỬA LỆNH =====
+// ===== THẺ CHỨC NĂNG: 🔎 Xem & kiểm tra (chỉ đọc) · ⚡ Chỉnh lệnh theo luật (ghi FUTA) · 🗂 Bảng tài · 🔓 Điều hành (cần mã) =====
+// Mỗi lúc chỉ hiện 1 thẻ cho gọn; kết quả đang xem bên dưới giữ nguyên khi đổi thẻ. Nhớ thẻ đang mở trên máy này.
+let TAB = 'xem';
+function setTab(t) {
+  const btn = document.querySelector('.tab[data-tab="' + t + '"]');
+  const want = t;
+  if (!btn || btn.hidden) t = 'xem';   // thẻ Điều hành chưa mở khoá: tạm hiện thẻ Xem, vẫn nhớ thẻ muốn mở (mở khoá xong tự về lại)
+  TAB = t;
+  document.querySelectorAll('.tab').forEach(function (b) { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.querySelectorAll('.pane').forEach(function (p) { p.hidden = p.dataset.pane !== t; });
+  if (want === t) try { localStorage.setItem('web_tab', t); } catch (e) { /* bỏ qua */ }
+}
+document.querySelectorAll('.tab').forEach(function (b) { b.onclick = function () { setTab(b.dataset.tab); }; });
+setTab((function () { try { return localStorage.getItem('web_tab') || 'xem'; } catch (e) { return 'xem'; } })());
+
+// ===== TÍNH NĂNG ẨN: ĐIỀU HÀNH =====
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
-  $('editGroup').hidden = !on; $('btnLock').hidden = !on; $('ca2Group').hidden = !on; // Ca 2: mục riêng, cũng cần mã sửa lệnh
-  if (on && !C2) setTimeout(function () { ca2Call({}, true); }, 1500); // đọc trạng thái ca 2 để hiện dòng nhỏ dưới nút // cả nhóm Sửa lệnh (ô biển số, khoảng giờ, 4 nút) ẩn/hiện cùng lúc
+  $('tabDh').hidden = !on; $('btnLock').hidden = !on; $('ca2Group').hidden = !on; // thẻ 🔓 Điều hành (ký, về bến, ca 1/ca 2) chỉ hiện khi mở khoá
+  if (!on && TAB === 'dh') setTab('xem');
+  if (on && !C2) setTimeout(function () { ca2Call({}, true); }, 1500); // đọc trạng thái ca 2 để hiện dòng nhỏ dưới nút
   if (!on) hideUndo();
-  if (!on && (MODE === 'edit' || MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; ED = null; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (!on && (MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
 }
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
     localStorage.setItem('edit_key', ekey); setUnlocked(true);
-    if (!silent) msg('🔓 Đã mở khoá tính năng sửa lệnh', 'ok');
+    if (!silent) { setTab('dh'); msg('🔓 Đã mở khoá thẻ 🔓 Điều hành (ký, về bến, ca 1 / ca 2)', 'ok'); }
+    else if (localStorage.getItem('web_tab') === 'dh') setTab('dh');
   }).catch(function (e) {
     if (silent) { if (!e.net && !e.login) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
     msg('❌ ' + e.message, 'err');
@@ -546,185 +561,7 @@ function tryUnlock(ekey, silent) {
   if (getEkey() && (getSid() || !USER_MODE)) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
 })();
 
-$('btnEdit').onclick = function () {
-  const s = sel(); const plate = $('plate').value.trim();
-  if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy).', 'err'); return; }
-  if (!plate) { msg('❌ Nhập biển số xe cần sửa.', 'err'); $('plate').focus(); return; }
-  $('btnEdit').disabled = true; msg('Đang tải lệnh của xe ' + plate + '...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
-  loadEdit(s, plate).then(function () { msg('✅ Xe ' + ED.plate + ' — ' + ED.ngay + ': ' + ED.orders.length + ' lệnh. Sửa giờ rồi bấm Lưu.', 'ok'); })
-    .catch(function (e) { msg('❌ ' + e.message, 'err'); })
-    .then(function () { $('btnEdit').disabled = false; });
-};
-$('plate').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnEdit').click(); } };
-
-function loadEdit(s, plate) {
-  return api({ action: 'editlist', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
-    if (!res.orders) throw new Error('Server chưa có action "editlist". Dán Edit.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
-    ED = res; ED.sel = s; ED.iso = isoDate(); MODE = 'edit'; $('btnCopy').style.display = 'none';
-    renderEdit();
-  });
-}
-
-function renderEdit() {
-  let nTrips = 0; ED.orders.forEach(function (o) { nTrips += o.trips.length; });
-  $('stats').innerHTML = [['Biển số', ED.plate], ['Lệnh', ED.orders.length], ['Chuyến', nTrips]]
-    .map(x => '<div class="stat"><b>' + esc(x[1]) + '</b>' + x[0] + '</div>').join('');
-  // (nút "Điền Giờ về bến = Giờ đến" đã bỏ: theo luật mới, bình thường về bến = đến + 1 phút -> dùng "⚡ Tự chỉnh theo luật")
-  let out = '<div class="edit-bar">' +
-    '<button class="edit-btn big" data-act="saveAll" id="btnSaveAll">💾 Lưu tất cả thay đổi</button>' +
-    '<span class="edit-hint">Ô đã đổi tô vàng. Chỉ tính các chuyến đang hiện (trong khoảng giờ). Lưu 1 lượt cho cả loạt, có xác nhận trước, lưu xong vẫn ↩️ Hoàn tác được.</span></div>';
-  ED.orders.forEach(function (o) {
-    out += '<div class="ord-h">Lệnh ' + esc(o.lenh) + '<small>' + esc(o.code) + '</small></div>';
-    if (o.canhBao.length) out += '<div class="ord-warn">⚠️ Danh sách chuyến bất thường: ' + esc(o.canhBao.join('; ')) + ' — kiểm tra kỹ mã chuyến trước khi sửa.</div>';
-    out += '<table><thead><tr>' + ['STT', 'Mã chuyến', 'Lịch tài', 'Giờ điều xe', 'Sửa điều xe', 'Giờ đi', 'Giờ đến', 'Giờ về bến', 'Sửa về bến']
-      .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>';
-    o.trips.forEach(function (t) {
-      const sm = String(t.tai || '').match(/^(\d{1,2}):(\d{2})/);
-      const st = sm ? (+sm[1] * 60 + +sm[2]) : '';
-      const ended = !!(t.den && t.veben);
-      const base = ' data-oid="' + esc(o.id) + '" data-tid="' + esc(t.id) + '"';
-      out += '<tr data-start="' + st + '" data-den="' + esc(hm5(t.den)) + '"><td>' + t.stt + '</td><td>' + esc(t.code) + '</td><td>' + esc(t.tai) + '</td><td>' + esc(hm5(t.dieuxe)) + '</td>' +
-        (ended
-          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.dieuxe)) + '" maxlength="5" data-f="dieuxe" data-orig="' + esc(hm5(t.dieuxe)) + '"' + base + '><button class="edit-btn" data-save="dieuxe"' + base + '>Lưu</button></td>'
-          : '<td class="ed-off">chưa kết thúc</td>') +
-        '<td>' + esc(hm5(t.di)) + '</td><td>' + esc(hm5(t.den)) + '</td><td>' + esc(hm5(t.veben)) + '</td>' +
-        (t.den
-          ? '<td class="edcell"><input class="edit-in" value="' + esc(hm5(t.veben)) + '" maxlength="5" data-f="veben" data-orig="' + esc(hm5(t.veben)) + '"' + base + '><button class="edit-btn" data-save="veben"' + base + '>Lưu</button></td>'
-          : '<td class="ed-off">chưa có giờ đến</td>') + '</tr>';
-    });
-    out += '</tbody></table>';
-  });
-  $('out').innerHTML = out;
-  applyRange();
-}
-// Gõ giờ: ô khác giá trị gốc tô vàng, nút "Lưu tất cả" hiện số thay đổi
-$('out').addEventListener('input', function (ev) {
-  const inp = ev.target;
-  if (MODE !== 'edit' || !inp.classList || !inp.classList.contains('edit-in')) return;
-  inp.classList.toggle('changed', (inp.value || '').trim() !== inp.dataset.orig);
-  editCount();
-});
-function editCount() {
-  const b = $('btnSaveAll'); if (!b) return;
-  const n = collectChanges().length;
-  b.textContent = n ? '💾 Lưu ' + n + ' thay đổi' : '💾 Lưu tất cả thay đổi';
-}
-
-// --- Lọc theo khoảng giờ lịch chạy (chỉ ẩn/hiện dòng, không mất giờ đang gõ) ---
-function parseHM(s) {
-  const m = String(s || '').trim().match(/^(\d{1,2}):(\d{1,2})$/);
-  return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
-}
-function applyRange() {
-  if (MODE !== 'edit') return;
-  const from = parseHM($('tFrom').value), to = parseHM($('tTo').value);
-  const has = from !== null || to !== null;
-  $('out').querySelectorAll('tr[data-start]').forEach(function (tr) {
-    let show = true;
-    if (has) {
-      const s = tr.dataset.start === '' ? null : +tr.dataset.start;
-      if (s === null) show = false;
-      else if (from !== null && to !== null) show = from <= to ? (s >= from && s <= to) : (s >= from || s <= to); // qua nửa đêm
-      else if (from !== null) show = s >= from;
-      else show = s <= to;
-    }
-    tr.hidden = !show;
-  });
-}
-$('tFrom').oninput = $('tTo').oninput = function () { applyRange(); editCount(); };
-
-// --- Lưu hàng loạt (có xác nhận) ---
-function collectChanges() {
-  const list = [];
-  $('out').querySelectorAll('input.edit-in').forEach(function (inp) {
-    const tr = inp.closest('tr');
-    if (tr && tr.hidden) return;
-    const v = (inp.value || '').trim();
-    if (v === inp.dataset.orig) return;
-    list.push({ field: inp.dataset.f, oid: inp.dataset.oid, tid: inp.dataset.tid, hhmm: v, input: inp });
-  });
-  return list;
-}
-function findTrip(oid, tid) {
-  const order = ED.orders.find(o => String(o.id) === String(oid));
-  return { order: order, trip: order && order.trips.find(t => String(t.id) === String(tid)) };
-}
-// LƯU TẤT CẢ: gửi cả loạt trong 1 lượt (editmany, POST vì dữ liệu dài). Máy chủ đọc lại 1 lần, kiểm từng ô y như lưu 1 ô,
-// 1 PUT mỗi lệnh, đọc lại kiểm, nhớ hoàn tác. Trước đây mỗi ô 1 lượt + tải lại bảng xe giữa 2 ô cùng chuyến.
-function runBatch(ch) {
-  const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
-  msg('Đang lưu ' + ch.length + ' thay đổi lên FUTA (1 lượt: đọc lại → kiểm → lưu → đọc lại kiểm)...');
-  const changes = ch.map(function (c) {
-    const f = findTrip(c.oid, c.tid);
-    return { orderId: c.oid, tripId: c.tid, field: c.field, hhmm: c.hhmm, snap: f.trip ? f.trip.snap : '', stt: f.trip ? f.trip.stt : '' };
-  });
-  return apiPost({ action: 'editmany', ekey: getEkey(), routeId: ED.sel.id, label: ED.sel.code, date: ED.iso, plate: ED.plate, changes: JSON.stringify(changes) }, 300000)
-    .then(function (r) {
-      if (!r.results) throw new Error('Server chưa có action "editmany". Dán edit.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
-      const okN = [], bad = [];
-      r.results.forEach(function (x, i) {
-        const c = ch[i], f = findTrip(c.oid, c.tid), name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
-        const tag = f.trip ? 'Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' · ' + name : name;
-        (x && x.ok ? okN : bad).push(tag + ': ' + (x ? x.message : 'không có kết quả'));
-      });
-      const text = (bad.length ? '⚠️ ' : '✅ ') + 'Đã xử lý ' + ch.length + ' thay đổi: ' + okN.length + ' thành công, ' + bad.length + ' lỗi' +
-        (bad.length ? '\n' + bad.join('\n') : '');
-      return loadEdit(ED.sel, ED.plate).then(function () {
-        msg(text, bad.length ? 'err' : 'ok');
-        showUndo(r.undoId, 'Đã lưu xe ' + ED.plate + '. Lỡ tay?');
-      });
-    })
-    .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
-}
-
-$('out').addEventListener('click', function (ev) {
-  const a = ev.target.closest && ev.target.closest('button[data-act]');
-  if (!a || MODE !== 'edit' || !ED) return;
-  if (a.dataset.act === 'saveAll') {
-    const ch = collectChanges();
-    if (!ch.length) { msg('Chưa có thay đổi nào để lưu (trong khoảng giờ đang hiện).', 'err'); return; }
-    for (let k = 0; k < ch.length; k++) {
-      if (parseHM(ch[k].hhmm) === null) { msg('❌ Giờ phải dạng HH:mm (vd 22:36)', 'err'); ch[k].input.focus(); return; }
-    }
-    const lines = ch.map(function (c) {
-      const f = findTrip(c.oid, c.tid);
-      const name = c.field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
-      return '• Lệnh ' + f.order.lenh + ' · chuyến ' + f.trip.stt + ' (' + f.trip.code + ') · ' + name + ': ' + c.input.dataset.orig + ' → ' + c.hhmm;
-    });
-    const range = ($('tFrom').value.trim() || $('tTo').value.trim()) ? '\nKhoảng giờ lịch chạy: ' + ($('tFrom').value.trim() || '…') + ' – ' + ($('tTo').value.trim() || '…') : '';
-    if (!confirm('Xe ' + ED.plate + ' · ' + ED.ngay + range + '\nSẽ lưu ' + ch.length + ' thay đổi lên hệ thống FUTA:\n\n' + clip(lines, 40).join('\n') +
-                 '\n\nXác nhận lưu? (lưu xong vẫn hoàn tác được)')) return;
-    runBatch(ch);
-  }
-});
-
-$('out').addEventListener('click', function (ev) {
-  const b = ev.target.closest && ev.target.closest('button[data-save]');
-  if (!b || MODE !== 'edit' || !ED) return;
-  const field = b.dataset.save, oid = b.dataset.oid, tid = b.dataset.tid;
-  const input = b.parentNode.querySelector('input[data-f="' + field + '"]');
-  const hhmm = (input.value || '').trim();
-  const order = ED.orders.find(o => String(o.id) === oid);
-  const trip = order && order.trips.find(t => String(t.id) === tid);
-  if (!trip) return;
-  const name = field === 'dieuxe' ? 'Giờ điều xe' : 'Giờ về bến';
-  const curV = field === 'dieuxe' ? trip.dieuxe : trip.veben;
-  if (!/^\d{1,2}:\d{1,2}$/.test(hhmm)) { msg('❌ Giờ phải dạng HH:mm (vd 22:36)', 'err'); input.focus(); return; }
-  if (!confirm('Xe ' + ED.plate + ' · lệnh ' + order.lenh + ' · chuyến ' + trip.stt + ' (' + trip.code + ')\n' + name + ': ' + hm5(curV) + '  →  ' + hhmm + '\n\nLưu lên hệ thống FUTA?')) return;
-
-  const btns = $('out').querySelectorAll('button'); btns.forEach(x => x.disabled = true);
-  msg('Đang lưu...');
-  api({ action: 'edit', ekey: getEkey(), routeId: ED.sel.id, label: ED.sel.code, plate: ED.plate, stt: trip.stt, date: ED.iso, orderId: oid, tripId: tid, field: field, hhmm: hhmm, snap: trip.snap }, 120000, 0)
-    .then(function (r) {
-      const cls = r.same || r.ok ? 'ok' : 'err';
-      msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls);
-      return loadEdit(ED.sel, ED.plate).then(function () { // nạp lại bảng, giữ thông báo
-        msg(r.message + (r.warn ? '\n⚠️ ' + r.warn : ''), cls);
-        showUndo(r.undoId, 'Đã lưu ' + name + ' chuyến ' + trip.stt + '. Lỡ tay?');
-      });
-    })
-    .catch(function (e) { msg('❌ ' + e.message, 'err'); btns.forEach(x => x.disabled = false); });
-});
+// (Đã bỏ phần sửa tay từng xe — ✏️ Sửa lệnh. Chỉ còn ⚡ Chỉnh theo luật.)
 
 // ===== CHUYỂN NGÀY TRƯỚC / SAU =====
 function shiftDay(n) {
@@ -758,7 +595,7 @@ $('btnNext').onclick = function () { shiftDay(1); };
 let AU = null;
 
 // ⚡ Tự chỉnh dùng TÀI KHOẢN FUTA CỦA NGƯỜI BẤM: đăng nhập 1 lần -> máy chủ giữ phiên 6 giờ (không lưu mật khẩu), web nhớ mã phiên.
-function getFs() { try { return localStorage.getItem('futa_fs') || ''; } catch (e) { return ''; } }
+function getFs() { try { const v = localStorage.getItem('futa_fs') || ''; return /^[0-9a-f]{64}$/.test(v) ? v : ''; } catch (e) { return ''; } }
 function setFs(r) {
   if (r) { localStorage.setItem('futa_fs', r.fs); localStorage.setItem('futa_user', r.futa); localStorage.setItem('futa_het', r.het || ''); }
   else ['futa_fs', 'futa_user', 'futa_het'].forEach(function (k) { localStorage.removeItem(k); });
@@ -766,9 +603,13 @@ function setFs(r) {
 }
 function futaMe() {
   const u = localStorage.getItem('futa_user') || '';
-  $('futaMe').textContent = getFs() && u ? '🔑 Đang dùng FUTA: ' + u + ' (tới ' + (localStorage.getItem('futa_het') || '?') + ')' : '🔑 Chưa đăng nhập FUTA — bấm ⚡ để đăng nhập';
-  $('btnFutaOut').hidden = !getFs();
+  const on = !!(getFs() && u);
+  $('futaMe').innerHTML = on ? '✅ Đang dùng FUTA <b>' + esc(u) + '</b> · giữ tới ' + esc(localStorage.getItem('futa_het') || '?') : '🔑 Chưa đăng nhập FUTA của bạn';
+  $('futaBox').classList.toggle('on', on);
+  $('btnFutaOut').hidden = !getFs(); $('btnFutaIn').hidden = on;
 }
+// máy chủ Apps Script chưa dán bản 36 (không biết action futalogin -> trả "Web App đang chạy", không có mã phiên)
+const MAY_CHU_CU = 'Máy chủ Apps Script CHƯA lên bản mới: dán đè user.gs, web.gs, edit.gs rồi Triển khai → Quản lý triển khai → ✏️ Sửa → Phiên bản mới → Triển khai.';
 let FU_NEXT = null;   // việc chờ sau khi đăng nhập FUTA xong
 function futaForm(why, next) {
   FU_NEXT = next || null;
@@ -787,6 +628,7 @@ function futaLogin() {
   msg('Đang đăng nhập FUTA...');
   apiPost({ action: 'futalogin', futaUser: u.trim(), futaPass: pw }, 60000).then(function (r) {
     if ($('fuPass')) $('fuPass').value = '';
+    if (!r.fs) throw new Error(MAY_CHU_CU);
     setFs(r);
     msg('✅ Đã đăng nhập FUTA ' + r.futa + ' (giữ tới ' + r.het + ').', 'ok');
     const next = FU_NEXT; FU_NEXT = null;
@@ -795,6 +637,7 @@ function futaLogin() {
 }
 $('out').addEventListener('click', function (ev) { if (ev.target.closest && ev.target.closest('button[data-fu="login"]')) futaLogin(); });
 $('out').addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && MODE === 'futa' && ev.target.closest && ev.target.closest('.fu-form')) { ev.preventDefault(); futaLogin(); } });
+$('btnFutaIn').onclick = function () { futaForm('', function () { msg('✅ Đã đăng nhập FUTA. Giờ bấm ⚡ Xem trước theo luật.', 'ok'); $('out').innerHTML = ''; }); };
 $('btnFutaOut').onclick = function () {
   const fs = getFs(); setFs(null);
   if (fs) api({ action: 'futalogout', fs: fs }, 30000, 0).catch(function () {});
@@ -829,6 +672,7 @@ function autoPlan(prefix) {
       st.canXem || st.loi ? 'err' : 'ok');
   }).catch(function (e) {
     if (e.futaLogin) { setFs(null); futaForm('🔑 ' + e.message, function () { autoPlan(prefix); }); return; }
+    if (/Sai mã mở khoá/.test(e.message)) { msg('❌ ' + MAY_CHU_CU, 'err'); return; }
     msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err');
   }).then(function () { $('btnAuto').disabled = false; });
 }
@@ -912,6 +756,7 @@ $('out').addEventListener('click', function (ev) {
 // Chỉ ký lệnh đã edit xong (không còn chuyến cần Tự chỉnh / chuyến FUTA báo sai giờ), đủ giờ về bến, sau giờ về bến chuyến cuối.
 // Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
 $('btnKy').onclick = function () { kyPlan(''); };
+$('plate').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('btnKy').click(); } };
 
 function kyPlan(prefix) {
   const s = sel();
@@ -1621,7 +1466,10 @@ function undoList(note, cls) {
     UD = res; MODE = 'undo'; $('btnCopy').style.display = 'none';
     renderUndo();
     msg(note || '↩️ ' + res.list.length + ' lần lưu hôm nay (hoàn tác được tới 23:55, quá giờ tự xoá). Bấm "↩️ Hoàn tác" ở lần lưu cần trả lại giá trị cũ.', cls || 'info');
-  }).catch(function (e) { msg((note ? note + '\n' : '') + '❌ ' + e.message, 'err'); });
+  }).catch(function (e) {
+    if (e.futaLogin) { setFs(null); futaForm('🔑 ' + e.message, function () { undoList(note, cls); }); return; }
+    msg((note ? note + '\n' : '') + '❌ ' + e.message, 'err');
+  });
 }
 
 function renderUndo() {
@@ -1686,11 +1534,13 @@ function undoRun(id) {
       const cls = bad.length || r.stopped ? 'err' : 'ok';
       if (r.redoId) showUndo(r.redoId, e.of ? 'Đã làm lại. Đổi ý?' : 'Đã hoàn tác. Hoàn tác nhầm?', e.of ? '↩️ Hoàn tác lại' : '↪️ Làm lại (ghi lại giá trị vừa bỏ)');
       else hideUndo();
-      if (MODE === 'edit' && ED) return loadEdit(ED.sel, ED.plate).then(function () { msg(line, cls); });
       if (MODE === 'auto' && AU) return autoPlan(line);
       return undoList(line, cls);
     });
-  }).catch(function (e) { msg('❌ ' + e.message, 'err'); });
+  }).catch(function (e) {
+    if (e.futaLogin) { setFs(null); futaForm('🔑 ' + e.message, function () { undoRun(id); }); return; }
+    msg('❌ ' + e.message, 'err');
+  });
 }
 
 // Thanh "Lỡ tay?" hiện ngay dưới dòng thông báo sau mỗi lần lưu; ẩn khi bấm sang tác vụ khác hoặc bấm ×

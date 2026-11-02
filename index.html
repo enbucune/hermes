@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Check edit cụm</title>
+<title>Check edit cụm 9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 
@@ -16,11 +16,11 @@
     <div class="brand">
       <span class="brand-mark" id="brandMark">🚌</span>
       <div>
-        <h1>Check edit cụm</h1>
+        <h1>Check edit cụm 9</h1>
       </div>
     </div>
     <div class="hero-btns">
-      <button id="btnLock" class="ghost-light" hidden>🔒 Địt lệnh vận chuyển </button>
+      <button id="btnLock" class="ghost-light" hidden>🔒 Khoá Điều hành</button>
       <button id="btnUser" class="ghost-light">👤 Đăng nhập</button>
     </div>
   </div>
@@ -29,12 +29,13 @@
 <main class="page">
 
   <section class="controls">
+    <!-- BƯỚC 1: chọn tuyến + ngày (dùng chung cho mọi thẻ) -->
     <div class="fields">
       <div class="field field-route">
         <label for="route">Tuyến</label>
         <div class="inbox"><input type="text" id="route" data-route="one" placeholder="Đang tải tuyến..." autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="route" tabindex="-1" aria-label="Xoá">×</button></div>
       </div>
-      <div class="field">
+      <div class="field field-date">
         <label for="date">Ngày (dd/mm/yyyy)</label>
         <div class="datebox">
           <button type="button" id="btnPrev" class="day-btn" title="Ngày trước" aria-label="Ngày trước">‹</button>
@@ -42,68 +43,84 @@
           <button type="button" id="btnNext" class="day-btn" title="Ngày sau" aria-label="Ngày sau">›</button>
         </div>
       </div>
-      <div class="field">
-        <label for="nguoiDo">Người đo nồng độ cồn</label>
+    </div>
+
+    <!-- BƯỚC 2: chọn việc cần làm. Mỗi lúc chỉ hiện 1 thẻ (app.js: setTab) -->
+    <nav class="tabs" role="tablist" aria-label="Chức năng">
+      <button type="button" class="tab t-xem" data-tab="xem" role="tab"><span class="tab-ico">🔎</span><span class="tab-tx"><b>Xem &amp; kiểm tra</b><small>chỉ đọc, không ghi gì</small></span></button>
+      <button type="button" class="tab t-sua" data-tab="sua" role="tab"><span class="tab-ico">⚡</span><span class="tab-tx"><b>Chỉnh lệnh theo luật</b><small>ghi lên FUTA bằng tài khoản bạn</small></span></button>
+      <button type="button" class="tab t-bt" data-tab="bt" role="tab"><span class="tab-ico">🗂</span><span class="tab-tx"><b>Bảng tài</b><small>ghép 2–3 tuyến ra Excel</small></span></button>
+      <button type="button" class="tab t-dh" data-tab="dh" role="tab" id="tabDh" hidden><span class="tab-ico">🔓</span><span class="tab-tx"><b>Điều hành</b><small>ký, về bến, ca 1 / ca 2</small></span></button>
+    </nav>
+
+    <!-- 🔎 XEM & KIỂM TRA: chỉ đọc -->
+    <div class="pane p-xem" data-pane="xem">
+      <p class="pane-note">🔎 Chỉ đọc dữ liệu, <b>không ghi gì</b> lên hệ thống. Chọn tuyến + ngày ở trên rồi bấm 1 nút.</p>
+      <div class="actions" id="actions">
+        <button id="btnLoad" class="act act-main">🚐 Tải bảng xe</button>
+        <button id="btnEbms" class="act act-ebms">📊 So sánh EBMS</button>
+        <button id="btnLvc" class="act act-lvc">📋 Kiểm tra lệnh</button>
+        <button id="btnGps" class="act act-gps">🛰 Chụp GPS mất chuyến</button>
+        <button id="btnNv" class="act act-nv">👥 Trích xuất nhân viên</button>
+      </div>
+      <div class="xem-more">
+        <label for="nguoiDo">Người đo nồng độ cồn <small>(điền vào file Trích xuất nhân viên)</small></label>
         <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam">
       </div>
     </div>
 
-    <div class="actions" id="actions">
-      <button id="btnLoad" class="act act-main">🚐 Tải bảng xe</button>
-      <button id="btnEbms" class="act act-ebms">📊 So sánh EBMS</button>
-      <button id="btnNv" class="act act-nv">👥 Trích xuất nhân viên</button>
-      <button id="btnLvc" class="act act-lvc">📋 Kiểm tra lệnh</button>
-      <button id="btnGps" class="act act-gps">🛰 Chụp GPS<span class="hide-sm"> mất chuyến</span></button>
-    </div>
-
-    <!-- ⚡ TỰ CHỈNH THEO LUẬT: ai có mã truy cập cũng dùng được, nhưng edit bằng TÀI KHOẢN FUTA CỦA CHÍNH NGƯỜI ĐÓ -->
-    <div class="auto-box" id="autoGroup">
-      <div class="eg-head"><span class="eg-ico">⚡</span><div><b>Tự chỉnh theo luật</b><small>Edit bằng TÀI KHOẢN FUTA CỦA BẠN (đăng nhập 1 lần, giữ 6 giờ, không lưu mật khẩu) · luôn xem trước rồi mới lưu · lỡ tay thì ↩️ Hoàn tác</small></div></div>
+    <!-- ⚡ CHỈNH LỆNH THEO LUẬT: ai có mã truy cập cũng dùng được, edit bằng TÀI KHOẢN FUTA CỦA CHÍNH NGƯỜI ĐÓ -->
+    <div class="pane p-sua" data-pane="sua" id="autoGroup" hidden>
+      <ol class="steps">
+        <li><b>Đăng nhập FUTA của bạn</b><span>1 lần, giữ 6 giờ, không lưu mật khẩu</span></li>
+        <li><b>Bấm ⚡ Xem trước</b><span>web tính giờ theo luật, chưa ghi gì</span></li>
+        <li><b>Xem bảng → 💾 Lưu</b><span>lỡ tay thì ↩️ Hoàn tác (tới 23:55)</span></li>
+      </ol>
+      <div class="futa-box" id="futaBox">
+        <span id="futaMe">🔑 Chưa đăng nhập FUTA của bạn</span>
+        <button type="button" id="btnFutaIn" class="btn-soft fb-in">🔑 Đăng nhập FUTA</button>
+        <button type="button" id="btnFutaOut" class="ag-out" hidden>Đăng xuất FUTA</button>
+      </div>
       <div class="ag-row">
-        <div class="field"><label for="plateAuto">Biển số xe (trống = cả tuyến)</label><div class="inbox"><input type="text" id="plateAuto" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plateAuto" tabindex="-1" aria-label="Xoá">×</button></div></div>
-        <button id="btnAuto" class="act act-edit">⚡ Tự chỉnh theo luật</button>
-      </div>
-      <div class="ag-futa"><span id="futaMe">🔑 Chưa đăng nhập FUTA</span> <button type="button" id="btnFutaOut" class="ag-out" hidden>Đăng xuất FUTA</button></div>
-    </div>
-
-    <!-- Nhóm SỬA LỆNH: chỉ hiện sau khi mở khoá (5 lần bấm 🚌 + mã sửa lệnh). Tách riêng khung đỏ để khỏi bấm nhầm. -->
-    <div class="edit-group" id="editGroup" hidden>
-      <div class="eg-head"><span class="eg-ico">🔓</span><div><b>Sửa lệnh vận chuyển</b><small>Ghi thẳng lên FUTA · luôn hỏi xác nhận trước khi ghi · lỡ tay thì bấm ↩️ Hoàn tác</small></div></div>
-      <div class="eg-fields">
-        <div class="field" id="fPlate">
-          <label for="plate">Biển số xe</label>
-          <div class="inbox"><input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div>
-        </div>
-        <div class="field" id="fFrom">
-          <label for="tFrom">Sửa từ giờ (lịch chạy)</label>
-          <input type="text" id="tFrom" placeholder="vd: 14:00" maxlength="5" autocomplete="off">
-        </div>
-        <div class="field" id="fTo">
-          <label for="tTo">Đến giờ</label>
-          <input type="text" id="tTo" placeholder="vd: 22:00" maxlength="5" autocomplete="off">
-        </div>
-      </div>
-      <div class="actions eg-actions">
-        <button id="btnEdit" class="act act-edit">✏️ Sửa lệnh</button>
-        <button id="btnKy" class="act act-edit">✍️ Điều hành ký</button>
-        <button id="btnVeben" class="act act-edit">🅿️ Tự xác nhận về bến</button>
+        <div class="field"><label for="plateAuto">Biển số xe <small>(để trống = cả tuyến)</small></label><div class="inbox"><input type="text" id="plateAuto" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plateAuto" tabindex="-1" aria-label="Xoá">×</button></div></div>
+        <button id="btnAuto" class="act act-auto">⚡ Xem trước theo luật</button>
         <button id="btnUndo" class="act act-undo">↩️ Hoàn tác</button>
       </div>
     </div>
 
-    <div class="bt-box">
-      <div class="bt-title"><span class="bt-ico">🗂</span><div><b>Bảng tài ghép tuyến</b><small>Chọn 2–3 tuyến, dùng ngày ở trên, ghép thành 1 file Excel</small></div></div>
+    <!-- 🗂 BẢNG TÀI GHÉP TUYẾN -->
+    <div class="pane p-bt" data-pane="bt" hidden>
+      <p class="pane-note">🗂 Chọn 2–3 tuyến, dùng <b>ngày ở trên</b>, ghép thành 1 file Excel.</p>
       <div class="bt-row">
         <div class="field"><label for="bt1">Tuyến 1</label><div class="inbox"><input type="text" id="bt1" data-route="bt" placeholder="vd: 161" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt1" tabindex="-1" aria-label="Xoá">×</button></div></div>
         <div class="field"><label for="bt2">Tuyến 2</label><div class="inbox"><input type="text" id="bt2" data-route="bt" placeholder="vd: 157" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt2" tabindex="-1" aria-label="Xoá">×</button></div></div>
-        <div class="field"><label for="bt3">Tuyến 3 (không bắt buộc)</label><div class="inbox"><input type="text" id="bt3" data-route="bt" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt3" tabindex="-1" aria-label="Xoá">×</button></div></div>
+        <div class="field"><label for="bt3">Tuyến 3 <small>(không bắt buộc)</small></label><div class="inbox"><input type="text" id="bt3" data-route="bt" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt3" tabindex="-1" aria-label="Xoá">×</button></div></div>
         <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
       </div>
     </div>
 
-    <div class="ca2-box" id="ca2Group" hidden>
-      <div class="bt-title"><span class="bt-ico">🌙</span><div><b>Ca 1 + Ca 2 tự động</b><small>Ca 1: 14:00 về bến + edit lệnh ca 1 (không ký). Ca 2: từ 22:00 xe nào về hết thì ký (lệnh ca 1 chỉ edit khi bị đỏ). Chạy trên máy chủ, đóng web vẫn chạy</small></div></div>
-      <div class="ca2-row"><button id="btnCa2" class="act act-ca2">🌙 Mở Ca 1 / Ca 2</button><span class="ca2-mini" id="ca2Mini"></span></div>
+    <!-- 🔓 ĐIỀU HÀNH: chỉ hiện sau khi mở khoá (5 lần bấm 🚌 + mã). Ghi bằng tài khoản chung của máy chủ -->
+    <div class="pane p-dh" data-pane="dh" id="editGroup" hidden>
+      <p class="pane-note">🔓 Ghi thẳng lên FUTA · luôn hỏi xác nhận trước khi ghi · <b>chữ ký không gỡ được</b>.</p>
+      <div class="dh-grid">
+        <div class="dh-card">
+          <div class="dh-h">✍️ Điều hành ký</div>
+          <small>Chỉ ký lệnh đã chỉnh xong, xe đã về bến. Xem danh sách trước rồi mới ký.</small>
+          <div class="field"><label for="plate">Biển số xe <small>(trống = cả tuyến)</small></label><div class="inbox"><input type="text" id="plate" placeholder="vd: 50H66798" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div></div>
+          <button id="btnKy" class="act act-edit">✍️ Xem lệnh cần ký</button>
+        </div>
+        <div class="dh-card">
+          <div class="dh-h">🅿️ Xác nhận về bến</div>
+          <small>Xe đã chạy xong mà chưa xác nhận về bến. Có thể bật tự động mỗi giờ.</small>
+          <button id="btnVeben" class="act act-edit">🅿️ Mở về bến</button>
+        </div>
+        <div class="dh-card ca2-box" id="ca2Group" hidden>
+          <div class="dh-h">🌙 Ca 1 + Ca 2 tự động</div>
+          <small>Ca 1: 14:00 về bến + edit lệnh ca 1. Ca 2: từ 22:00 xe nào về hết thì ký. Chạy trên máy chủ, đóng web vẫn chạy.</small>
+          <button id="btnCa2" class="act act-ca2">🌙 Mở Ca 1 / Ca 2</button>
+          <span class="ca2-mini" id="ca2Mini"></span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -150,7 +167,7 @@
 <div class="auth" id="auth" hidden>
   <div class="auth-card">
     <button type="button" class="auth-x" id="authX" title="Đóng" hidden>×</button>
-    <div class="auth-logo">🚌 <b>Check edit cụm</b></div>
+    <div class="auth-logo">🚌 <b>Check edit cụm 9</b></div>
     <div class="auth-tabs" id="authTabs">
       <button type="button" data-tab="login" class="on">Đăng nhập</button>
       <button type="button" data-tab="reg">Đăng ký</button>
@@ -197,6 +214,6 @@
   </div>
 </div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
