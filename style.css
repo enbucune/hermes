@@ -66,9 +66,10 @@ button:disabled { opacity: .55; cursor: wait; }
 /* ===== Thông báo ===== */
 #msg { margin-top: 18px; font-size: 14px; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; white-space: pre-wrap; background: var(--blue-100); color: var(--blue-700); font-weight: 500; }
 #msg:empty { display: none; }
-#msg:not(.ok):not(.err):not(.info)::before { content: ''; width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid currentColor; border-top-color: transparent; animation: spin .8s linear infinite; flex-shrink: 0; }
+#msg:not(.ok):not(.err):not(.info):not(.warn)::before { content: ''; width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid currentColor; border-top-color: transparent; animation: spin .8s linear infinite; flex-shrink: 0; }
 #msg.ok { background: #E1F6EA; color: #0C6B3F; }
 #msg.err { background: #FDE8EA; color: #A02634; }
+#msg.warn { background: #FFF4D6; color: #7A4B00; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ===== Thẻ thống kê: màu theo ý nghĩa ===== */
@@ -527,3 +528,26 @@ tr.ud-detail td { background: #FFFBEA !important; white-space: normal; font-weig
   .ag-row .act { flex: 1 1 100%; }
   .field-date { flex: 1 1 100% !important; }
 }
+
+/* ===== Bản 42: soi lỗi nhanh — bấm ô thống kê / chú thích màu để lọc ===== */
+.stat.st-f { cursor: pointer; transition: transform .12s, box-shadow .12s; user-select: none; }
+.stat.st-f:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(23,45,110,.14); }
+.stat.st-f.on { box-shadow: 0 0 0 3px var(--blue-600), 0 6px 18px rgba(23,45,110,.14); }
+.stat.st-f:focus-visible { outline: 3px solid var(--blue-600); outline-offset: 2px; }
+button.lg { border: 0; cursor: pointer; font-family: inherit; line-height: 1.5; transition: box-shadow .12s, opacity .12s; }
+button.lg b { font-family: var(--num); font-size: 14px; margin-left: 4px; }
+button.lg:hover:not(:disabled) { box-shadow: 0 0 0 2px currentColor inset; }
+button.lg.on { box-shadow: 0 0 0 2px currentColor inset, 0 2px 8px rgba(0,0,0,.12); }
+button.lg:disabled { opacity: .45; cursor: default; }
+.fil-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 18px; background: var(--blue-50); color: var(--blue-900); font-size: 14px; border-bottom: 1px solid var(--line); position: sticky; left: 0; }
+.fil-bar .fil-x { height: 32px; padding: 0 12px; font-size: 13px; }
+table.t-ebms td.notes { min-width: 280px; }
+details.rules { padding: 12px 22px; }
+details.rules[hidden] { display: none; }
+details.rules summary { cursor: pointer; list-style: none; }
+details.rules summary::-webkit-details-marker { display: none; }
+details.rules summary h4 { display: inline; margin: 0; }
+details.rules summary h4::before { content: '▸ '; }
+details.rules[open] summary h4::before { content: '▾ '; }
+details.rules[open] summary { margin-bottom: 8px; }
+details.rules summary small { font-weight: 500; color: var(--muted); font-size: 12.5px; }

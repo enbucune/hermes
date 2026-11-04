@@ -338,11 +338,11 @@ $('btnLoad').onclick = function () {
   const s = sel(); if (!s.id || !isoDate()) { msg('❌ Chưa nhập đúng tuyến/ngày (ngày gõ dạng dd/mm/yyyy), hoặc danh sách tuyến chưa tải xong.', 'err'); return; }
   $('btnLoad').disabled = true; msg('Đang tải...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'load', routeId: s.id, label: s.code, date: isoDate() }).then(function (res) {
-    DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = '';
+    DATA = res; CUR = s; MODE = 'trips'; $('btnCopy').style.display = 'none';
     const nMat = res.missed.filter(m => !isDx(m)).length;
     msg((res.stats.warn || nMat ? '⚠️ ' : '✅ ') + 'Tuyến ' + s.code + ' — ' + $('date').value + ': ' +
       (res.stats.warn ? res.stats.warn + '/' + res.stats.total + ' chuyến có lỗi' : 'không có chuyến nào lỗi giờ (' + res.stats.total + ' chuyến)') +
-      (nMat ? ' · ' + nMat + ' mất chuyến' : '') + (res.stats.warn ? ' — bấm ô màu để lọc, 📋 Copy danh sách lỗi để gửi' : ''), res.stats.warn || nMat ? 'warn' : 'ok'); render();
+      (nMat ? ' · ' + nMat + ' mất chuyến' : '') + (res.stats.warn ? ' — bấm ô màu để lọc' : ''), res.stats.warn || nMat ? 'warn' : 'ok'); render();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnLoad').disabled = false; });
 };
@@ -387,7 +387,7 @@ $('btnEbms').onclick = function () {
   $('btnEbms').disabled = true; msg('Đang đăng nhập EBMS và so sánh (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'ebms', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
-    EB = res; MODE = 'ebms'; $('btnCopy').style.display = ''; EB.sel = s;
+    EB = res; MODE = 'ebms'; $('btnCopy').style.display = 'none';
     const nLech = res.results.filter(r => catOf(r.loai) !== 'ok').length;
     msg((nLech ? '⚠️ ' : '✅ ') + 'So sánh EBMS tuyến ' + s.code + ' — ngày ' + res.ngay + ' (PC: ' + res.pcCount + ' chuyến, EBMS: ' + res.ebmsCount + ' chuyến' +
         (res.gps ? ' · 🛰 ' + res.gps : '') + ')' + (nLech ? ': ' + nLech + ' dòng cần xem' : ': tất cả khớp'), nLech ? 'warn' : 'ok');
@@ -405,7 +405,6 @@ function renderEbms() {
   const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
   const hit = c => !FIL || FIL === 'all' || FIL === c || (FIL === 'lech' && (c === 'warn' || c === 'plan'));
   let html = '';
-  VIS = [];
   EB.results.forEach(function (r) {
     const c = catOf(r.loai);
     if (only && c === 'ok') return;
@@ -413,7 +412,6 @@ function renderEbms() {
     const f = [r.loai, r.khDi, r.khDen, r.khXe, r.thXe, r.thDi, r.thDen, r.benDau, r.trangThaiEBMS, r.lichChayPC, r.xePC, r.benXuatPhatPC,
       r.gioDiPC, r.gioDenPC, r.chenhLechDi, r.chenhLechDen, r.gpsDi || '', r.gpsVe || '', r.pcGps || '', r.ebGps || '', r.soBen];
     if (q && (f.join(' ') + ' ' + r.ghi).toLowerCase().indexOf(q) === -1) return;
-    if (c !== 'ok') VIS.push([r.loai, r.khXe || r.thXe || r.xePC, 'KH ' + (r.khDi || r.lichChayPC || '?'), r.ghi].filter(Boolean).join(' · '));
     // "Ghi chú" (lý do lệch) để ngay sau cột Loại cho khỏi kéo ngang tới cuối bảng
     html += '<tr class="e-' + c + '"><td>' + esc(f[0]) + '</td><td class="notes">' + esc(r.ghi) + '</td>' + f.slice(1).map(v => '<td>' + esc(v) + '</td>').join('') + '</tr>';
   });
@@ -424,30 +422,10 @@ function renderEbms() {
 }
 
 // ===== RENDER =====
-// Lý do lỗi của 1 chuyến, viết ra chữ (trước chỉ có màu + rê chuột mới thấy, điện thoại không xem được)
-const toMin = v => { const m = /^(\d{1,2}):(\d{2})/.exec(String(v || '').trim()); return m ? +m[1] * 60 + +m[2] : null; };
-const wrapMin = d => ((d + 720) % 1440 + 1440) % 1440 - 720;
-const pmMin = d => (d > 0 ? '+' : '') + d + ' phút';
-function tripWhy(r) {
-  const out = [], L = toMin(r.lich), Ls = String(r.lich || '').slice(0, 5);
-  const dx = toMin(r.t[0]), den = toMin(r.t[2]), vb = toMin(r.t[3]);
-  if ((r.k[0] === 'red' || r.k[0] === 'yellow') && dx != null && L != null) {
-    const d = wrapMin(dx - L);
-    out.push([r.k[0], d >= 0 ? 'Điều xe trễ: ' + r.t[0] + (d ? ' (sau lịch ' + Ls + ' ' + d + ' phút)' : ' bằng giờ lịch ' + Ls) + ', phải điều trước lịch'
-      : 'Điều xe sớm ' + (-d) + ' phút: ' + r.t[0] + ' (lịch ' + Ls + ')']);
-  }
-  if ((r.k[3] === 'red' || r.k[3] === 'yellow') && vb != null && den != null)
-    out.push([r.k[3], 'Về bến lệch ' + pmMin(wrapMin(vb - den)) + ' so với giờ đến: ' + r.t[2] + ' → ' + r.t[3]]);
-  if (r.k[1] === 'green') out.push(['green', 'Giờ đi ' + r.t[1] + ' khác lịch ' + Ls + (r.chenh != null ? ' (' + pmMin(r.chenh) + ')' : '')]);
-  const seen = {};
-  r.n.forEach(function (t) { String(t || '').split('\n').forEach(function (x) { if (x && !seen[x]) { seen[x] = 1; out.push(['purple', 'Trùng giờ: ' + x]); } }); });
-  return out;
-}
 const WHY_KEYS = ['red', 'yellow', 'green', 'purple'];
 
 function render() {
   const st = DATA.stats, nDx = DATA.missed.filter(isDx).length;
-  DATA.rows.forEach(function (r) { if (!r.why) r.why = tripWhy(r); });
   $('stats').innerHTML = statHtml([['Tổng chuyến', st.total, '', 'all'], ['Có cảnh báo', st.warn, '', 'warn'], ['Cặp trùng giờ', st.conflicts, '', 'purple'],
     ['Mất chuyến', st.missed - nDx, '', 'mat']].concat(nDx ? [['Đề xuất mất chuyến', nDx, 'e-warn', 'mat']] : []));
 
@@ -461,27 +439,22 @@ function render() {
   const q = norm($('q').value), only = $('onlyWarn').checked;
   const hit = r => !FIL || FIL === 'all' || FIL === 'mat' || (FIL === 'warn' ? !!r.k.join('') : r.k.indexOf(FIL) !== -1);
   let band = false, prev = null, html = '';
-  VIS = [];
   DATA.rows.forEach(function (r) {
     if (r.xe !== prev) { band = !band; prev = r.xe; }
-    if (q && norm(r.xe + ' ' + r.lich + ' ' + r.why.map(w => w[1]).join(' ')).indexOf(q) === -1) return;
+    if (q && norm(r.xe + ' ' + r.lich).indexOf(q) === -1) return;
     if (only && !r.k.join('')) return;
     if (!hit(r)) return;
-    if (r.why.length) VIS.push(r.xe + ' · lịch ' + r.lich + ': ' + r.why.map(w => w[1]).join('; '));
     const cells = r.t.map((v, i) => '<td class="' + r.k[i] + '"' + (r.n[i] ? ' title="' + esc(r.n[i]) + '"' : '') + '>' + esc(v) + '</td>').join('');
     const ch = r.chenh == null ? '' : (r.chenh > 0 ? '+' : '') + r.chenh + ' phút';
-    const why = r.why.map(w => '<div class="why w-' + w[0] + '">' + esc(w[1]) + '</div>').join('');
     html += '<tr class="' + (band ? 'bandB' : '') + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.lich) + '</td>' + cells +
-      '<td class="' + (r.k[1] === 'green' ? 'green' : '') + '">' + ch + '</td><td class="notes why-c">' + (why || '<span class="why-ok">✓</span>') + '</td></tr>';
+      '<td class="' + (r.k[1] === 'green' ? 'green' : '') + '">' + ch + '</td></tr>';
   });
-  let out = filBar() + '<table><thead><tr><th>Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Chênh lệch giờ đi</th><th>Lỗi / lý do</th></tr></thead><tbody>' +
-    (html || '<tr><td colspan="8">' + emptyText() + '</td></tr>') + '</tbody></table>';
+  let out = filBar() + '<table><thead><tr><th>Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Chênh lệch giờ đi</th></tr></thead><tbody>' +
+    (html || '<tr><td colspan="7">' + emptyText() + '</td></tr>') + '</tbody></table>';
 
   if (DATA.missed.length) {
     // Mất chuyến (xe KHÔNG chạy) và Đề xuất mất chuyến (xe CÓ chạy, chờ duyệt) là 2 loại khác nhau: tách màu + có giờ đi/đến thực tế
     const nDx2 = DATA.missed.filter(isDx).length;
-    if (!FIL || FIL === 'all' || FIL === 'mat') DATA.missed.forEach(function (m) { if (!q || norm([m.xe, m.lichChay, m.maChuyen, m.benXuatPhat, m.taiXe, m.tiepVien].join(' ')).indexOf(q) !== -1)
-      VIS.push((isDx(m) ? 'Đề xuất mất chuyến' : 'Mất chuyến') + ' · ' + m.xe + ' · lịch ' + m.lichChay + ' · ' + m.maChuyen); });
     out += '<h3 id="matH">⚠️ Mất chuyến (' + (DATA.missed.length - nDx2) + ')' + (nDx2 ? ' · Đề xuất mất chuyến (' + nDx2 + ')' : '') + '</h3>' +
       '<table><thead><tr><th>Loại</th><th>Mã chuyến</th><th>Lịch chạy</th><th>Bến</th><th>Xe</th><th>Đi → đến thực tế</th><th>Tài xế</th><th>Tiếp viên</th><th>Trạng thái</th></tr></thead><tbody>' +
       DATA.missed.slice().sort((a, b) => (isDx(a) - isDx(b)) || String(a.lichChay).localeCompare(String(b.lichChay))).map(m =>
@@ -531,13 +504,6 @@ function renderNv() {
 }
 
 $('btnCopy').onclick = function () {
-  if (MODE === 'trips' || MODE === 'ebms' || MODE === 'lvc') {
-    const o = MODE === 'trips' ? CUR : MODE === 'ebms' ? EB.sel : LV.sel, ten = { trips: 'Bảng xe', ebms: 'So sánh EBMS', lvc: 'Kiểm tra lệnh' }[MODE];
-    if (!VIS.length) { msg('✅ Không có dòng lỗi nào trong bảng đang xem để copy', 'ok'); return; }
-    copyText('🔎 ' + ten + ' tuyến ' + ((o && o.code) || '') + ' — ' + $('date').value + (FIL && FIL !== 'all' ? ' (lọc: ' + (FIL_TEN[FIL] || FIL) + ')' : '') + ': ' + VIS.length + ' dòng lỗi\n' +
-      VIS.map((t, i) => (i + 1) + '. ' + t).join('\n'), '📋 Đã copy ' + VIS.length + ' dòng lỗi, dán vào Zalo / Sheet được luôn');
-    return;
-  }
   if (MODE === 'bt' && BT) { copyText(btGrid().map(r => r.join('\t')).join('\n'), '📋 Đã copy bảng tài, qua Google Sheet bấm Ctrl+V'); return; }
   if (!NV) return;
   const clean = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ');
@@ -557,7 +523,7 @@ $('btnLvc').onclick = function () {
   $('btnLvc').disabled = true; msg('Đang kiểm tra lệnh vận chuyển tuyến ' + s.code + ' (có thể mất 20-40 giây)...'); $('out').innerHTML = ''; $('stats').innerHTML = '';
   api({ action: 'lvc', routeId: s.id, label: s.code, date: isoDate() }, 180000).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
-    LV = res; MODE = 'lvc'; $('btnCopy').style.display = res.rows.length ? '' : 'none'; LV.sel = s;
+    LV = res; MODE = 'lvc'; $('btnCopy').style.display = 'none';
     const nBad = res.rows.filter(r => r.level === 'bad').length, nCb = res.rows.filter(r => r.level === 'warn').length;
     if (res.rows.length) msg((nBad ? '🔴 ' : nCb ? '🟠 ' : '✅ ') + 'Lệnh tuyến ' + s.code + ' — ngày ' + res.ngay + ': ' + res.rows.length + ' lệnh' +
       (nBad || nCb ? ' · ' + nBad + ' lỗi, ' + nCb + ' cảnh báo (đưa lên đầu bảng)' : ', tất cả đạt'), nBad || nCb ? 'warn' : 'ok');
@@ -575,7 +541,6 @@ function renderLvc() {
   const q = norm($('q').value), only = $('onlyWarn').checked;
   const tag = { ok: '✅ ĐẠT', warn: '🟠 CẢNH BÁO', bad: '🔴 LỖI' }, cls = { ok: 'e-ok', warn: 'e-warn', bad: 'e-nopc' };
   let html = '';
-  VIS = [];
   // lỗi lên đầu, rồi cảnh báo, rồi đạt (giữ thứ tự cũ trong cùng mức)
   const ord = { bad: 0, warn: 1, ok: 2 };
   LV.rows.map((r, i) => [r, i]).sort((a, b) => (ord[a[0].level] - ord[b[0].level]) || (a[1] - b[1])).forEach(function (x) {
@@ -583,7 +548,6 @@ function renderLvc() {
     if (only && r.level === 'ok') return;
     if (FIL && FIL !== 'all' && FIL !== r.level) return;
     if (q && norm([r.xe, r.code, r.lai, r.loi.join(' '), r.cb.join(' ')].join(' ')).indexOf(q) === -1) return;
-    if (r.level !== 'ok') VIS.push(r.xe + ' · ' + r.code + ': ' + r.loi.map(t => '❌ ' + t).concat(r.cb.map(t => '⚠️ ' + t)).join('; '));
     const notes = r.loi.map(x => '<div>❌ ' + esc(x) + '</div>').concat(r.cb.map(x => '<div>⚠️ ' + esc(x) + '</div>')).join('');
     html += '<tr class="' + cls[r.level] + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.code) + '</td><td class="left">' + esc(r.lai) +
       '</td><td>' + (r.soChuyen == null ? '' : r.soChuyen) + '</td><td>' + tag[r.level] + '</td><td class="notes">' + notes + '</td></tr>';
@@ -593,7 +557,7 @@ function renderLvc() {
 }
 
 // ===== LỌC NHANH (bảng xe / EBMS / lệnh): bấm ô thống kê hoặc chú thích màu = chỉ xem loại đó, bấm lại = bỏ lọc =====
-let FIL = '', VIS = [];   // VIS: các dòng lỗi đang hiện, dạng chữ (nút 📋 Copy danh sách lỗi)
+let FIL = '';
 const FIL_TEN = { warn: 'có cảnh báo', red: 'màu đỏ', yellow: 'màu vàng', green: 'màu xanh lá', purple: 'trùng giờ (tím)', ok: 'đạt / khớp', lech: 'lệch giờ', nopc: 'thiếu phân công', noebms: 'thiếu EBMS', bad: 'lỗi' };
 function statHtml(list) { // [tên, số, class màu, khoá lọc]
   return list.map(x => '<div class="stat st-f ' + (x[2] || '') + (FIL === x[3] || (!FIL && x[3] === 'all') ? ' on' : '') + '" data-f="' + x[3] + '" role="button" tabindex="0" title="' +
@@ -692,7 +656,6 @@ $('btnNext').onclick = function () { shiftDay(1); dayRerun(); };
   const sync = function () {
     lg.style.display = (MODE === 'trips' && $('out').children.length) ? '' : 'none';
     document.body.dataset.mode = MODE; // CSS ẩn/hiện ô "Chỉ hiện dòng cảnh báo" theo màn đang xem
-    $('btnCopy').textContent = (MODE === 'trips' || MODE === 'ebms' || MODE === 'lvc') ? '📋 Copy danh sách lỗi' : '📋 Copy dán vào Sheet';
     $('q').placeholder = { gps: 'Lọc theo tuyến, xe, lịch, bến, tài xế...', undo: 'Lọc theo người lưu, tuyến, xe...', nv: 'Lọc theo tên, chức vụ...',
       auto: 'Lọc theo xe, mã chuyến, lịch...', bt: 'Tìm biển số xe...' }[MODE] || 'Lọc theo xe, tên, bến...';
   };
