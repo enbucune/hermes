@@ -1032,7 +1032,8 @@ function renderCa2() {
   let out = '';
   if (C2.on) out += '<div class="panel-note">' + (C2.veben ? '🅿️ Tự xác nhận về bến: ĐANG BẬT (máy chủ quét mỗi 1 giờ).' : '🅿️ Tự xác nhận về bến đang tắt (đã hết ca hoặc bị tắt) — mỗi lượt ca 2 vẫn tự xác nhận về bến.') + '</div>';
   if (!C2.lich) out += '<div class="panel-note err">⚠️ Máy chủ CHƯA CÀI LỊCH ca 2: mở Apps Script, chọn hàm <b>ca2_cai_dat</b> rồi bấm Chạy 1 lần. Chưa cài thì bật lên cũng không tự chạy.</div>';
-  if (C2.stopKy) out += '<div class="panel-note err">⛔ FUTA đã TỪ CHỐI KÝ 1 lệnh nên ca 2 đã DỪNG KÝ cả buổi (vẫn về bến + edit). Xem nhật ký, ký tay trên FUTA.</div>';
+  if (C2.stopKy === true) out += '<div class="panel-note err">⛔ FUTA đã TỪ CHỐI KÝ 1 lệnh nên ca 2 đã DỪNG KÝ cả buổi (vẫn về bến + edit). Xem nhật ký, ký tay trên FUTA.</div>';
+  else if (C2.stopKy && C2.stopKy.length) out += '<div class="panel-note err">⛔ FUTA từ chối ký 3 lần, ca 2 thôi ký các lệnh: <b>' + esc(C2.stopKy.join(', ')) + '</b> — anh ký tay trên FUTA. Các xe khác ca 2 vẫn ký bình thường.</div>';
   out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(c1.tuyen, sel().code ? [sel().code] : []), '🌙 Chọn tuyến (dùng cho nút Bật ca 1 / Bật ca 2, chỉ tuyến được tick)') + '</div>';
   out += '<div class="edit-bar"><b>☀️ Ca 1</b> ' + (c1.on ? '<span class="c2-ok-t">ĐANG BẬT · ' + esc(c1.tuyen.join(', ')) + '</span> ' : '<span>đang tắt</span> ') +
     '<button class="edit-btn" data-c2="on1">☀️ ' + (c1.on ? 'Lưu tuyến ca 1' : 'Bật ca 1') + '</button> ' + (c1.on ? '<button class="edit-btn" data-c2="off1">⚪ Tắt ca 1</button> ' : '') +
