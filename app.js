@@ -53,9 +53,27 @@ function authParam() { return USER_MODE ? { sid: getSid(), src: 'web' } : { key:
 function getSid() { try { return localStorage.getItem('web_sid') || ''; } catch (e) { return ''; } }
 let ME = null;
 
-// ===== JSONP (tự thử lại khi lỗi kết nối) =====
-let _n = 0;
+// ===== GỌI MÁY CHỦ (tự thử lại khi lỗi kết nối) =====
+// Gọi bằng fetch KHÔNG gửi cookie Google (credentials 'omit'): trình duyệt đăng nhập nhiều tài khoản Google /
+// cookie Google cũ làm script.google.com chuyển hướng vòng vèo -> trang chậm, đổi trình duyệt mới hết.
+// fetch lỗi mạng thì mới dùng JSONP (cách cũ) làm dự phòng.
+let _n = 0, NO_FETCH = false;
 function apiOnce(params, timeoutMs) {
+  if (NO_FETCH || !window.fetch) return apiJsonp(params, timeoutMs);
+  let url;
+  try { url = getUrl(); } catch (e) { return Promise.reject(e); }
+  const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
+  const q = new URLSearchParams(Object.assign(authParam(), params));
+  return fetch(url + '?' + q.toString(), { credentials: 'omit', cache: 'no-store', signal: ctl.signal })
+    .then(function (r) { return r.json(); })
+    .then(function (data) { if (!data || !data.ok) throw apiErr(data); return data; }, function (e) {
+      if (e.name === 'AbortError') throw new Error('Hết thời gian chờ');
+      if (e instanceof SyntaxError) { NO_FETCH = true; return apiJsonp(params, timeoutMs); } // máy chủ không trả JSON
+      return apiJsonp(params, timeoutMs); // lỗi mạng / CORS: thử lại bằng JSONP
+    })
+    .finally(function () { clearTimeout(timer); });
+}
+function apiJsonp(params, timeoutMs) {
   return new Promise(function (resolve, reject) {
     let url;
     try { url = getUrl(); } catch (e) { reject(e); return; }
