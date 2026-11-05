@@ -1030,7 +1030,7 @@ $('out').addEventListener('click', function (ev) {
 
 // ===== CA 2 TỰ ĐỘNG (gọi ca2 trong ca2.gs) — MỤC RIÊNG, không chung nhóm nút Sửa lệnh =====
 // ☀️ Ca 1 (14:00): về bến + edit LỆNH CA 1 (mọi chuyến lịch trước 14:00) 1 lần, không ký. 🌙 Ca 2 ký từ 22:00: lệnh ca 1 không đỏ thì ký luôn, đỏ mới edit.
-// Bật ca 1 / ca 2 = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Máy chủ quét: từ 22:00 mỗi 20 phút, từ 23:00 mỗi 10 phút, từ 23:30 mỗi 5 phút.
+// Bật ca 1 / ca 2 = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Máy chủ quét: từ 22:00 mỗi 20 phút, từ 23:00 mỗi 10 phút, từ 23:30 mỗi 5 phút, từ 23:50 canh mỗi phút.
 // Mỗi lượt: xác nhận về bến -> XE NÀO VỀ HẾT thì edit lệnh ca 2 (+ lệnh ca 1 bị đỏ) rồi ký; xe đang chạy để yên. Ký hết thì tự tắt.
 const C2_NHOM = [['tre', 'c2-tre'], ['chay', 'c2-chay'], ['chua_chay', 'c2-chua'], ['veben', 'c2-veben'], ['xong', 'c2-xong'], ['seky', 'c2-xong'], ['loi', 'c2-loi'], ['ky', 'c2-ky']];
 const C2_TEN = { seky: 'SẼ KÝ (xem thử)', loi: 'ĐÃ VỀ BẾN, chưa ký được' };
@@ -1125,7 +1125,7 @@ function renderCa2() {
   if (C2.xem1) out += '<div class="ord-warn"><div><b>👀 XEM THỬ CA 1 (chưa ghi gì) — lúc ' + esc(C2.xem1.at || '') + '</b></div>' +
     C2.xem1.sum.concat(C2.xem1.log).map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
   out += '<div class="edit-hint"><b>🌙 Ca 2</b></div>';
-  out += '<div class="c2-cfg"><label for="ca2Moc">Giờ quét ca 2 (bắt đầu ký 22:00; mặc định 22:00→23:00 mỗi 20 phút, 23:00→23:30 mỗi 10 phút, sau 23:30 mỗi 5 phút; giờ cuối = chốt)</label>' +
+  out += '<div class="c2-cfg"><label for="ca2Moc">Giờ quét ca 2 (bắt đầu ký 22:00; mặc định 22:00→23:00 mỗi 20 phút, 23:00→23:30 mỗi 10 phút, sau 23:30 mỗi 5 phút; từ 23:50 canh xe về mỗi phút tới 23:58)</label>' +
     '<input type="text" id="ca2Moc" value="' + esc(C2.moc.join(', ')) + '" autocomplete="off" spellcheck="false">' +
     '<div class="c2-mocs">' + C2.moc.map(function (m, i) {
       const done = C2.done.indexOf(m) >= 0, next = C2.on && m === C2.sau;
@@ -1136,7 +1136,8 @@ function renderCa2() {
     (C2.on ? '<button class="edit-btn" data-c2="off">⚪ Tắt</button> <button class="edit-btn" data-c2="run">▶️ Chạy ngay 1 lượt</button> ' : '') +
     '<button class="edit-btn" data-c2="xem">👀 Xem thử ngay (không ghi)</button> <button class="edit-btn" data-c2="reload">🔄 Tải lại</button>' +
     '<span class="edit-hint">Bật = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Từ 22:00 mỗi lần quét: xác nhận về bến → <b>XE NÀO VỀ HẾT</b> (xe ca 1 đang chạy lệnh ca 2 thì chờ) (không còn chuyến) thì <b>EDIT lệnh ca 2</b> (Tự chỉnh; dòng FUTA từ chối thì bỏ qua) rồi <b>KÝ</b> luôn xe đó. <b>Lệnh ca 1</b>: không đỏ thì ký luôn, KHÔNG edit; đỏ (FUTA khoá ký) mới edit đúng lệnh đó rồi ký ' +
-    '(đã edit xong, sau về bến chuyến cuối ≥ 5 phút). Xe ĐANG CHẠY / CHƯA CHẠY / CHƯA XUẤT BẾN: để yên, không edit, không ký. ' +
+    '(đã edit xong, sau về bến chuyến cuối ≥ 10 phút). Xe ĐANG CHẠY / CHƯA CHẠY / CHƯA XUẤT BẾN: để yên. <b>Từ 23:50</b>: xe chưa về thì edit trước, canh mỗi phút, xe về là xác nhận về bến + edit + ký ngay. ' +
+    'Lệnh không có xe đi: bỏ qua. Mỗi lệnh ký riêng, 1 lệnh chưa được không chặn lệnh khác. ' +
     'Quá lịch ≥ 5 phút chưa xuất bến: BÁO. Chuyến "Mất Chuyến": bỏ qua. Ký hết thì tự tắt. Không đẩy lệnh. Edit có ↩️ Hoàn tác; ký thì không gỡ được.</span></div>';
   if (C2.xem) {
     out += ca2Board({ at: C2.xem.at, routes: C2.xem.routes }, '👀 XEM THỬ (chưa ghi gì)');
@@ -1163,11 +1164,11 @@ $('out').addEventListener('click', function (ev) {
   }
   if (act === 'xem') { if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; } ca2Call({ op: 'xem', tuyen: tuyen, moc: moc }); return; }
   if (act === 'run') {
-    if (!confirm('CHẠY NGAY 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\n\nXác nhận về bến → xe nào về hết thì edit + ký điều hành (sau về bến chuyến cuối ≥ 5 phút). Xe đang chạy để yên.\nKý rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
+    if (!confirm('CHẠY NGAY 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\n\nXác nhận về bến → xe nào về hết thì edit + ký điều hành (sau về bến chuyến cuối ≥ 10 phút). Xe đang chạy để yên.\nKý rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
     ca2Call({ op: 'run' }); return;
   }
   if (!tuyen) { msg('❌ Chưa tick tuyến nào', 'err'); return; }
-  if (!confirm('BẬT ca 2 tự động cho tuyến ' + tuyen + '?\n\nBật luôn 🅿️ tự xác nhận về bến (quét ngay, rồi 1 giờ/lần).\nGiờ quét: ' + moc + '\nBắt đầu ký 22:00. Mỗi lần quét: xác nhận về bến → XE NÀO VỀ HẾT thì edit lệnh ca 2 (lệnh ca 1 chỉ edit khi đỏ) + KÝ ĐIỀU HÀNH luôn xe đó (sau về bến chuyến cuối ≥ 5 phút). Xe đang chạy để yên. Ký hết thì tự tắt.\n' +
+  if (!confirm('BẬT ca 2 tự động cho tuyến ' + tuyen + '?\n\nBật luôn 🅿️ tự xác nhận về bến (quét ngay, rồi 1 giờ/lần).\nGiờ quét: ' + moc + '\nBắt đầu ký 22:00. Mỗi lần quét: xác nhận về bến → XE NÀO VỀ HẾT thì edit lệnh ca 2 (lệnh ca 1 chỉ edit khi đỏ) + KÝ ĐIỀU HÀNH luôn xe đó (sau về bến chuyến cuối ≥ 10 phút). Xe đang chạy để yên; từ 23:50 xe chưa về thì edit trước + canh mỗi phút, về là ký ngay. Ký hết thì tự tắt.\n' +
                'Đóng web vẫn chạy. Ký rồi KHÔNG gỡ được. Không đẩy lệnh.')) return;
   ca2Call({ op: 'on', tuyen: tuyen, moc: moc });
 });
