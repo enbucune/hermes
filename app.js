@@ -374,6 +374,7 @@ function rerender() {
   else if (MODE === 'undo') { if (UD) renderUndo(); }
   else if (MODE === 'ky') { if (KY) renderKy(); }
   else if (MODE === 'ca2') { if (C2) renderCa2(); }
+  else if (MODE === 'lap') { if (window.renderLap) window.renderLap(); }
   else if (DATA) render();
 }
 
@@ -481,11 +482,22 @@ $('btnNv').onclick = function () {
   api({ action: 'nv', routeId: s.id, label: s.code, date: isoDate(), nguoiDo: nd }).then(function (res) {
     if (!res.rows) throw new Error('Server chưa có action "nv". Thêm dòng router vào Web.gs, dán Nv.gs, rồi Deploy lại BẢN MỚI.');
     NV = res; NV.tuyen = s.code; MODE = 'nv'; $('btnCopy').style.display = '';
+    if (res.conCho) nvCon(s, NV);   // link đo cồn chưa có sẵn: tải ngầm, không bắt chờ danh sách nhân viên
     msg('✅ Tuyến ' + s.code + ' — ' + res.ngay + ': ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến, đã bỏ chuyến mất và trùng)', 'ok');
     renderNv();
   }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
     .then(function () { $('btnNv').disabled = false; });
 };
+
+// Link file đo cồn (máy chủ mở file tổng rất chậm, 20 giây – 5 phút): tải NGẦM sau khi đã hiện nhân viên, không khoá nút.
+// Xong thì vẽ lại nút "📝 Nhập đo cồn" nếu vẫn đang xem đúng bảng nhân viên đó.
+function nvCon(s, nv) {
+  nv.conLoading = true;
+  api({ action: 'con', routeId: s.id, label: s.code, date: isoDate() }, 330000, 0).then(function (r) {
+    nv.con = r.con || []; nv.conAll = r.conAll || nv.conAll;
+  }).catch(function () { nv.conFail = true; })
+    .then(function () { nv.conLoading = false; if (MODE === 'nv' && NV === nv) renderNv(); });
+}
 
 function nvVisible() {
   const q = $('q').value.trim().toLowerCase();
@@ -501,7 +513,9 @@ function renderNv() {
     '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
   // nút mở file báo cáo đo nồng độ cồn của tuyến (đọc từ tab DS của file tổng, xem Con.gs)
   const con = (NV.con || []).map(x => '<a class="link-btn" href="' + safeUrl(x.url) + '" target="_blank" rel="noopener">📝 Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
-    (NV.conAll ? '<span class="edit-hint">Chưa thấy file đo cồn của tuyến ' + esc(NV.tuyen || '') + ' trong tab DS.</span>' : '');
+    (NV.conLoading ? '<span class="edit-hint">⏳ Đang tìm file đo cồn của tuyến ' + esc(NV.tuyen || '') + '... (file tổng mở chậm, vẫn copy / làm việc khác được)</span>'
+      : NV.conFail ? '<span class="edit-hint">Chưa lấy được link file đo cồn, bấm 👥 Trích xuất nhân viên lại sau ít phút.</span>'
+      : NV.conAll ? '<span class="edit-hint">Chưa thấy file đo cồn của tuyến ' + esc(NV.tuyen || '') + ' trong tab DS.</span>' : '');
   const bar = con || NV.conAll ? '<div class="panel-bar"><div class="pb-left">' + con + '</div>' +
     (NV.conAll ? '<a class="link-btn soft" href="' + safeUrl(NV.conAll) + '" target="_blank" rel="noopener">📊 File tổng đo cồn</a>' : '') + '</div>' : '';
   $('out').innerHTML = bar + '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
@@ -649,6 +663,7 @@ function shiftDay(n) {
 let DAY_T = null;
 function dayRerun() {
   clearTimeout(DAY_T);
+  if (MODE === 'lap' && TAB === 'lap') { $('date').dispatchEvent(new Event('change')); return; } // 📅 Lập bảng tài: đổi ngày là xoay lại ngay (lapbt.js)
   if (!CHECK_BTN[MODE] || !$('out').children.length || TAB !== 'xem') return;
   DAY_T = setTimeout(function () { if (!document.body.classList.contains('is-busy')) rerunCheck(); }, 700);
 }
@@ -1775,7 +1790,7 @@ $('btnLogout').onclick = function () {
 
 // ===== KHOÁ NÚT: đang chạy 1 thao tác thì khoá các nút khác (bấm nhiều nút cùng lúc dễ quá tải máy chủ / FUTA) =====
 (function () {
-  const FREE = { gpsstatus: 1, editauth: 1 }; // chạy nền (hỏi tiến độ GPS, kiểm tra mã): không khoá
+  const FREE = { gpsstatus: 1, editauth: 1, con: 1 }; // chạy nền (hỏi tiến độ GPS, kiểm tra mã, tải link đo cồn): không khoá
   const BTN = '.act, .edit-btn, [data-gps="go"]';
   let n = 0, timer = null;
   let runBtn = null;

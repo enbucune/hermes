@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=44">
+<link rel="stylesheet" href="style.css?v=46">
 </head>
 <body>
 
@@ -52,6 +52,7 @@
       <button type="button" class="tab t-xem" data-tab="xem" role="tab"><span class="tab-ico">🔎</span><span class="tab-tx"><b>Xem &amp; kiểm tra</b><small>chỉ đọc, không ghi gì</small></span></button>
       <button type="button" class="tab t-sua" data-tab="sua" role="tab"><span class="tab-ico">⚡</span><span class="tab-tx"><b>Chỉnh lệnh theo luật</b><small>ghi lên FUTA bằng tài khoản bạn</small></span></button>
       <button type="button" class="tab t-bt" data-tab="bt" role="tab"><span class="tab-ico">🗂</span><span class="tab-tx"><b>Bảng tài</b><small>ghép 2–3 tuyến ra Excel</small></span></button>
+      <button type="button" class="tab t-lap" data-tab="lap" role="tab"><span class="tab-ico">📅</span><span class="tab-tx"><b>Lập bảng tài</b><small>xoay tour, thêm / xoá xe</small></span></button>
       <button type="button" class="tab t-dh" data-tab="dh" role="tab" id="tabDh" hidden><span class="tab-ico">🔓</span><span class="tab-tx"><b>Điều hành</b><small>ký, về bến, ca 1 / ca 2</small></span></button>
     </nav>
 
@@ -99,6 +100,17 @@
         <div class="field"><label for="bt3">Tuyến 3 <small>(không bắt buộc)</small></label><div class="inbox"><input type="text" id="bt3" data-route="bt" placeholder="để trống nếu chỉ 2 tuyến" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="bt3" tabindex="-1" aria-label="Xoá">×</button></div></div>
         <button id="btnBt" class="act act-bt">🗂 Xuất bảng tài</button>
       </div>
+    </div>
+
+    <!-- 📅 LẬP BẢNG TÀI (lapbt.js): chạy trên máy, không ghi FUTA -->
+    <div class="pane p-lap" data-pane="lap" hidden>
+      <p class="pane-note">📅 Lấy 1 ngày trong file bảng tài làm <b>mẫu</b>, web tự xoay tour theo <b>ngày ở trên</b>, tổ ôm xe đổi ca mỗi thứ Hai. Lưu trên máy này, <b>không ghi lên FUTA</b>.</p>
+      <div class="bt-row">
+        <button type="button" id="btnLapFile" class="act act-bt">📥 Nạp file bảng tài (.xlsx)</button>
+        <input type="file" id="lapFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <button type="button" id="btnLap" class="act act-main">📅 Lập bảng tài ngày đã chọn</button>
+      </div>
+      <div class="lap-tpls" id="lapTpls"></div>
     </div>
 
     <!-- 🔓 ĐIỀU HÀNH: chỉ hiện sau khi mở khoá (5 lần bấm 🚌 + mã). Ghi bằng tài khoản chung của máy chủ -->
@@ -216,6 +228,7 @@
   </div>
 </div>
 
-<script src="app.js?v=44"></script>
+<script src="app.js?v=46"></script>
+<script src="lapbt.js?v=46"></script>
 </body>
 </html>
