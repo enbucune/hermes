@@ -677,3 +677,9 @@ table.lap-t td.lap-dim { opacity: .45; }
   .lap-grid { grid-template-columns: 1fr; }
   .lap-side { position: static; max-height: 55vh; }
 }
+
+/* ===== Bản 49: CHỈ 1 THANH CUỘN (của trang) — các khung không tự cuộn dọc nữa (anh dặn 06/11/2026) =====
+   Bảng rộng vẫn kéo ngang trong khung. Dropdown chọn tuyến / ô dữ liệu thô / cửa sổ đăng nhập vẫn cuộn riêng. */
+.wrap, .lap-tw { max-height: none; overflow-y: visible; }
+.c2-log, .ud-list, .lap-side { max-height: none; overflow: visible; }
+@media (max-width: 980px) { .lap-side { max-height: none; } }
