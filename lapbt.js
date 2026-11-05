@@ -34,6 +34,7 @@ const lapWeek = iso => Math.floor((lapUtc(iso) / 864e5 + 3) / 7); // tuần bắ
 const lapThu = iso => ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(lapUtc(iso)).getUTCDay()];
 const lapVn = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
 const lapMod = (a, n) => ((a % n) + n) % n;
+const lapSdt = v => { const d = String(v == null ? '' : v).replace(/\D/g, ''); return d.length === 9 && d[0] !== '0' ? '0' + d : d || lapNorm(v); }; // Excel lưu SĐT dạng số -> mất số 0 đầu
 
 // ---------- đọc file .xlsx (tự giải nén, chỉ mở sheet cần dùng — file 20MB vẫn nhanh) ----------
 async function lapZip(buf) {
@@ -430,10 +431,14 @@ function lapPlan(tpl, iso, day) {
   (day.seg || []).forEach(function (s) { all.forEach(function (x) { if (x.bus === s.bus && x.ca === s.ca && x.t >= s.from) { x[s.role] = s.name; x['sua_' + s.role] = true; } }); });
   all.forEach(function (x) { const o = day.trip && day.trip[x.dir + '_' + x.t]; if (o) { if (o.lx != null) { x.lx = o.lx; x.sua_lx = true; } if (o.tv != null) { x.tv = o.tv; x.sua_tv = true; } } });
   all.forEach(function (x) { x.key = x.dir + '_' + x.t; x.doi = !!x.bus && x.bus !== x.base; });
+  // số TÀI như bảng tài FUTA: tài 1..N = ca 1 của lốt, tài N+1..2N = ca 2 (tài đi theo lốt, xe xoay qua các tài mỗi ngày)
+  const N = tpl.lots.length;
+  all.forEach(function (x) { const l = tpl.lots[x.lot], h = l.hoP ? l.hoP[lapMod(k, 2)] : l.ho; x.tai = x.lot + 1 + (h != null && x.j >= h ? N : 0); });
+  busInfo.forEach(function (b) { b.tai = b.lot != null ? b.lot + 1 : null; });
   const thieu = all.filter(x => !x.bus).length, tre = all.filter(x => x.late).length;
   if (thieu) warn.push('🔴 ' + thieu + ' chuyến THIẾU XE (không xe nào về bến kịp, trễ quá ' + LAP_MAX_TRE + ' phút) — thêm xe dự phòng / xe mượn, hoặc cắt chuyến.');
   if (tre) warn.push('🟠 ' + tre + ' chuyến xe tới bến không kịp giờ (trễ tối đa ' + Math.max.apply(null, all.map(x => x.late || 0)) + ' phút) — thiếu xe, nên thêm xe hoặc giãn giờ.');
-  busInfo.forEach(function (b) { if (b.n && (!b.crew.lx[0] || (b.hoT != null && !b.crew.lx[1]))) warn.push('🟡 Xe ' + b.bus + ' chưa có tên lái xe ' + (!b.crew.lx[0] ? 'ca sáng' : 'ca chiều') + ' — sửa ở mục 🧑‍✈️ Tổ lái.'); });
+  busInfo.forEach(function (b) { if (b.n && (!b.crew.lx[0] || (b.hoT != null && !b.crew.lx[1]))) warn.push('🟡 Xe ' + b.bus + ' chưa có tên lái xe ' + (!b.crew.lx[0] ? 'ca 1' : 'ca 2') + ' — sửa ở cột 🚌 Danh sách xe bên trái.'); });
   return { iso: iso, k: k, flip: flip, rows: all, buses: busInfo, warn: warn, nDon: nDon, thieu: thieu, tre: tre };
 }
 function lapStats(plan) {
@@ -443,7 +448,7 @@ function lapStats(plan) {
     [['lx', x.lx], ['tv', x.tv]].forEach(function (p) {
       const name = lapClean(p[1]) || '(chưa có tên)', k = p[0] + '|' + name;
       const o = P[k] = P[k] || { role: p[0], name: name, n: 0, seg: {}, ts: [] };
-      o.n++; o.seg[x.bus + ' ' + (x.ca === 'C' ? 'chiều' : 'sáng')] = 1; o.ts.push(x);
+      o.n++; o.seg[x.bus + ' ca ' + (x.ca === 'C' ? '2' : '1')] = 1; o.ts.push(x);
     });
   });
   return Object.keys(P).map(function (k) {
@@ -459,7 +464,7 @@ if (typeof module !== 'undefined') module.exports = { lapBook, lapParseDay, lapR
 
 // ================= GIAO DIỆN =================
 if (typeof document !== 'undefined' && document.getElementById('btnLap')) (function () {
-  const LAP = { code: '', tpl: null, day: null, plan: null, view: 'bt', book: null, file: '', cand: [], pop: null };
+  const LAP = { code: '', tpl: null, day: null, plan: null, view: 'bt', book: null, file: '', cand: [], pop: null, sel: '' };
   const K_TPL = c => 'lap_tpl_' + c, K_DAY = (c, iso) => 'lap_day_' + c + '_' + iso;
   const store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } },
@@ -524,14 +529,14 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
         if (!store.set(K_TPL(code), tpl)) return;
         LAP.code = code; LAP.tpl = tpl; run(true);
         msg('✅ Đã nạp mẫu tuyến ' + code + ': sheet ' + s.name + ' (' + tpl.lots.length + ' xe, ' + day.trips.length + ' chuyến). Học thời gian quay đầu từ ' + tpl.hocNgay + ' ngày.' +
-          (tpl.lots.some(l => l.hoGuess) ? ' Có xe ngày mẫu không giao ca, web tự đoán giờ giao ca — xem lại ở 🧑‍✈️ Tổ lái.' : ''), 'ok');
+          (tpl.lots.some(l => l.hoGuess) ? ' Có xe ngày mẫu không giao ca, web tự đoán giờ giao ca — xem lại giờ giao ca ở cột 🚌 Danh sách xe.' : ''), 'ok');
       });
     });
   }
 
   // ----- lập + vẽ -----
   $('btnLap').onclick = function () { run(); };
-  document.querySelector('.tab[data-tab="lap"]').addEventListener('click', function () { if (MODE !== 'lap' && (LAP.tpl || codes().length)) run(true); });
+  $('tabLap').addEventListener('click', function () { if (MODE !== 'lap' && (LAP.tpl || codes().length)) run(true); });
   $('date').addEventListener('change', function () { if (MODE === 'lap') run(true); });
   function run(quiet) {
     const iso = isoDate(); if (!iso) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
@@ -551,7 +556,7 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
   function summary() {
     const p = LAP.plan, t = LAP.tpl, d = LAP.day, nd = Object.keys(d.del || {}).length, na = (d.add || []).length;
     return (p.thieu || p.tre ? '⚠️ ' : '✅ ') + 'Bảng tài ' + t.code + ' — ' + lapThu(LAP.iso) + ' ' + lapVn(LAP.iso) + ': ' + p.buses.filter(b => b.n).length + ' xe, ' + p.rows.filter(x => x.bus).length + ' chuyến' +
-      (nd ? ' · xoá ' + nd + ' xe' : '') + (na ? ' · thêm ' + na + ' xe' : '') + (p.nDon ? ' · dồn tài ' + p.nDon + ' chuyến' : '') + (p.thieu ? ' · ' + p.thieu + ' chuyến thiếu xe' : '') + (p.tre ? ' · ' + p.tre + ' chuyến trễ' : '');
+      (nd ? ' · rút ' + nd + ' xe' : '') + (na ? ' · thêm ' + na + ' xe' : '') + (p.nDon ? ' · dồn tài ' + p.nDon + ' chuyến' : '') + (p.thieu ? ' · ' + p.thieu + ' chuyến thiếu xe' : '') + (p.tre ? ' · ' + p.tre + ' chuyến trễ' : '');
   }
   function save() {
     const d = LAP.day, empty = !Object.keys(d.del || {}).length && !(d.add || []).length && !Object.keys(d.crew || {}).length && !Object.keys(d.ho || {}).length && !Object.keys(d.trip || {}).length && !(d.seg || []).length;
@@ -565,6 +570,9 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
   const dirName = i => (LAP.tpl.dirs[i] || 'Chiều ' + (i + 1));
   const benOf = i => dirName(i).split(/\s*(?:→|-|–)\s*/)[0];
   const nm = s => s ? esc(lapClean(s) || s) : '<span class="lap-no">— chưa có —</span>';
+  // ===== GIAO DIỆN BẢN 48: cột trái = danh sách xe (ca 1 / ca 2, LX + TV), bên phải = bảng tài kiểu "lịch làm việc" FUTA =====
+  const dirTo = i => esc(LAP.tpl.code + ' - ' + dirName(i).replace(/\s*(?:→|-|–)\s*/, ' đến '));
+  const phone = n => { const o = (LAP.tpl.names || {})[lapClean(n)]; return o && o.dt ? esc(lapSdt(o.dt)) : ''; };
   function render() {
     if (MODE !== 'lap' || !LAP.plan) return;
     const p = LAP.plan, t = LAP.tpl, d = LAP.day;
@@ -574,53 +582,81 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
       '<div class="stat ' + (p.nDon ? 'e-warn' : 'e-ok') + '"><b>' + p.nDon + '</b>Chuyến đổi xe (dồn tài)</div>' +
       '<div class="stat ' + (p.thieu || p.tre ? 'e-nopc' : 'e-ok') + '"><b>' + (p.thieu + p.tre) + '</b>Thiếu xe / trễ</div>' +
       '<div class="stat e-n"><b>' + nLx + ' · ' + nTv + '</b>Lái xe · tiếp viên</div>';
-    const head = '<div class="panel-bar lap-bar"><div class="pb-left"><b class="lap-h">📅 Tuyến ' + esc(t.code) + ' · ' + lapThu(LAP.iso) + ' ' + lapVn(LAP.iso) + '</b>' +
-      '<span class="pill p-ok" title="Mẫu lấy từ file ' + esc(t.file || '') + '">Mẫu: sheet ' + esc(t.sheet) + ' (' + lapVn(t.date) + ')</span>' +
+    const head = '<div class="lap-head"><div class="lh-l"><b class="lap-h">📅 Tuyến ' + esc(t.code) + ' · ' + lapThu(LAP.iso) + ' ' + lapVn(LAP.iso) + '</b>' +
+      '<span class="pill p-ok" title="Mẫu lấy từ file ' + esc(t.file || '') + '">Mẫu: sheet ' + esc(t.sheet) + '</span>' +
       '<span class="pill p-info">' + (p.k === 0 ? 'Đúng ngày mẫu' : 'Xoay ' + (p.k > 0 ? '+' : '') + p.k + ' ngày') + ' · ' + (p.flip ? 'tổ ĐỔI ca so với mẫu' : 'tổ cùng ca với mẫu') + '</span>' +
-      (LAP.book && LAP.book.sheets && t.file === LAP.file ? '<label class="lap-sh">Đổi sheet mẫu <select data-lap="sheet">' + LAP.cand.slice(0, 40).map(s => '<option value="' + s.idx + '"' + (s.name === t.sheet ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>' : '') +
-      '</div><div class="lap-acts"><button type="button" class="btn-soft" data-lap="add">➕ Thêm xe</button>' +
-      '<button type="button" class="btn-soft" data-lap="reset"' + (Object.keys(d).length ? '' : ' disabled') + '>↺ Bỏ mọi thay đổi ngày này</button>' +
+      (LAP.book && t.file === LAP.file ? '<label class="lap-sh">Sheet mẫu <select data-lap="sheet">' + LAP.cand.slice(0, 40).map(s => '<option value="' + s.idx + '"' + (s.name === t.sheet ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>' : '') +
+      '</div><div class="lap-acts"><button type="button" class="btn-soft" data-lap="reset"' + (Object.keys(d).length ? '' : ' disabled') + '>↺ Bỏ thay đổi ngày này</button>' +
       '<button type="button" class="btn-soft btn-solid" data-lap="xlsx">⬇️ Tải Excel</button></div></div>';
-    const chips = '<div class="lap-chips">' + p.buses.map(function (b) {
-      const cls = b.del ? (b.n ? 'part' : 'off') : b.add ? 'new' : '';
-      const sub = b.del ? (b.n ? 'chạy tới ' + lapHm(b.del.from) + ' · ' : '') + esc(b.del.why || 'đã xoá') : b.first ? lapHm(b.first.t) + ' ' + esc(benOf(b.first.dir)) + ' · ' + b.n + ' ch' : 'không có chuyến';
-      const tag = b.add ? (b.src ? 'thay ' + b.src.slice(-5) : esc(b.add.note || 'thêm')) : '';
-      return '<span class="lap-chip ' + cls + '" title="' + esc(b.del ? 'Xe đã xoá' + (b.del.from ? ' từ ' + lapHm(b.del.from) : ' cả ngày') : b.add ? 'Xe thêm từ ' + lapHm(b.add.from || 0) : 'Lốt bắt đầu ' + (b.first ? lapHm(b.first.t) : '')) + '"><b>' + esc(b.bus) + '</b><small>' + sub + (tag ? ' · ' + tag : '') + '</small>' +
-        (b.del ? '<button type="button" data-lap="undel" data-bus="' + esc(b.bus) + '" title="Cho xe chạy lại">↺</button>'
-          : b.add ? '<button type="button" data-lap="unadd" data-bus="' + esc(b.bus) + '" title="Bỏ xe này">×</button>'
-          : '<button type="button" data-lap="del" data-bus="' + esc(b.bus) + '" title="Xoá xe (đi xưởng / sự cố)">✕</button>') + '</span>';
-    }).join('') + '</div>';
     const warn = p.warn.length ? '<div class="lap-warn">' + p.warn.map(esc).join('<br>') + '</div>' : '';
-    const views = '<div class="lap-views">' + [['bt', '🗓 Bảng tài'], ['ns', '👥 Nhân sự (' + (nLx + nTv) + ')'], ['to', '🧑‍✈️ Tổ lái']].map(v => '<button type="button" data-lapv="' + v[0] + '" class="' + (LAP.view === v[0] ? 'on' : '') + '">' + v[1] + '</button>').join('') + '</div>';
+    const views = '<div class="lap-views">' + [['bt', '🗓 Bảng tài'], ['ns', '👥 Số chuyến từng người']].map(v => '<button type="button" data-lapv="' + v[0] + '" class="' + (LAP.view === v[0] ? 'on' : '') + '">' + v[1] + '</button>').join('') +
+      (LAP.sel ? '<span class="lv-sel">Đang chọn xe <b>' + esc(LAP.sel) + '</b> <button type="button" data-lapsel="' + esc(LAP.sel) + '" title="Bỏ chọn">×</button></span>' : '') + '</div>';
     const names = '<datalist id="lapNames">' + Object.keys(t.names || {}).sort((a, b) => a.localeCompare(b, 'vi')).map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
-    $('out').innerHTML = '<div class="lap">' + head + chips + warn + views + (LAP.view === 'ns' ? viewNs() : LAP.view === 'to' ? viewTo() : viewBt()) + names + '</div>' + (LAP.pop ? pop() : '');
+    const keep = $('out').querySelector('.lap-side'), keepTop = keep ? keep.scrollTop : 0;
+    $('out').innerHTML = '<div class="lap">' + head + warn + '<div class="lap-grid">' + side() + '<section class="lap-main">' + views + (LAP.view === 'ns' ? viewNs() : viewBt()) + '</section></div>' + names + '</div>' + (LAP.pop ? pop() : '');
+    const s2 = $('out').querySelector('.lap-side'); if (s2) s2.scrollTop = keepTop;
     const f = $('out').querySelector('.lap-pop [autofocus]'); if (f) f.focus();
   }
 
+  // cột trái: mỗi xe 1 thẻ — tài, lốt hôm nay, ca 1 / ca 2 (LX + TV sửa ngay), giờ giao ca, nút Rút xe
+  function side() {
+    const p = LAP.plan;
+    const inp = (b, f, v, ph) => '<input type="text" class="lap-in" list="lapNames" data-bus="' + esc(b) + '" data-f="' + f + '" value="' + esc(lapClean(v) || v || '') + '" placeholder="' + ph + '" autocomplete="off" spellcheck="false">';
+    const card = function (b) {
+      const on = LAP.sel === b.bus, cls = (on ? ' sel' : '') + (b.add ? ' new' : '') + (b.del ? (b.n ? ' part' : ' off') : '') + (b.own || b.hoOwn ? ' own' : '');
+      const end = b.last ? lapHm(b.last.t) : '', ho = b.hoT != null ? lapHm(b.hoT) : '';
+      const tag = b.add ? '<span class="pill p-ok">' + (b.src ? 'thay ' + esc(b.src) : esc(b.add.note || 'xe thêm')) + (b.add.from ? ' · từ ' + lapHm(b.add.from) : '') + '</span>'
+        : b.del ? '<span class="pill p-err">' + esc(b.del.why || 'Rút') + (b.del.from ? ' · từ ' + lapHm(b.del.from) : ' · cả ngày') + '</span>' : '';
+      const btn = b.del ? '<button type="button" class="ls-btn ok" data-lap="undel" data-bus="' + esc(b.bus) + '" title="Cho xe chạy lại">↺ Chạy lại</button>'
+        : b.add ? '<button type="button" class="ls-btn" data-lap="unadd" data-bus="' + esc(b.bus) + '" title="Bỏ xe này khỏi ngày này">Bỏ xe</button>'
+        : '<button type="button" class="ls-btn" data-lap="del" data-bus="' + esc(b.bus) + '" title="Rút xe (đi xưởng / sự cố)">Rút xe</button>';
+      const body = b.n ? '<div class="ls-ca"><div class="ls-cn">Ca 1 <small>' + (b.first ? lapHm(b.first.t) : '') + '–' + (ho || end) + '</small></div>' + inp(b.bus, 'lx0', b.crew.lx[0], 'Lái xe ca 1') + inp(b.bus, 'tv0', b.crew.tv[0], 'Tiếp viên ca 1') + '</div>' +
+        '<div class="ls-ca"><div class="ls-cn">Ca 2 <label class="ls-ho" title="Giờ giao ca — để trống = 1 tổ chạy cả ngày">giao <input type="text" class="lap-in lap-ho" data-bus="' + esc(b.bus) + '" data-f="ho" value="' + ho + '" placeholder="--:--"></label><small>–' + end + '</small></div>' +
+        (b.hoT != null ? inp(b.bus, 'lx1', b.crew.lx[1], 'Lái xe ca 2') + inp(b.bus, 'tv1', b.crew.tv[1], 'Tiếp viên ca 2') : '<small class="ls-one">1 tổ chạy cả ngày</small>') + '</div>' : '';
+      return '<div class="ls-card' + cls + '" data-lapsel="' + esc(b.bus) + '"><div class="ls-h"><b>' + esc(b.bus) + '</b>' + (b.tai ? '<span class="ls-tai">Tài ' + b.tai + '</span>' : '') + btn + '</div>' +
+        '<div class="ls-sub">' + (b.first ? lapHm(b.first.t) + ' ' + esc(benOf(b.first.dir)) + ' → ' + end + ' · <b>' + b.n + '</b> chuyến' : 'không chạy chuyến nào') + ' ' + tag +
+        (b.own || b.hoOwn ? ' <button type="button" class="ls-mini" data-lap="crewreset" data-bus="' + esc(b.bus) + '" title="Về tổ theo lịch xoay">↺ tổ gốc</button>' : '') + '</div>' + body + '</div>';
+    };
+    const dang = p.buses.filter(b => b.n || (b.add && !b.del)), off = p.buses.filter(b => !b.n && b.del);
+    return '<aside class="lap-side"><div class="ls-top"><div><b>🚌 Danh sách xe</b><small>' + dang.length + ' xe chạy' + (off.length ? ' · ' + off.length + ' xe rút' : '') + '</small></div>' +
+      '<button type="button" class="btn-soft btn-solid ls-add" data-lap="add">➕ Thêm xe</button></div>' +
+      '<p class="ls-note">Bấm vào xe để xem chuyến của xe trong bảng. Sửa tên ở đây = cả ca của xe, chỉ ngày ' + lapVn(LAP.iso) + '.</p>' +
+      dang.map(card).join('') + (off.length ? '<div class="ls-sec">Xe đã rút</div>' + off.map(card).join('') : '') +
+      (p.buses.some(b => b.own) ? '<button type="button" class="lap-mini ls-fix" data-lap="crewfix">💾 Lưu tổ đã sửa làm tổ ôm xe cố định từ nay</button>' : '') + '</aside>';
+  }
+
+  // bảng tài giống file "lịch làm việc" tải từ FUTA: TÀI | GIỜ TÀI | SỐ XE | LÁI XE | ĐIỆN THOẠI | TIẾP VIÊN | ĐIỆN THOẠI mỗi chiều
   function viewBt() {
-    const p = LAP.plan, nd = LAP.tpl.dirs.length, q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
+    const p = LAP.plan, nd = LAP.tpl.dirs.length, q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked, sel = LAP.sel;
     const cols = [];
     for (let i = 0; i < nd; i++) cols.push(p.rows.filter(x => x.dir === i));
     const n = Math.max.apply(null, cols.map(c => c.length));
     const hit = x => q && ((x.bus || '').toLowerCase().indexOf(q.replace(/[\s.\-]/g, '')) >= 0 || lapClean(x.lx).toLowerCase().indexOf(q) >= 0 || lapClean(x.tv).toLowerCase().indexOf(q) >= 0);
     const bad = x => x && (!x.bus || x.late || x.doi || !x.lx || !x.tv);
-    let h1 = '<tr><th rowspan="2">STT</th>', h2 = '<tr>';
-    for (let i = 0; i < nd; i++) { h1 += (i ? '<th class="bt-gap" rowspan="2"></th>' : '') + '<th colspan="4" class="bt-ben">' + esc(dirName(i)) + '</th>'; h2 += '<th>Giờ XB</th><th>Số xe</th><th>Lái xe</th><th>Tiếp viên</th>'; }
+    let h1 = '<tr>', h2 = '<tr>';
+    for (let i = 0; i < nd; i++) {
+      h1 += (i ? '<th class="bt-gap" rowspan="2"></th>' : '') + '<th colspan="7" class="bt-ben lap-dir' + i + '">' + dirTo(i) + '</th>';
+      h2 += '<th>TÀI</th><th>GIỜ TÀI</th><th>SỐ XE</th><th>LÁI XE</th><th>ĐIỆN THOẠI</th><th>TIẾP VIÊN</th><th>ĐIỆN THOẠI</th>';
+    }
     let body = '';
     for (let r = 0; r < n; r++) {
       const xs = cols.map(c => c[r]);
       if (only && !xs.some(bad)) continue;
-      body += '<tr' + (xs.some(x => x && hit(x)) ? ' class="lap-hit"' : '') + '><td>' + (r + 1) + '</td>' + xs.map(function (x, i) {
+      body += '<tr' + (xs.some(x => x && hit(x)) ? ' class="lap-hit"' : '') + '>' + xs.map(function (x, i) {
         const gap = i ? '<td class="bt-gap"></td>' : '';
-        if (!x) return gap + '<td></td><td></td><td></td><td></td>';
-        const giao = x.dau && x.n > 0;
-        return gap + '<td class="lap-gio' + (x.dau ? ' dau' : '') + (giao ? ' giao' : '') + '" title="' + (x.n === 0 ? 'Chuyến đầu ngày của xe' : giao ? 'Giao ca: tổ chiều nhận xe' : '') + '">' + lapHm(x.t) + (x.late ? '<small class="lap-tre">trễ ' + x.late + '\'</small>' : '') + '</td>' +
-          '<td class="lap-xe' + (!x.bus ? ' thieu' : x.doi ? ' doi' : '') + '" title="' + (x.doi ? 'Dồn tài: lịch xoay là xe ' + esc(x.base) : '') + '">' + (x.bus ? esc(x.bus) : 'THIẾU XE') + '</td>' +
-          ['lx', 'tv'].map(rl => '<td class="lap-nm' + (x['sua_' + rl] ? ' sua' : '') + '"' + (x.bus ? ' data-lapk="' + x.key + '" data-role="' + rl + '" title="Bấm để đổi tên chuyến này"' : '') + '>' + (x.bus ? nm(x[rl]) : '') + '</td>').join('');
+        if (!x) return gap + '<td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+        const giao = x.dau && x.n > 0, me = sel && x.bus === sel ? ' lap-me' : sel ? ' lap-dim' : '';
+        return gap + '<td class="lap-tai' + me + '">' + (x.tai || '') + '</td>' +
+          '<td class="lap-gio' + (x.dau ? ' dau' : '') + (giao ? ' giao' : '') + me + '" title="' + (x.n === 0 ? 'Chuyến đầu ngày của xe' : giao ? 'Giao ca: tổ ca 2 nhận xe' : '') + '">' + lapHm(x.t) + (x.late ? '<small class="lap-tre">trễ ' + x.late + '\'</small>' : '') + '</td>' +
+          '<td class="lap-xe' + (!x.bus ? ' thieu' : x.doi ? ' doi' : '') + me + '"' + (x.bus ? ' data-lapsel="' + esc(x.bus) + '"' : '') + ' title="' + (x.doi ? 'Dồn tài: lịch xoay là xe ' + esc(x.base) + ' · ' : '') + 'Bấm để chọn xe">' + (x.bus ? esc(x.bus) : 'THIẾU XE') + '</td>' +
+          ['lx', 'tv'].map(rl => '<td class="lap-nm' + (x['sua_' + rl] ? ' sua' : '') + me + '"' + (x.bus ? ' data-lapk="' + x.key + '" data-role="' + rl + '" title="Bấm để đổi người chuyến này"' : '') + '>' + (x.bus ? nm(x[rl]) : '') + '</td>' +
+            '<td class="lap-dt' + me + '">' + (x.bus ? phone(x[rl]) : '') + '</td>').join('');
       }).join('') + '</tr>';
     }
-    return '<p class="panel-note">Bấm vào tên lái xe / tiếp viên để đổi người cho 1 chuyến hoặc tới hết ca. <span class="lap-key dau">giờ đỏ</span> chuyến đầu ca · <span class="lap-key doi">xe vàng</span> dồn tài · <span class="lap-key sua">tên xanh</span> đã sửa tay.</p>' +
-      '<table class="bt lap-t"><thead>' + h1 + '</tr>' + h2 + '</tr></thead><tbody>' + (body || '<tr><td colspan="9">Không có chuyến nào' + (only ? ' cần chú ý' : '') + '</td></tr>') + '</tbody></table>';
+    return '<div class="lap-title">LỊCH LÀM VIỆC TUYẾN BUÝT ' + esc(LAP.tpl.code) + ' · NGÀY ' + lapVn(LAP.iso) + '</div>' +
+      '<p class="panel-note">Tài 1–' + LAP.tpl.lots.length + ' = ca 1, tài ' + (LAP.tpl.lots.length + 1) + '–' + LAP.tpl.lots.length * 2 + ' = ca 2. Bấm tên để đổi người 1 chuyến / tới hết ca, bấm biển số để chọn xe. ' +
+      '<span class="lap-key dau">giờ đỏ</span> chuyến đầu ca · <span class="lap-key doi">xe vàng</span> dồn tài · <span class="lap-key sua">tên xanh</span> sửa tay.</p>' +
+      '<div class="lap-tw"><table class="bt lap-t"><thead>' + h1 + '</tr>' + h2 + '</tr></thead><tbody>' + (body || '<tr><td colspan="15">Không có chuyến nào' + (only ? ' cần chú ý' : '') + '</td></tr>') + '</tbody></table></div>';
   }
   function viewNs() {
     const st = LAP.stats, q = $('q').value.trim().toLowerCase();
@@ -637,29 +673,13 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
           (lv === 'hi' ? '<span class="pill p-warn">đi nhiều</span>' : lv === 'lo' ? '<span class="pill p-info">đi ít</span>' : '') + '</td></tr>';
       }).join('');
       return '<h4 class="lap-sub">' + title + ' · ' + a.length + ' người · trung bình ' + avg.toFixed(1) + ' chuyến' +
-        (a.length ? ' · nhiều nhất ' + esc(a[0].name) + ' (' + a[0].n + ') · ít nhất ' + esc(a.slice().sort((x, y) => x.n - y.n)[0].name) + ' (' + a.slice().sort((x, y) => x.n - y.n)[0].n + ')' : '') +
+        (a.length ? (a[0].n === a[a.length - 1].n ? ' · mọi người đều ' + a[0].n + ' chuyến'
+          : ' · nhiều nhất ' + esc(a[0].name) + ' (' + a[0].n + ') · ít nhất ' + esc(a[a.length - 1].name) + ' (' + a[a.length - 1].n + ')') : '') +
         (none ? ' · <span class="lap-no">' + none.n + ' chuyến chưa có tên</span>' : '') + '</h4>' +
         '<table class="lap-ns"><thead><tr><th>#</th><th>Họ tên</th><th>Số chuyến</th><th>Xe · ca</th><th>Giờ đầu → cuối</th><th>Ghi chú</th></tr></thead><tbody>' + rows + '</tbody></table>';
     };
     return part('lx', '🚍 Lái xe') + part('tv', '🎫 Tiếp viên');
   }
-  function viewTo() {
-    const p = LAP.plan;
-    const inp = (b, f, v) => '<input type="text" class="lap-in" list="lapNames" data-bus="' + esc(b) + '" data-f="' + f + '" value="' + esc(lapClean(v) || v || '') + '" placeholder="— chưa có —" autocomplete="off" spellcheck="false">';
-    const rows = p.buses.filter(b => b.n || b.add).map(function (b) {
-      return '<tr class="' + (b.own || b.hoOwn ? 'lap-own' : '') + '"><td><b>' + esc(b.bus) + '</b>' + (b.src ? '<br><small>thay ' + esc(b.src) + '</small>' : '') + '</td>' +
-        '<td>' + (b.first ? lapHm(b.first.t) + ' ' + esc(benOf(b.first.dir)) + ' → ' + lapHm(b.last.t) : '—') + '<br><small>' + b.n + ' chuyến</small></td>' +
-        '<td>' + inp(b.bus, 'lx0', b.crew.lx[0]) + '</td><td>' + inp(b.bus, 'tv0', b.crew.tv[0]) + '</td>' +
-        '<td><input type="text" class="lap-in lap-ho" data-bus="' + esc(b.bus) + '" data-f="ho" value="' + (b.hoT != null ? lapHm(b.hoT) : '') + '" placeholder="cả ngày" title="Giờ giao ca (để trống = 1 tổ chạy cả ngày)">' + (b.hoGuess && !b.hoOwn ? '<br><small>đoán</small>' : '') + '</td>' +
-        '<td>' + inp(b.bus, 'lx1', b.crew.lx[1]) + '</td><td>' + inp(b.bus, 'tv1', b.crew.tv[1]) + '</td>' +
-        '<td>' + (b.own || b.hoOwn ? '<button type="button" class="lap-mini" data-lap="crewreset" data-bus="' + esc(b.bus) + '" title="Về tổ theo lịch xoay">↺</button>' : '') + '</td></tr>';
-    }).join('');
-    const anyOwn = p.buses.some(b => b.own);
-    return '<p class="panel-note">Tổ ôm xe đi theo xe, tự đổi ca sáng/chiều mỗi thứ Hai (gõ <b>(s)</b> / <b>(c)</b> sau tên để cố định ca). Sửa ở đây chỉ áp dụng <b>ngày ' + lapVn(LAP.iso) + '</b>' +
-      (anyOwn ? ' · <button type="button" class="lap-mini" data-lap="crewfix">💾 Lưu tổ hôm nay làm tổ cố định từ nay</button>' : '') + '</p>' +
-      '<table class="lap-to"><thead><tr><th>Xe</th><th>Lốt hôm nay</th><th>LX ca sáng</th><th>TV ca sáng</th><th>Giao ca</th><th>LX ca chiều</th><th>TV ca chiều</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
-  }
-
   // ----- hộp nhập (thêm xe / xoá xe / đổi tên) -----
   function pop() {
     const P = LAP.pop, p = LAP.plan, t = LAP.tpl;
@@ -667,37 +687,44 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
     let body = '';
     if (P.type === 'del') {
       const b = p.buses.find(x => x.bus === P.bus) || {};
-      body = '<h4>✕ Xoá xe ' + esc(P.bus) + '</h4><small>Các chuyến của xe từ giờ này được dồn cho xe khác (xe về bến sớm nhất nhận chuyến kế tiếp).</small>' +
+      body = '<h4>🚫 Rút xe ' + esc(P.bus) + '</h4><small>Các chuyến của xe từ giờ này được dồn cho xe khác (xe về bến sớm nhất nhận chuyến kế tiếp).</small>' +
         '<div class="lap-f"><label>Từ giờ <input name="from" value="' + (P.from != null ? lapHm(P.from) : '') + '" placeholder="trống = cả ngày" autofocus></label>' +
         '<label>Lý do <input name="why" list="lapWhy" value="' + esc(P.why || 'Đi xưởng') + '"></label></div>' +
         '<datalist id="lapWhy"><option value="Đi xưởng"><option value="Sự cố"><option value="Hư xe"><option value="Bảo dưỡng"><option value="Cho tuyến khác mượn"></datalist>' +
         (b.first ? '<small>Lốt hôm nay: ' + lapHm(b.first.t) + ' ' + esc(benOf(b.first.dir)) + ', ' + b.n + ' chuyến.</small>' : '');
     } else if (P.type === 'add') {
       const dels = p.buses.filter(b => b.del && !p.buses.some(x => x.src === b.bus));
-      body = '<h4>➕ Thêm xe</h4><small>Xe dự phòng hoặc xe mượn tuyến khác. Chọn "Thay cho" để xe mới nhận nguyên lốt + tổ của xe đã xoá.</small>' +
+      body = '<h4>➕ Thêm xe</h4><small>Xe dự phòng hoặc xe mượn tuyến khác. Chọn "Thay cho" để xe mới nhận nguyên lốt + tổ của xe đã rút.</small>' +
         '<div class="lap-f"><label>Biển số <input name="bus" placeholder="vd 50H70218" autofocus autocomplete="off" spellcheck="false"></label>' +
         '<label>Thay cho <select name="thay"><option value="">— xe tăng cường (dồn tài) —</option>' + dels.map((b, i) => '<option value="' + esc(b.bus) + '"' + (i === 0 ? ' selected' : '') + '>' + esc(b.bus) + ' (' + esc(b.del.why || 'đã xoá') + ')</option>').join('') + '</select></label>' +
         '<label>Từ giờ <input name="from" placeholder="trống = cả ngày"></label>' +
         '<label>Vào ở bến ' + benSel(0) + '</label>' +
         '<label>Ghi chú <input name="note" list="lapNote" value="Dự phòng"></label></div>' +
         '<datalist id="lapNote"><option value="Dự phòng"><option value="Mượn tuyến 157"><option value="Mượn tuyến 159"><option value="Mượn tuyến 160"><option value="Mượn tuyến 161"></datalist>' +
-        (dels.length ? '' : '<small>Chưa xoá xe nào nên xe thêm sẽ là xe tăng cường: các xe cùng dồn tài từ giờ xe vào.</small>');
+        (dels.length ? '' : '<small>Chưa rút xe nào nên xe thêm sẽ là xe tăng cường: các xe cùng dồn tài từ giờ xe vào.</small>');
     } else if (P.type === 'name') {
       const x = p.rows.find(r => r.key === P.key); if (!x) return '';
-      body = '<h4>✏️ Đổi ' + (P.role === 'lx' ? 'lái xe' : 'tiếp viên') + ' · ' + lapHm(x.t) + ' ' + esc(dirName(x.dir)) + ' · xe ' + esc(x.bus) + ' (ca ' + (x.ca === 'C' ? 'chiều' : 'sáng') + ')</h4>' +
+      body = '<h4>✏️ Đổi ' + (P.role === 'lx' ? 'lái xe' : 'tiếp viên') + ' · ' + lapHm(x.t) + ' ' + esc(dirName(x.dir)) + ' · xe ' + esc(x.bus) + ' (ca ' + (x.ca === 'C' ? '2' : '1') + ')</h4>' +
         '<div class="lap-f"><label>Họ tên <input name="name" list="lapNames" value="' + esc(lapClean(x[P.role])) + '" autofocus autocomplete="off" spellcheck="false"></label></div>' +
-        '<div class="lap-rad"><label><input type="radio" name="scope" value="1" checked> Chỉ chuyến này</label><label><input type="radio" name="scope" value="ca"> Từ chuyến này tới hết ca ' + (x.ca === 'C' ? 'chiều' : 'sáng') + '</label></div>' +
-        '<small>Muốn đổi cả ngày / cả ca cho xe này thì sửa ở mục 🧑‍✈️ Tổ lái.</small>' +
+        '<div class="lap-rad"><label><input type="radio" name="scope" value="1" checked> Chỉ chuyến này</label><label><input type="radio" name="scope" value="ca"> Từ chuyến này tới hết ca ' + (x.ca === 'C' ? '2' : '1') + '</label></div>' +
+        '<small>Muốn đổi cả ca cho xe này thì sửa ở cột 🚌 Danh sách xe bên trái.</small>' +
         ((LAP.day.trip && LAP.day.trip[x.key] && LAP.day.trip[x.key][P.role] != null) || (LAP.day.seg || []).some(s => s.bus === x.bus && s.ca === x.ca && s.role === P.role && s.from <= x.t) ? '<button type="button" class="lap-mini" data-lap="nameclr">↺ Bỏ tên sửa tay ở chuyến này</button>' : '');
     }
     return '<div class="lap-pop" role="dialog"><form class="lap-pf" data-lapf="' + P.type + '">' + body +
-      '<div class="lap-pb"><button type="submit" class="btn-soft btn-solid">' + (P.type === 'del' ? 'Xoá xe' : P.type === 'add' ? 'Thêm xe' : 'Lưu') + '</button><button type="button" class="btn-soft" data-lap="close">Huỷ</button></div></form></div>';
+      '<div class="lap-pb"><button type="submit" class="btn-soft btn-solid">' + (P.type === 'del' ? 'Rút xe' : P.type === 'add' ? 'Thêm xe' : 'Lưu') + '</button><button type="button" class="btn-soft" data-lap="close">Huỷ</button></div></form></div>';
   }
 
   $('out').addEventListener('click', function (ev) {
     if (MODE !== 'lap' || !LAP.plan) return;
     const v = ev.target.closest('[data-lapv]'); if (v) { LAP.view = v.dataset.lapv; render(); return; }
     const k = ev.target.closest('[data-lapk]'); if (k) { LAP.pop = { type: 'name', key: k.dataset.lapk, role: k.dataset.role }; render(); return; }
+    const sl = ev.target.closest('[data-lapsel]');
+    if (sl && !ev.target.closest('input, label, [data-lap]')) {
+      LAP.sel = LAP.sel === sl.dataset.lapsel ? '' : sl.dataset.lapsel; LAP.view = 'bt'; render();
+      if (LAP.sel) { const r = $('out').querySelector('.lap-t td.lap-me'); if (r) r.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (sl.tagName === 'TD') { const c = $('out').querySelector('.ls-card.sel'); if (c) c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }
+      return;
+    }
     const a = ev.target.closest('[data-lap]'); if (!a || a.tagName === 'SELECT') return;
     const d = LAP.day, act = a.dataset.lap, bus = a.dataset.bus;
     if (act === 'close') { LAP.pop = null; render(); }
@@ -784,37 +811,37 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
     loadExcelJS().then(function (ExcelJS) {
       const p = LAP.plan, t = LAP.tpl, nd = t.dirs.length, N = t.names || {};
       const wb = new ExcelJS.Workbook(), nXe = p.buses.filter(b => b.n).length;
-      const ws = wb.addWorksheet(LAP.iso.slice(8, 10) + '.' + LAP.iso.slice(5, 7) + '.' + nXe, { views: [{ state: 'frozen', ySplit: 4 }] });
+      // giống file "lịch làm việc" tải từ FUTA: TÀI | GIỜ TÀI | SỐ XE | LÁI XE | ĐIỆN THOẠI | TIẾP VIÊN | ĐIỆN THOẠI mỗi chiều
+      const ws = wb.addWorksheet('BẢNG TÀI ' + nXe + ' XE ' + LAP.iso.slice(8, 10) + '.' + LAP.iso.slice(5, 7), { views: [{ state: 'frozen', ySplit: 3 }] });
       const font = { name: 'Times New Roman', size: 12 }, mid = { horizontal: 'center', vertical: 'middle', wrapText: true };
       const fill = c => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + c } });
       const thin = { style: 'thin', color: { argb: 'FF9AA7BF' } }, box = { top: thin, left: thin, bottom: thin, right: thin };
-      const W = 9, cols = nd * W;
-      ws.mergeCells(1, 1, 1, cols); ws.getCell(1, 1).value = 'LỊCH LÀM VIỆC TUYẾN ' + t.code;
-      ws.mergeCells(2, 1, 2, cols); ws.getCell(2, 1).value = 'NGÀY ' + lapVn(LAP.iso) + ' (' + lapThu(LAP.iso) + ') · ' + nXe + ' xe';
-      [1, 2].forEach(r => { const c = ws.getCell(r, 1); c.font = Object.assign({}, font, { bold: true, size: r === 1 ? 16 : 13 }); c.alignment = mid; });
-      const hd = ['STT', 'GIỜ XB', 'SỐ XE', 'LÁI XE', 'MSNV', 'SĐT', 'TIẾP VIÊN', 'MSNV', 'SĐT'];
+      const W = 7, cols = nd * W;
+      ws.mergeCells(1, 1, 1, cols); ws.getCell(1, 1).value = 'LỊCH LÀM VIỆC TUYẾN BUÝT ' + t.code + ' NGÀY ' + lapVn(LAP.iso) + ' (' + lapThu(LAP.iso) + ') · ' + nXe + ' XE';
+      ws.getCell(1, 1).font = Object.assign({}, font, { bold: true, size: 15 }); ws.getCell(1, 1).alignment = mid; ws.getRow(1).height = 26;
+      const hd = ['TÀI', 'GIỜ TÀI', 'SỐ XE', 'LÁI XE', 'ĐIỆN THOẠI', 'TIẾP VIÊN', 'ĐIỆN THOẠI'];
       for (let i = 0; i < nd; i++) {
-        ws.mergeCells(3, i * W + 1, 3, i * W + W); const c = ws.getCell(3, i * W + 1); c.value = (nd > 1 ? (i ? 'LƯỢT VỀ' : 'LƯỢT ĐI') + ' (' : '(') + dirName(i) + ')';
+        ws.mergeCells(2, i * W + 1, 2, i * W + W); const c = ws.getCell(2, i * W + 1); c.value = t.code + ' - ' + dirName(i).replace(/\s*(?:→|-|–)\s*/, ' đến ');
         c.font = Object.assign({}, font, { bold: true }); c.alignment = mid; c.fill = fill(i ? 'FFDDB0' : 'CFE2FF');
-        hd.forEach(function (h, j) { const x = ws.getCell(4, i * W + j + 1); x.value = h; x.font = Object.assign({}, font, { bold: true }); x.alignment = mid; x.border = box; x.fill = fill('E6EDFD'); });
+        hd.forEach(function (h, j) { const x = ws.getCell(3, i * W + j + 1); x.value = h; x.font = Object.assign({}, font, { bold: true }); x.alignment = mid; x.border = box; x.fill = fill('E6EDFD'); });
       }
       const colz = []; for (let i = 0; i < nd; i++) colz.push(p.rows.filter(x => x.dir === i));
       const n = Math.max.apply(null, colz.map(c => c.length));
       for (let r = 0; r < n; r++) {
         colz.forEach(function (c, i) {
-          const x = c[r], base = i * W + 1, row = ws.getRow(r + 5);
-          const vals = x ? [r + 1, x.t / 1440, x.bus || 'THIẾU XE', lapClean(x.lx), (N[lapClean(x.lx)] || {}).ms || '', (N[lapClean(x.lx)] || {}).dt || '', lapClean(x.tv), (N[lapClean(x.tv)] || {}).ms || '', (N[lapClean(x.tv)] || {}).dt || ''] : new Array(W).fill('');
+          const x = c[r], base = i * W + 1, row = ws.getRow(r + 4);
+          const vals = x ? [x.tai || '', x.t / 1440, x.bus || 'THIẾU XE', lapClean(x.lx), lapSdt((N[lapClean(x.lx)] || {}).dt), lapClean(x.tv), lapSdt((N[lapClean(x.tv)] || {}).dt)] : new Array(W).fill('');
           vals.forEach(function (v, j) {
             const cell = row.getCell(base + j); cell.value = v; cell.font = font; cell.alignment = mid; cell.border = box;
             if (j === 1 && x) { cell.numFmt = 'hh:mm'; if (x.dau) { cell.fill = fill('FF5B5B'); cell.font = Object.assign({}, font, { bold: true, color: { argb: 'FFFFFFFF' } }); } }
             if (j === 2 && x && (!x.bus || x.late)) cell.fill = fill(!x.bus ? 'FF9C9C' : 'FFD08A');
             else if (j === 2 && x && x.doi) cell.fill = fill('FFF1A8');
-            if ((j === 3 || j === 6) && x && x[j === 3 ? 'sua_lx' : 'sua_tv']) cell.font = Object.assign({}, font, { color: { argb: 'FF1F44B8' }, bold: true });
+            if ((j === 3 || j === 5) && x && x[j === 3 ? 'sua_lx' : 'sua_tv']) cell.font = Object.assign({}, font, { color: { argb: 'FF1F44B8' }, bold: true });
           });
           if (x && x.late) row.getCell(base + 1).note = 'Xe tới bến trễ ' + x.late + ' phút';
         });
       }
-      [6, 11, 12, 24, 11, 12, 24, 11, 12].forEach((w, j) => { for (let i = 0; i < nd; i++) ws.getColumn(i * W + j + 1).width = w; });
+      [7, 10, 13, 26, 14, 26, 14].forEach((w, j) => { for (let i = 0; i < nd; i++) ws.getColumn(i * W + j + 1).width = w; });
       // nhân sự
       const ns = wb.addWorksheet('Nhân sự');
       ns.addRow(['Chức vụ', 'Họ tên', 'Số chuyến', 'Xe · ca', 'Giờ đầu', 'Giờ cuối', 'Ghi chú']).eachCell(c => { c.font = Object.assign({}, font, { bold: true }); c.fill = fill('E6EDFD'); c.border = box; });
@@ -825,10 +852,10 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
       });
       [12, 28, 11, 34, 10, 10, 18].forEach((w, j) => { ns.getColumn(j + 1).width = w; });
       // tổ lái + xe thay đổi
-      const to = wb.addWorksheet('Tổ lái');
-      to.addRow(['BKS', 'Lốt', 'Số chuyến', 'LX ca sáng', 'TV ca sáng', 'Giao ca', 'LX ca chiều', 'TV ca chiều', 'Ghi chú']).eachCell(c => { c.font = Object.assign({}, font, { bold: true }); c.fill = fill('E6EDFD'); c.border = box; });
+      const to = wb.addWorksheet('Danh sách xe');
+      to.addRow(['BKS', 'Tài · lốt', 'Số chuyến', 'LX ca 1', 'TV ca 1', 'Giao ca', 'LX ca 2', 'TV ca 2', 'Ghi chú']).eachCell(c => { c.font = Object.assign({}, font, { bold: true }); c.fill = fill('E6EDFD'); c.border = box; });
       p.buses.forEach(function (b) {
-        const r = to.addRow([b.bus, b.first ? lapHm(b.first.t) + ' ' + benOf(b.first.dir) : '', b.n, lapClean(b.crew.lx[0]), lapClean(b.crew.tv[0]), b.hoT != null ? lapHm(b.hoT) : 'cả ngày', lapClean(b.crew.lx[1]), lapClean(b.crew.tv[1]),
+        const r = to.addRow([b.bus, (b.tai ? 'Tài ' + b.tai + ' · ' : '') + (b.first ? lapHm(b.first.t) + ' ' + benOf(b.first.dir) : ''), b.n, lapClean(b.crew.lx[0]), lapClean(b.crew.tv[0]), b.hoT != null ? lapHm(b.hoT) : 'cả ngày', lapClean(b.crew.lx[1]), lapClean(b.crew.tv[1]),
           b.del ? 'Xoá ' + (b.del.from ? 'từ ' + lapHm(b.del.from) : 'cả ngày') + ' — ' + (b.del.why || '') : b.add ? (b.src ? 'Thay ' + b.src : 'Thêm') + (b.add.from ? ' từ ' + lapHm(b.add.from) : '') + ' — ' + (b.add.note || '') : '']);
         r.eachCell(c => { c.font = font; c.border = box; });
         if (b.del || b.add) r.getCell(1).fill = fill(b.del ? 'FF9C9C' : 'C8F0D4');
@@ -839,10 +866,11 @@ if (typeof document !== 'undefined' && document.getElementById('btnLap')) (funct
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       a.download = 'Bảng tài ' + LAP.tpl.code + ' - ' + lapVn(LAP.iso).replace(/\//g, '.') + '.xlsx'; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      msg('✅ Đã tải Excel bảng tài ' + LAP.tpl.code + ' ngày ' + lapVn(LAP.iso) + ' (3 sheet: bảng tài, nhân sự, tổ lái).', 'ok');
+      msg('✅ Đã tải Excel bảng tài ' + LAP.tpl.code + ' ngày ' + lapVn(LAP.iso) + ' (3 sheet: bảng tài kiểu lịch làm việc FUTA, nhân sự, danh sách xe).', 'ok');
     }).catch(function (e) { msg('❌ Không tạo được Excel: ' + e.message, 'err'); });
   }
 
   drawTpls();
-  if (TAB === 'lap' && codes().length) setTimeout(function () { run(true); }, 0); // mở lại web đang ở thẻ này thì lập luôn
+  // thẻ ẩn: mở khoá xong (tự mở lại bằng mã cũ) mà đang ở thẻ này thì lập luôn
+  new MutationObserver(function () { if (!$('tabLap').hidden && TAB === 'lap' && MODE !== 'lap' && codes().length) run(true); }).observe($('tabLap'), { attributes: true, attributeFilter: ['hidden', 'class'] });
 })();

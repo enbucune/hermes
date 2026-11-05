@@ -623,7 +623,9 @@ setTab((function () { try { return localStorage.getItem('web_tab') || 'xem'; } c
 function getEkey() { try { return localStorage.getItem('edit_key') || ''; } catch (e) { return ''; } }
 function setUnlocked(on) {
   $('tabDh').hidden = !on; $('btnLock').hidden = !on; $('ca2Group').hidden = !on; // thẻ 🔓 Điều hành (ký, về bến, ca 1/ca 2) chỉ hiện khi mở khoá
-  if (!on && TAB === 'dh') setTab('xem');
+  $('tabLap').hidden = !on; // 📅 Lập bảng tài cũng là thẻ ẩn, mở cùng mã Điều hành
+  if (!on && (TAB === 'dh' || TAB === 'lap')) setTab('xem');
+  if (!on && MODE === 'lap') { MODE = 'trips'; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
   if (on && !C2) setTimeout(function () { ca2Call({}, true); }, 1500); // đọc trạng thái ca 2 để hiện dòng nhỏ dưới nút
   if (!on) hideUndo();
   if (!on && (MODE === 'veben' || MODE === 'undo' || MODE === 'ky' || MODE === 'ca2')) { MODE = 'trips'; VB = null; UD = null; KY = null; C2 = null; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
@@ -631,8 +633,8 @@ function setUnlocked(on) {
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
     localStorage.setItem('edit_key', ekey); setUnlocked(true);
-    if (!silent) { setTab('dh'); msg('🔓 Đã mở khoá thẻ 🔓 Điều hành (ký, về bến, ca 1 / ca 2)', 'ok'); }
-    else if (localStorage.getItem('web_tab') === 'dh') setTab('dh');
+    if (!silent) { setTab('dh'); msg('🔓 Đã mở khoá thẻ 🔓 Điều hành (ký, về bến, ca 1 / ca 2) và 📅 Lập bảng tài', 'ok'); }
+    else if (localStorage.getItem('web_tab') === 'dh' || localStorage.getItem('web_tab') === 'lap') setTab(localStorage.getItem('web_tab'));
   }).catch(function (e) {
     if (silent) { if (!e.net && !e.login && !/tạm khoá/.test(e.message)) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
     msg('❌ ' + e.message, 'err');
