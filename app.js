@@ -2,6 +2,8 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbxWzYaiYmEQiVrl4oNgFCBBxOHUnX8_nIZK396IrXbFDx-H0sz-BAhhozyo14wrWLAs/exec';
 function getUrl() { return API_URL; }
 
+// BẢO MẬT: không cho trang khác nhúng web này vào khung ẩn để lừa bấm nút (clickjacking). GitHub Pages không đặt được header nên chặn bằng JS.
+if (window.top !== window.self) { document.documentElement.innerHTML = ''; try { window.top.location = window.self.location.href; } catch (e) { /* bỏ qua */ } throw new Error('Không chạy trong khung'); }
 let DATA = null, CUR = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +17,8 @@ function msg(t, cls) { // cls: ok / warn (xong nhưng có lỗi) / err / info; t
   }
 }
 const hm5 = v => String(v || '').slice(-5);
+// Link lấy từ Sheet / máy chủ: chỉ cho http(s), chặn "javascript:..." (ai sửa ô Sheet thành mã độc thì bấm link cũng không chạy)
+const safeUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? esc(String(u).trim()) : '#';
 // Mất chuyến (xe KHÔNG chạy: tài xế/tiếp viên "Mất Chuyến") khác Đề xuất mất chuyến (xe CÓ chạy, có giờ đi/đến, chờ duyệt)
 const isDx = m => m.loai === 'dexuat' || /đề xuất/i.test(m.trangThai || '');
 const clip = (lines, n) => lines.length > n ? lines.slice(0, n).concat(['… và ' + (lines.length - n) + ' dòng nữa']) : lines;
@@ -63,8 +67,9 @@ function apiOnce(params, timeoutMs) {
   let url;
   try { url = getUrl(); } catch (e) { return Promise.reject(e); }
   const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
-  const q = new URLSearchParams(Object.assign(authParam(), params));
-  return fetch(url + '?' + q.toString(), { credentials: 'omit', cache: 'no-store', signal: ctl.signal })
+  // BẢO MẬT (05/11/2026): gửi bằng POST, mã truy cập / mã mở khoá / phiên FUTA nằm trong thân yêu cầu, KHÔNG nằm trên URL
+  // (URL hay bị lưu lại ở lịch sử, nhật ký proxy / máy chủ). doPost (Gps.gs) chuyển sang web_handle_ y như doGet.
+  return fetch(url, { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', cache: 'no-store', signal: ctl.signal })
     .then(function (r) { return r.json(); })
     .then(function (data) { if (!data || !data.ok) throw apiErr(data); return data; }, function (e) {
       if (e.name === 'AbortError') throw new Error('Hết thời gian chờ');
@@ -110,7 +115,7 @@ function apiErr(data) {
 // POST (mật khẩu, token Google không nằm trên URL). Apps Script trả CORS cho body text/plain.
 function apiPost(params, timeoutMs) {
   const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
-  return fetch(getUrl(), { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), signal: ctl.signal })
+  return fetch(getUrl(), { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', signal: ctl.signal })
     .then(function (r) { return r.json(); }, function (e) {
       throw new Error(e.name === 'AbortError' ? 'Hết thời gian chờ' : 'Không kết nối được tới máy chủ, thử lại sau ít giây.');
     })
@@ -495,10 +500,10 @@ function renderNv() {
     '</td><td>' + esc(r.gioXuatBen) + '</td><td>' + esc(r.thoiGianDo) + '</td><td class="left">' + esc(r.ten) + '</td><td>' + esc(r.chucVu) +
     '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
   // nút mở file báo cáo đo nồng độ cồn của tuyến (đọc từ tab DS của file tổng, xem Con.gs)
-  const con = (NV.con || []).map(x => '<a class="link-btn" href="' + esc(x.url) + '" target="_blank" rel="noopener">📝 Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
+  const con = (NV.con || []).map(x => '<a class="link-btn" href="' + safeUrl(x.url) + '" target="_blank" rel="noopener">📝 Nhập đo cồn tuyến ' + esc(x.tuyen) + '</a>').join('') ||
     (NV.conAll ? '<span class="edit-hint">Chưa thấy file đo cồn của tuyến ' + esc(NV.tuyen || '') + ' trong tab DS.</span>' : '');
   const bar = con || NV.conAll ? '<div class="panel-bar"><div class="pb-left">' + con + '</div>' +
-    (NV.conAll ? '<a class="link-btn soft" href="' + esc(NV.conAll) + '" target="_blank" rel="noopener">📊 File tổng đo cồn</a>' : '') + '</div>' : '';
+    (NV.conAll ? '<a class="link-btn soft" href="' + safeUrl(NV.conAll) + '" target="_blank" rel="noopener">📊 File tổng đo cồn</a>' : '') + '</div>' : '';
   $('out').innerHTML = bar + '<table><thead><tr>' + ['Ngày', 'Tuyến', 'Giờ đi', 'Giờ xuất bến', 'Thời gian đo', 'Tên', 'Chức vụ', 'Trạng thái', 'Vi phạm', 'Người đo']
     .map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="10">Không có nhân viên nào</td></tr>') + '</tbody></table>';
 }
@@ -615,7 +620,7 @@ function tryUnlock(ekey, silent) {
     if (!silent) { setTab('dh'); msg('🔓 Đã mở khoá thẻ 🔓 Điều hành (ký, về bến, ca 1 / ca 2)', 'ok'); }
     else if (localStorage.getItem('web_tab') === 'dh') setTab('dh');
   }).catch(function (e) {
-    if (silent) { if (!e.net && !e.login) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
+    if (silent) { if (!e.net && !e.login && !/tạm khoá/.test(e.message)) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
     msg('❌ ' + e.message, 'err');
   });
 }
@@ -1248,6 +1253,9 @@ function loadExcelJS() {
   _xl = new Promise(function (resolve, reject) {
     const sc = document.createElement('script');
     sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    // BẢO MẬT: kiểm tra đúng file gốc (mã băm cdnjs công bố) — CDN bị sửa file thì trình duyệt không chạy
+    sc.integrity = 'sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==';
+    sc.crossOrigin = 'anonymous'; sc.referrerPolicy = 'no-referrer';
     sc.onload = function () { resolve(window.ExcelJS); };
     sc.onerror = function () { _xl = null; reject(new Error('Không tải được thư viện Excel, kiểm tra mạng rồi bấm lại')); };
     document.head.appendChild(sc);
@@ -1434,7 +1442,7 @@ function renderGps() {
   const canGo = (!r || r.status === 'completed') && !other && T.some(t => t.chup);
   const fb = (k, label, n) => '<button type="button" class="gp-f' + (GP.filter === k ? ' on' : '') + '" data-gpf="' + k + '">' + label + ' <b>' + n + '</b></button>';
   out += '<div class="panel-bar"><div class="pb-left">' +
-    (sheet ? '<a class="link-btn soft" href="' + esc(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS' + (GP.rieng ? ' của bạn' : '') + '</a>' : '') +
+    (sheet ? '<a class="link-btn soft" href="' + safeUrl(sheet) + '" target="_blank" rel="noopener">📄 Sheet GPS' + (GP.rieng ? ' của bạn' : '') + '</a>' : '') +
     '<a class="link-btn soft" href="' + MAT_CHUYEN_URL + '" target="_blank" rel="noopener">📋 Báo cáo mất chuyến</a>' +
     '<span class="gp-fs">' + fb('all', 'Tất cả', T.length) + fb('mat', '🔴 Mất chuyến', T.length - nDx) + fb('dexuat', '🟠 Đề xuất', nDx) + '</span></div>' +
     (canGo ? '<button class="edit-btn big" data-gps="go"' + (picked.length ? '' : ' disabled') + '>🛰 Chụp ' + picked.length + ' chuyến' + (nR > 1 ? ' · ' + nR + ' tuyến 1 lần' : '') + '</button>' : '') + '</div>';
@@ -1442,7 +1450,7 @@ function renderGps() {
     out += '<div class="panel-note ' + (r.conclusion === 'success' ? 'ok' : 'err') + '">' + (r.conclusion === 'success' ? '✅ Chụp xong, link ảnh đã ghi vào Google Sheet.' : '⚠️ Có chuyến chụp lỗi, xem Google Sheet (hoặc tick chụp lại).') + '</div>';
   } else if (r) {
     out += '<div class="panel-note busy">⏳ Đang chụp ' + esc(GP.sent ? GP.sent.n + ' chuyến · tuyến ' + GP.sent.codes : '') + (r.n > 1 ? ' — xong ' + (r.xong || 0) + '/' + r.n + ' phần' : '') +
-      '... có thể mất vài phút. Vẫn bấm được nút khác, xong sẽ báo.' + (r.url ? ' <a href="' + esc(r.url) + '" target="_blank" rel="noopener">Xem trên GitHub</a>' : '') + '</div>';
+      '... có thể mất vài phút. Vẫn bấm được nút khác, xong sẽ báo.' + (r.url ? ' <a href="' + safeUrl(r.url) + '" target="_blank" rel="noopener">Xem trên GitHub</a>' : '') + '</div>';
   } else if (other) {
     out += '<div class="panel-note busy">⏳ Đang có 1 lần chụp khác chạy (tuyến ' + esc(GPS_RUN.sent ? GPS_RUN.sent.codes : '') + '). Chờ xong rồi chụp tiếp, để khỏi quá tải GitHub / Google.</div>';
   } else if (canGo) {
