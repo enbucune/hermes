@@ -1,6 +1,5 @@
 // ===== CẤU HÌNH: URL Web App của Apps Script (kết thúc /exec) =====
 const API_URL = 'https://script.google.com/macros/s/AKfycbxWzYaiYmEQiVrl4oNgFCBBxOHUnX8_nIZK396IrXbFDx-H0sz-BAhhozyo14wrWLAs/exec';
-function getUrl() { return API_URL; }
 
 // BẢO MẬT: không cho trang khác nhúng web này vào khung ẩn để lừa bấm nút (clickjacking). GitHub Pages không đặt được header nên chặn bằng JS.
 if (window.top !== window.self) { document.documentElement.innerHTML = ''; try { window.top.location = window.self.location.href; } catch (e) { /* bỏ qua */ } throw new Error('Không chạy trong khung'); }
@@ -16,7 +15,11 @@ function msg(t, cls) { // cls: ok / warn (xong nhưng có lỗi) / err / info; t
     if (r.top > window.innerHeight - 60 || r.bottom < 0) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 }
-const hm5 = v => String(v || '').slice(-5);
+const busy = () => document.body.classList.contains('is-busy');   // đang chạy 1 thao tác (nút bị khoá)
+function xoaMan() { $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+// Hàng chip số liệu (không bấm được): [tên, số, class màu]
+const chipHtml = list => list.map(x => '<div class="stat' + (x[2] ? ' ' + x[2] : '') + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+const isoNgay = d => String(d || '').split('/').reverse().join('-');   // dd/mm/yyyy -> yyyy-mm-dd
 // Link lấy từ Sheet / máy chủ: chỉ cho http(s), chặn "javascript:..." (ai sửa ô Sheet thành mã độc thì bấm link cũng không chạy)
 const safeUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? esc(String(u).trim()) : '#';
 // Mất chuyến (xe KHÔNG chạy: tài xế/tiếp viên "Mất Chuyến") khác Đề xuất mất chuyến (xe CÓ chạy, có giờ đi/đến, chờ duyệt)
@@ -49,12 +52,10 @@ let ME = null;
 let _n = 0, NO_FETCH = false;
 function apiOnce(params, timeoutMs) {
   if (NO_FETCH || !window.fetch) return apiJsonp(params, timeoutMs);
-  let url;
-  try { url = getUrl(); } catch (e) { return Promise.reject(e); }
   const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
   // BẢO MẬT (05/11/2026): gửi bằng POST, mã truy cập / mã mở khoá / phiên FUTA nằm trong thân yêu cầu, KHÔNG nằm trên URL
   // (URL hay bị lưu lại ở lịch sử, nhật ký proxy / máy chủ). doPost (Gps.gs) chuyển sang web_handle_ y như doGet.
-  return fetch(url, { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', cache: 'no-store', signal: ctl.signal })
+  return fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', cache: 'no-store', signal: ctl.signal })
     .then(function (r) { return r.json(); })
     .then(function (data) { if (!data || !data.ok) throw apiErr(data); return data; }, function (e) {
       if (e.name === 'AbortError') throw new Error('Hết thời gian chờ');
@@ -65,8 +66,6 @@ function apiOnce(params, timeoutMs) {
 }
 function apiJsonp(params, timeoutMs) {
   return new Promise(function (resolve, reject) {
-    let url;
-    try { url = getUrl(); } catch (e) { reject(e); return; }
     const cb = '__cb' + (++_n) + '_' + Date.now();
     const q = new URLSearchParams(Object.assign(authParam(), { callback: cb }, params));
     const script = document.createElement('script');
@@ -82,7 +81,7 @@ function apiJsonp(params, timeoutMs) {
       }
     };
     timer = setTimeout(function () { if (!done) { clean(); reject(new Error('Hết thời gian chờ')); } }, timeoutMs || 120000);
-    script.src = url + '?' + q.toString();
+    script.src = API_URL + '?' + q.toString();
     document.body.appendChild(script);
   });
 }
@@ -100,7 +99,7 @@ function apiErr(data) {
 // POST (mật khẩu, token Google không nằm trên URL). Apps Script trả CORS cho body text/plain.
 function apiPost(params, timeoutMs) {
   const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
-  return fetch(getUrl(), { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', signal: ctl.signal })
+  return fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign(authParam(), params)), credentials: 'omit', signal: ctl.signal })
     .then(function (r) { return r.json(); }, function (e) {
       throw new Error(e.name === 'AbortError' ? 'Hết thời gian chờ' : 'Không kết nối được tới máy chủ, thử lại sau ít giây.');
     })
@@ -210,8 +209,8 @@ function rerunCurrent(doiTuyen) {
   if (TAB === 'bt') { if (!doiTuyen && BTR.size) btRun(); return; }   // Bảng tài có ô chọn tuyến riêng
   if (TAB !== 'xem' || !sel().id || !isoDate()) return;
   if (MODE === 'gps') { ovNen(); if (!doiTuyen && GPSR.size) gpsFind(); return; }   // GPS có ô chọn tuyến riêng
-  if (MODE === 'auto' && AU) { ovNen(); autoPlan(''); return; }
-  if (MODE === 'ky' && KY) { ovNen(); kyPlan(''); return; }
+  if (MODE === 'auto') { ovNen(); autoPlan(''); return; }
+  if (MODE === 'ky') { ovNen(); kyPlan(''); return; }
   rerunCheck();
 }
 // Vừa mở web / vừa tải xong danh sách tuyến: hiện luôn màn của mục đang mở
@@ -312,7 +311,7 @@ function rbPick(r, viaEnter) {
   if (el.id === 'route') {
     localStorage.setItem('last_route', routeText(r));
     $('plate').value = ''; $('q').value = '';   // biển số / ô lọc là của tuyến cũ
-    if (!viaEnter && !document.body.classList.contains('is-busy')) rerunCurrent(true);   // chọn bằng chuột / chạm: xem luôn (Enter thì enterRun làm)
+    if (!viaEnter && !busy()) rerunCurrent(true);   // chọn bằng chuột / chạm: xem luôn (Enter thì enterRun làm)
     return viaEnter;
   }
   return false;
@@ -389,14 +388,14 @@ function napBo(list) { list.forEach(function (a) { delete NAP[a]; }); }
 function moXem(mode, action, cho, ve, extra, ms) {
   const s = sel(); if (thieuSel(s)) return;
   const id = ++VIEW_ID;
-  MODE = mode; $('out').innerHTML = ''; $('stats').innerHTML = ''; msg(cho); syncView();
-  nap(action, s, extra, ms).then(function (res) { ovCards(); if (id === VIEW_ID) ve(res, s); },
-    function (e) { ovCards(); if (id === VIEW_ID) msg('❌ ' + e.message, 'err'); });
+  MODE = mode; xoaMan(); msg(cho); syncView();
+  nap(action, s, extra, ms).then(function (res) { ovCards(); if (id === VIEW_ID) { if (res.at) showDataAt(res.at); ve(res, s); } })
+    .catch(function (e) { ovCards(); if (id === VIEW_ID) msg('❌ ' + e.message, 'err'); });   // bắt cả lỗi ném ra lúc vẽ
 }
 // Tải ngầm giờ chạy + lệnh để các ô có số và màn Tổng quan ghép được theo xe
 function ovNen() {
   const s = sel(); if (!s.id || !isoDate()) return;
-  const xong = function () { ovCards(); if (MODE === 'ov') renderOv(); };
+  const xong = function (res) { ovCards(); if (MODE !== 'ov') return; if (res && res.at && res._key === curKey()) showDataAt(res.at); renderOv(); };
   LV_LOI = '';
   nap('load', s).then(xong, function (e) { ovCards(); if (MODE === 'ov') msg('❌ ' + e.message, 'err'); });
   nap('lvc', s, null, 180000).then(xong, function () { LV_LOI = s.id + '|' + isoDate(); xong(); });
@@ -416,16 +415,18 @@ function ovCards() {
   if (co(LV)) {
     const bad = LV.rows.filter(r => r.level === 'bad').length, cb = LV.rows.filter(r => r.level === 'warn').length;
     ovThe('Lvc', bad + cb, bad || cb ? bad + ' lỗi · ' + cb + ' cảnh báo' : LV.rows.length + ' lệnh đạt', bad ? 'bad' : cb ? 'warn' : 'ok');
-  } else ovThe('Lvc', cho('lvc') ? '…' : '–', cho('lvc') ? 'đang kiểm tra' : LV_LOI === key && key ? 'lỗi, bấm thử lại' : 'bấm để kiểm tra');
+  } else ovThe('Lvc', cho('lvc') ? '…' : '–', cho('lvc') ? 'đang kiểm tra' : LV_LOI === key && key ? 'lỗi, bấm thử lại' : 'bấm kiểm tra');
   if (co(EB)) { const n = EB.results.filter(r => catOf(r.loai) !== 'ok').length; ovThe('Ebms', n, n ? 'dòng cần xem' : 'khớp hết', n ? 'bad' : 'ok'); }
-  else ovThe('Ebms', cho('ebms') ? '…' : '–', cho('ebms') ? 'đang so sánh' : 'bấm để so sánh');
-  if (co(NV)) ovThe('Nv', NV.stats.total, 'nhân viên'); else ovThe('Nv', cho('nv') ? '…' : '–', cho('nv') ? 'đang trích xuất' : 'bấm để trích xuất');
+  else ovThe('Ebms', cho('ebms') ? '…' : '–', cho('ebms') ? 'đang so sánh' : 'bấm so sánh');
+  if (co(NV)) ovThe('Nv', NV.stats.total, 'nhân viên'); else ovThe('Nv', cho('nv') ? '…' : '–', cho('nv') ? 'đang trích xuất' : 'bấm trích xuất');
 }
 
 // ===== TỔNG QUAN: ghép giờ chạy + mất chuyến + lệnh theo TỪNG XE, xe nặng nhất lên đầu. Bấm 1 xe = xem chuyến của xe đó, ô biển số điền sẵn để ⚡ / ✍️ =====
 const plateK = x => String(x || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+let OVX = null;   // { d, l, list }: kết quả ghép của đúng cặp DATA + LV này, khỏi ghép lại mỗi lần vẽ / gõ ô tìm
 function ovXe() {
   const key = curKey(), m = new Map(), lv = LV && LV._key === key ? LV : null;
+  if (OVX && OVX.d === DATA && OVX.l === lv) return OVX.list;
   const lay = function (x) {
     const k = plateK(x); if (!k) return null;
     if (!m.has(k)) m.set(k, { xe: x, n: 0, red: 0, yellow: 0, green: 0, purple: 0, mat: 0, dx: 0, lenh: [] });
@@ -439,7 +440,9 @@ function ovXe() {
     b.bad = b.lenh.filter(r => r.level === 'bad').length; b.cb = b.lenh.filter(r => r.level === 'warn').length;
     b.diem = b.bad * 100 + b.mat * 50 + b.red * 10 + b.cb * 5 + b.yellow + b.green + b.purple + b.dx;
   });
-  return list.sort((a, b) => b.diem - a.diem || String(a.xe).localeCompare(String(b.xe)));
+  list.sort((a, b) => b.diem - a.diem || String(a.xe).localeCompare(String(b.xe)));
+  OVX = { d: DATA, l: lv, list: list };
+  return list;
 }
 function renderOv() {
   const key = curKey();
@@ -476,17 +479,12 @@ $('out').addEventListener('click', function (ev) {
 $('btnOv').onclick = function () {
   const s = sel(); if (thieuSel(s)) return;
   ++VIEW_ID; MODE = 'ov'; syncView();
-  if (!DATA || DATA._key !== curKey()) { $('out').innerHTML = ''; $('stats').innerHTML = ''; msg('Đang tải...'); }
+  if (!DATA || DATA._key !== curKey()) { xoaMan(); msg('Đang tải...'); }
   else msg('');
   ovNen(); renderOv();
 };
 $('btnLoad').onclick = function () {
-  moXem('trips', 'load', 'Đang tải...', function (res, s) {
-    CUR = s;
-    const nMat = res.missed.filter(m => !isDx(m)).length;
-    msg((res.stats.warn || nMat ? '⚠️ ' : '✅ ') + (res.stats.warn ? res.stats.warn + '/' + res.stats.total + ' chuyến có lỗi' : 'Không có chuyến nào lỗi giờ (' + res.stats.total + ' chuyến)') +
-      (nMat ? ' · ' + nMat + ' mất chuyến' : ''), res.stats.warn || nMat ? 'warn' : 'ok'); render();
-  });
+  moXem('trips', 'load', 'Đang tải...', function (res, s) { CUR = s; msg(''); render(); });   // số liệu đã có ở ô + hàng chip, không nhắc lại
 };
 
 $('q').oninput = $('onlyWarn').onchange = function () { rerender(); };
@@ -529,34 +527,91 @@ $('btnEbms').onclick = function () {
   moXem('ebms', 'ebms', 'Đang so sánh EBMS (có thể mất 20-40 giây)...', function (res) {
     if (!res.results) throw new Error('Server chưa có action "ebms". Thêm dòng router vào Web.gs, dán Ebms.gs, rồi Deploy lại BẢN MỚI.');
     const nLech = res.results.filter(r => catOf(r.loai) !== 'ok').length;
-    msg((nLech ? '⚠️ ' + nLech + ' dòng cần xem' : '✅ Tất cả khớp') + ' (PC ' + res.pcCount + ' · EBMS ' + res.ebmsCount + (res.gps ? ' · 🛰 ' + res.gps : '') + ')', nLech ? 'warn' : 'ok');
+    // GPS đọc lỗi / chưa cấu hình cũng báo vàng: cột GPS đang thiếu
+    msg('PC ' + res.pcCount + ' · EBMS ' + res.ebmsCount + (res.gps ? ' · 🛰 ' + res.gps : ''), nLech || /lỗi|chưa cấu hình/i.test(res.gps || '') ? 'warn' : 'ok');
     renderEbms();
   }, null, 180000);
 };
 
-function renderEbms() {
-  const cnt = { ok: 0, warn: 0, plan: 0, nopc: 0, noebms: 0 };
-  EB.results.forEach(function (r) { const c = catOf(r.loai); if (cnt[c] != null) cnt[c]++; });
-  $('stats').innerHTML = statHtml([['Tất cả', EB.results.length, '', 'all'], ['Cần xem', EB.results.length - cnt.ok, 'e-warn', 'canxem'], ['Lệch giờ', cnt.warn + cnt.plan, 'e-warn', 'lech'],
-    ['Thiếu phân công', cnt.nopc, 'e-nopc', 'nopc'], ['Thiếu EBMS', cnt.noebms, 'e-noebms', 'noebms'], ['Khớp', cnt.ok, 'e-ok', 'ok']].filter(x => x[1] || x[3] === 'all'));
-
-  const q = $('q').value.trim().toLowerCase();
-  const hit = c => !FIL || FIL === 'all' || FIL === c || (FIL === 'canxem' && c !== 'ok') || (FIL === 'lech' && (c === 'warn' || c === 'plan'));
-  let html = '';
-  EB.results.forEach(function (r) {
-    const c = catOf(r.loai);
-    if (!hit(c)) return;
-    const f = [r.loai, r.khDi, r.khDen, r.khXe, r.thXe, r.thDi, r.thDen, r.benDau, r.trangThaiEBMS, r.lichChayPC, r.xePC, r.benXuatPhatPC,
-      r.gioDiPC, r.gioDenPC, r.chenhLechDi, r.chenhLechDen, r.gpsDi || '', r.gpsVe || '', r.pcGps || '', r.ebGps || '', r.soBen];
-    if (q && (f.join(' ') + ' ' + r.ghi).toLowerCase().indexOf(q) === -1) return;
-    // "Ghi chú" (lý do lệch) để ngay sau cột Loại cho khỏi kéo ngang tới cuối bảng
-    html += '<tr class="e-' + c + '"><td>' + esc(f[0]) + '</td><td class="notes">' + esc(r.ghi) + '</td>' + f.slice(1).map(v => '<td>' + esc(v) + '</td>').join('') + '</tr>';
-  });
-  const heads = ['Loại', 'Ghi chú', 'KH Đi', 'KH Đến', 'KH Xe', 'TH Xe', 'TH Đi', 'TH Đến', 'Bến đầu', 'TT EBMS', 'Lịch chạy PC', 'Xe PC', 'Bến PC', 'Giờ đi PC', 'Giờ đến PC', 'Lệch Đi', 'Lệch Về',
-    'GPS Đi', 'GPS Về', 'PC−GPS (đi/về)', 'EBMS−GPS (đi/về)', 'So bến'];
-  $('out').innerHTML = '<table class="t-ebms"><thead><tr>' + heads.map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' +
-    (html || '<tr><td colspan="' + heads.length + '">' + emptyText() + '</td></tr>') + '</tbody></table>';
+// Chỉ ĐỌC để tra tay. Cột xếp theo từng thứ cần so, 3 nguồn EBMS · PC (CityBus) · GPS đứng cạnh nhau; giờ VỀ in đậm (thứ cần soi nhất).
+// [tên cột, cách lấy, class ('g' = vạch ngăn nhóm, 'gv' = giờ về), 1 = cột GPS (ẩn khi máy chủ không gửi dữ liệu GPS)]
+const ebCo = v => !!v && v !== '-';
+const ebLichEb = r => ebCo(r.khDi) || ebCo(r.khDen) ? (ebCo(r.khDi) ? r.khDi : '') + '-' + (ebCo(r.khDen) ? r.khDen : '') : '-';
+const EB_COT = [
+  ['Bến đầu', r => r.benDau],
+  ['Lịch EBMS', ebLichEb, 'g'], ['Lịch PC', r => r.lichChayPC],
+  ['Xe EBMS', r => ebCo(r.thXe) ? r.thXe : r.khXe, 'g'], ['Xe PC', r => r.xePC],
+  ['Đi EBMS', r => r.thDi, 'g'], ['Đi PC', r => r.gioDiPC], ['Đi GPS', r => r.gpsDi, '', 1],
+  ['Về EBMS', r => r.thDen, 'g gv'], ['Về PC', r => r.gioDenPC, 'gv'], ['Về GPS', r => r.gpsVe, 'gv', 1],
+  ['Lệch Đi', r => r.chenhLechDi, 'g'], ['Lệch Về', r => r.chenhLechDen], ['PC−GPS (đi/về)', r => r.pcGps, '', 1], ['EBMS−GPS (đi/về)', r => r.ebGps, '', 1],
+  ['TT EBMS', r => r.trangThaiEBMS, 'g'], ['KH Xe', r => r.khXe], ['Bến PC', r => r.benXuatPhatPC], ['So bến', r => r.soBen]
+];
+// GPS3 chỉ được hỏi cho chuyến CityBus lệch EBMS (từ 7 phút). Máy chủ ghi kết luận ở đầu dòng ghi chú "🛰 <NHÃN>: ..." (GPS3_KQ trong ebms.gs)
+// và gửi r.gpsKq = sua / ok / ro cho cả dòng. Mỗi kết luận vẽ thành 1 khung màu theo nhãn; dòng 🛰 không có nhãn (máy chủ cũ) để khung trung tính.
+const GPS_KQ = { 'XEM LẠI CITYBUS': 'sua', 'CITYBUS ĐÚNG': 'ok', 'CHƯA RÕ': 'ro' };
+function ebGhi(ghi) {
+  return String(ghi || '').split(' | ').filter(Boolean).map(function (s) {
+    if (s.indexOf('🛰') !== 0) return '<div>' + esc(s) + '</div>';
+    const m = s.match(/^🛰\s*([^:]+): ([\s\S]*)$/), k = m && GPS_KQ[m[1]];
+    return '<div class="gk' + (k ? ' gk-' + k : '') + '">' + (k ? '<b>🛰 ' + esc(m[1]) + '</b>' + esc(m[2]) : '🛰 ' + esc(s.replace(/^🛰\s*/, ''))) + '</div>';
+  }).join('');
 }
+function renderEbms() {
+  const R = EB.results, cnt = { ok: 0, warn: 0, plan: 0, nopc: 0, noebms: 0 };
+  const coGhiGps = r => String(r.ghi || '').indexOf('🛰') !== -1, gpsSua = r => r.gpsKq === 'sua';
+  R.forEach(function (r) { const c = catOf(r.loai); if (cnt[c] != null) cnt[c]++; });
+  $('stats').innerHTML = statHtml([['Tất cả', R.length, '', 'all'], ['Cần xem', R.length - cnt.ok, 'e-warn', 'canxem'], ['Lệch giờ', cnt.warn + cnt.plan, 'e-warn', 'lech'],
+    ['Thiếu phân công', cnt.nopc, 'e-nopc', 'nopc'], ['Thiếu EBMS', cnt.noebms, 'e-noebms', 'noebms'],
+    ['🛰 Xem lại CityBus', R.filter(gpsSua).length, 'e-nopc', 'gpssua'], ['🛰 Đã hỏi GPS', R.filter(coGhiGps).length, 'e-n', 'gps'],
+    ['Khớp', cnt.ok, 'e-ok', 'ok']].filter(x => x[1] || x[3] === 'all'));
+
+  const coGps = R.some(r => r.gpsDi), cols = coGps ? EB_COT : EB_COT.filter(x => !x[3]);
+  const q = norm($('q').value);
+  const hit = (r, c) => !FIL || FIL === 'all' || FIL === c || (FIL === 'canxem' && c !== 'ok') || (FIL === 'lech' && (c === 'warn' || c === 'plan')) ||
+    (FIL === 'gps' && coGhiGps(r)) || (FIL === 'gpssua' && gpsSua(r));
+  const cls = x => x[2] ? ' class="' + x[2] + '"' : '';
+  let html = '';
+  R.forEach(function (r) {
+    const c = catOf(r.loai);
+    if (!hit(r, c)) return;
+    const v = cols.map(x => x[1](r) || '');
+    if (q && norm(r.loai + ' ' + r.ghi + ' ' + v.join(' ')).indexOf(q) === -1) return;   // bảng gọn cũng tìm trên đủ cột: gõ biển số vẫn ra
+    // Chi tiết: "Ghi chú" (lý do lệch) ngay sau cột Loại cho khỏi kéo ngang; mỗi ý 1 dòng, kết luận của GPS đóng khung
+    html += '<tr class="e-' + c + '">' + (EB_FULL ? '<td class="loai">' + esc(r.loai) + '</td><td class="notes">' + ebGhi(r.ghi) + '</td>' +
+      v.map((t, i) => '<td' + cls(cols[i]) + '>' + esc(t) + '</td>').join('') : ebGon(r, coGps)) + '</tr>';
+  });
+  const nGio = coGps ? 3 : 2, thGio = '<th class="g">CityBus</th><th>EBMS</th>' + (coGps ? '<th>GPS</th>' : '');
+  $('btnEbFull').textContent = EB_FULL ? '📋 Thu gọn' : '📋 Chi tiết';
+  $('out').innerHTML = (EB_FULL
+    ? '<table class="t-ebms"><thead><tr><th>Loại</th><th>Ghi chú</th>' + cols.map(x => '<th' + cls(x) + '>' + x[0] + '</th>').join('') + '</tr>'
+    : '<table class="t-ebms t-gon' + (coGps ? '' : ' g2') + '"><thead><tr><th rowspan="2">Lịch chạy</th><th rowspan="2">Đầu bến</th><th colspan="' + nGio + '" class="g">Giờ đi</th>' +
+      '<th colspan="' + nGio + '" class="g">Giờ đến</th><th rowspan="2" class="g">Kết quả</th></tr><tr>' + thGio + thGio + '</tr>') + '</thead><tbody>' +
+    (html || '<tr><td colspan="' + (EB_FULL ? cols.length + 2 : nGio * 2 + 3) + '">' + emptyText() + '</td></tr>') + '</tbody></table>';
+}
+// Bảng GỌN (mặc định, anh dặn 11/11/2026): chỉ Lịch chạy · Đầu bến · Giờ đi · Giờ đến, mỗi giờ 3 nguồn CityBus · EBMS · GPS đứng cạnh nhau, cuối dòng là kết quả.
+// Nút "📋 Chi tiết" trên thanh lọc mở bảng đủ cột (EB_COT); không nhớ qua lần mở web sau, lần nào vào cũng là bảng gọn.
+let EB_FULL = false;
+const EB_LECH = 7;   // phút, như EBMS_ACTUAL_TOL trong ebms.gs: 2 nguồn cách nhau từ ngần này thì tô ô giờ
+const EB_GIO = [['gioDiPC', 'thDi', 'gpsDi'], ['gioDenPC', 'thDen', 'gpsVe']];   // [CityBus, EBMS, GPS] của giờ đi, giờ đến
+const ebPhut = s => { const m = /^(\d{1,2}):(\d{2})/.exec(String(s || '')); return m ? m[1] * 60 + +m[2] : null; };
+const ebLech = (a, b) => { a = ebPhut(a); b = ebPhut(b); if (a == null || b == null) return false; const d = Math.abs(a - b); return Math.min(d, 1440 - d) >= EB_LECH; };
+// Tô ô giờ khi CityBus và EBMS lệch nhau: có giờ GPS thì chỉ tô bên cách GPS từ EB_LECH phút (bên sai), không có thì tô cả 2 bên.
+function ebTo(pc, eb, gps) {
+  if (!ebLech(pc, eb)) return [false, false];
+  const a = ebLech(pc, gps), b = ebLech(eb, gps);
+  return a || b ? [a, b] : [true, true];
+}
+function ebGon(r, coGps) {
+  const o = function (t, to, c) { return '<td' + (c ? ' class="' + c + '"' : '') + '>' + (to ? '<b class="lg">' + esc(t) + '</b>' : esc(t)) + '</td>'; };
+  // <wbr>: điện thoại cho lịch chạy xuống 2 dòng (06:00- / 07:00) để đủ chỗ cho 6 ô giờ; kq "tron": chuyến không có ghi chú
+  return '<td>' + esc(ebCo(r.lichChayPC) ? r.lichChayPC : ebLichEb(r)).replace('-', '-<wbr>') + '</td><td class="ben">' + esc(ebCo(r.benDau) ? r.benDau : ebCo(r.benXuatPhatPC) ? r.benXuatPhatPC : '') + '</td>' +
+    EB_GIO.map(function (k, i) {
+      const v = k.map(x => ebCo(r[x]) ? r[x] : ''), to = ebTo(v[0], v[1], v[2]), gv = i ? ' gv' : '';
+      return o(v[0], to[0], 'g' + gv) + o(v[1], to[1], gv.trim()) + (coGps ? o(v[2], false, gv.trim()) : '');
+    }).join('') +
+    '<td class="notes g kq' + (String(r.ghi || '').trim() ? '' : ' tron') + '"><b>' + esc(r.loai) + '</b>' + ebGhi(r.ghi) + '</td>';
+}
+$('btnEbFull').onclick = function () { EB_FULL = !EB_FULL; if (MODE === 'ebms' && EB) renderEbms(); };
 
 // ===== RENDER =====
 const WHY_KEYS = ['red', 'yellow', 'green', 'purple'];
@@ -582,12 +637,9 @@ function render() {
     html += '<tr class="' + (band ? 'bandB' : '') + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.lich) + '</td>' + cells +
       '<td class="' + (r.k[1] === 'green' ? 'green' : '') + '">' + ch + '</td></tr>';
   });
-  let out = '<table><thead><tr><th>Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Chênh lệch giờ đi</th></tr></thead><tbody>' +
+  $('out').innerHTML = '<table><thead><tr><th>Xe</th><th>Lịch chạy</th><th>Giờ điều xe</th><th>Giờ đi</th><th>Giờ đến</th><th>Giờ về bến</th><th>Chênh lệch giờ đi</th></tr></thead><tbody>' +
     (html || '<tr><td colspan="7">' + emptyText() + '</td></tr>') + '</tbody></table>';
-
-  $('out').innerHTML = out;
 }
-
 
 // ===== TRÍCH XUẤT NHÂN VIÊN =====
 (function () { const v = localStorage.getItem('nguoi_do'); if (v) $('nguoiDo').value = v; })();
@@ -603,8 +655,7 @@ $('btnNv').onclick = function () {
     if (!res.rows) throw new Error('Server chưa có action "nv". Thêm dòng router vào Web.gs, dán Nv.gs, rồi Deploy lại BẢN MỚI.');
     res.tuyen = s.code;
     if (res.conCho && !res._conDa) { res._conDa = true; nvCon(s, res); }   // link đo cồn chưa có sẵn: tải ngầm, không bắt chờ danh sách nhân viên
-    msg('✅ ' + res.stats.total + ' nhân viên (từ ' + res.tripCount + ' chuyến)', 'ok');
-    renderNv();
+    msg(''); renderNv();
   }, { nguoiDo: nd });
 };
 
@@ -619,14 +670,13 @@ function nvCon(s, nv) {
 }
 
 function nvVisible() {
-  const q = $('q').value.trim().toLowerCase();
-  return NV.rows.filter(r => !q || (r.ten + ' ' + r.chucVu).toLowerCase().indexOf(q) !== -1);
+  const q = norm($('q').value);
+  return NV.rows.filter(r => !q || norm(r.ten + ' ' + r.chucVu).indexOf(q) !== -1);
 }
 
 function renderNv() {
   const st = NV.stats;
-  $('stats').innerHTML = [['Tổng nhân viên', st.total], ['Lái xe', st.drivers], ['Tiếp viên', st.attendants], ['Trùng tên khác SĐT', st.ambiguous]]
-    .map(x => '<div class="stat"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  $('stats').innerHTML = chipHtml([['Tổng nhân viên', st.total], ['Lái xe', st.drivers], ['Tiếp viên', st.attendants], ['Trùng tên khác SĐT', st.ambiguous]]);
   const body = nvVisible().map(r => '<tr class="' + (r.isAmbiguous ? 'e-amb' : '') + '"><td>' + esc(r.ngay) + '</td><td>' + esc(r.tuyen) + '</td><td>' + esc(r.gioDi) +
     '</td><td>' + esc(r.gioXuatBen) + '</td><td>' + esc(r.thoiGianDo) + '</td><td class="left">' + esc(r.ten) + '</td><td>' + esc(r.chucVu) +
     '</td><td>' + (r.trangThai ? '✅' : '⬜') + '</td><td>' + (r.viPham ? '⚠️' : '⬜') + '</td><td>' + esc(r.nguoiDo) + '</td></tr>').join('');
@@ -645,9 +695,10 @@ $('btnCopy').onclick = function () {
   if (MODE === 'bt' && BT) { copyText(btGrid().map(r => r.join('\t')).join('\n'), '📋 Đã copy bảng tài, qua Google Sheet bấm Ctrl+V'); return; }
   if (!NV) return;
   const clean = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ');
-  const text = nvVisible().map(r => [r.ngay, r.tuyen, r.gioDi, r.gioXuatBen, r.thoiGianDo, r.ten, r.chucVu,
+  const rows = nvVisible();
+  const text = rows.map(r => [r.ngay, r.tuyen, r.gioDi, r.gioXuatBen, r.thoiGianDo, r.ten, r.chucVu,
     r.trangThai ? 'TRUE' : 'FALSE', r.viPham ? 'TRUE' : 'FALSE', r.nguoiDo].map(clean).join('\t')).join('\n');
-  copyText(text, '📋 Đã copy ' + nvVisible().length + ' dòng, qua Google Sheet bấm Ctrl+V');
+  copyText(text, '📋 Đã copy ' + rows.length + ' dòng, qua Google Sheet bấm Ctrl+V');
 };
 function copyText(text, okMsg) {
   const done = function () { msg(okMsg, 'ok'); };
@@ -659,10 +710,7 @@ function copyText(text, okMsg) {
 $('btnLvc').onclick = function () {
   moXem('lvc', 'lvc', 'Đang kiểm tra lệnh (có thể mất 20-40 giây)...', function (res) {
     if (!res.rows) throw new Error('Server chưa có action "lvc". Thêm dòng router vào Web.gs, dán Lvc.gs, rồi Deploy lại BẢN MỚI.');
-    const nBad = res.rows.filter(r => r.level === 'bad').length, nCb = res.rows.filter(r => r.level === 'warn').length;
-    if (res.rows.length) msg((nBad ? '🔴 ' : nCb ? '🟠 ' : '✅ ') + res.rows.length + ' lệnh' +
-      (nBad || nCb ? ' · ' + nBad + ' lỗi, ' + nCb + ' cảnh báo' : ', tất cả đạt'), nBad || nCb ? 'warn' : 'ok');
-    else msg('⚠️ Không có lệnh vận chuyển nào', 'err');
+    if (res.rows.length) msg(''); else msg('⚠️ Không có lệnh vận chuyển nào', 'err');
     renderLvc();
   }, null, 180000);
 };
@@ -691,10 +739,10 @@ function renderLvc() {
 
 // ===== LỌC NHANH (bảng xe / EBMS / lệnh): bấm ô thống kê hoặc chú thích màu = chỉ xem loại đó, bấm lại = bỏ lọc =====
 let FIL = '';
-const FIL_TEN = { warn: 'có cảnh báo', red: 'màu đỏ', yellow: 'màu vàng', green: 'màu xanh lá', purple: 'trùng giờ (tím)', ok: 'đạt / khớp', lech: 'lệch giờ', nopc: 'thiếu phân công', noebms: 'thiếu EBMS', bad: 'lỗi', canxem: 'cần xem' };
+const FIL_TEN = { warn: 'có cảnh báo', red: 'màu đỏ', yellow: 'màu vàng', green: 'màu xanh lá', purple: 'trùng giờ (tím)', ok: 'đạt / khớp', lech: 'lệch giờ', nopc: 'thiếu phân công', noebms: 'thiếu EBMS', bad: 'lỗi', canxem: 'cần xem', gps: 'đã hỏi GPS', gpssua: 'GPS bảo xem lại CityBus' };
 function statHtml(list) { // [tên, số, class màu, khoá lọc]
   return list.map(x => '<div class="stat st-f ' + (x[2] || '') + (FIL === x[3] || (!FIL && x[3] === 'all') ? ' on' : '') + '" data-f="' + x[3] + '" role="button" tabindex="0" title="' +
-    (x[3] === 'mat' ? 'Bấm để nhảy tới bảng mất chuyến' : 'Bấm để chỉ xem loại này, bấm lại để bỏ lọc') + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+    (x[3] === 'mat' ? 'Bấm để mở màn Mất chuyến (chụp GPS)' : 'Bấm để chỉ xem loại này, bấm lại để bỏ lọc') + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
 }
 function emptyText() {
   return FIL && FIL !== 'all' && FIL !== 'mat' ? 'Không có dòng nào ' + esc(FIL_TEN[FIL] || '') : ($('q').value.trim() ? 'Không có dòng nào khớp bộ lọc' : 'Không có dòng nào');
@@ -727,7 +775,7 @@ function viewHien(t) {
   $('dataAt').textContent = v.at || ''; LAST_RO = v.ro || null; $('btnFresh').hidden = !v.ro;
   $('msg').className = v.m ? v.c : ''; $('msg').textContent = v.m || '';
   if (v.mode) { MODE = v.mode; rerender(); }
-  else { MODE = 'none'; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  else { MODE = 'none'; xoaMan(); }
   syncView();
 }
 function setTab(t) {
@@ -748,11 +796,8 @@ function setTab(t) {
   if (t === 'xem' && doi && !$('out').children.length && ROUTES.length) moDau();
 }
 document.querySelectorAll('.tab').forEach(function (b) { b.onclick = function () { setTab(b.dataset.tab); }; });
-function tabDau() { try { const t = localStorage.getItem('web_tab') || 'xem'; return t === 'sua' || t === 'dh' ? 'xem' : t; } catch (e) { return 'xem'; } }
-setTimeout(function () { syncView(); setTab(tabDau()); }, 0);   // đợi chạy hết file (các biến dùng khi đổi thẻ khai báo ở dưới)
-document.body.dataset.tab = 'xem';
-document.querySelectorAll('.pane').forEach(function (p) { p.hidden = p.dataset.pane !== 'xem'; });
-document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === 'xem'); });
+function tabDau() { try { return localStorage.getItem('web_tab') || 'xem'; } catch (e) { return 'xem'; } }   // thẻ lạ / đang ẩn: setTab tự về 'xem'
+setTimeout(function () { syncView(); setTab(tabDau()); }, 0);   // đợi chạy hết file (các biến dùng khi đổi thẻ khai báo ở dưới); trước đó index.html để sẵn thẻ Tuyến
 
 // ===== TÍNH NĂNG ẨN: ĐIỀU HÀNH =====
 // Mở khoá: bấm 5 lần liên tiếp vào biểu tượng 🚌 ở đầu trang, nhập EDIT_KEY. Mã được server kiểm tra (không chỉ ẩn nút).
@@ -763,7 +808,7 @@ function setUnlocked(on) {
   if (on) { if (TAB === 'ca' && C2) vebenCall({}, true); return; }
   if (TAB === 'lap') setTab('bt');
   delete TAB_VIEW.lap; VB = null; KY = null;
-  if (MODE === 'ky') { MODE = 'none'; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+  if (MODE === 'ky') { MODE = 'none'; xoaMan(); }
   if (MODE === 'ca2' && C2) renderCa2();
 }
 function tryUnlock(ekey, silent) {
@@ -789,8 +834,6 @@ function tryUnlock(ekey, silent) {
   if (getEkey() && (getSid() || !USER_MODE)) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
 })();
 
-// (Đã bỏ phần sửa tay từng xe — ✏️ Sửa lệnh. Chỉ còn ⚡ Chỉnh theo luật.)
-
 // ===== CHUYỂN NGÀY TRƯỚC / SAU =====
 function shiftDay(n) {
   const v = isoDate(); if (!v) return;
@@ -802,7 +845,7 @@ let DAY_T = null, DAY_DA = isoDate();   // DAY_DA: ngày vừa xem, gõ lại đ
 function dayRerun() {
   clearTimeout(DAY_T);
   if (MODE === 'lap' && TAB === 'lap') { $('date').dispatchEvent(new Event('change')); return; } // 📅 Lập bảng tài: đổi ngày là xoay lại ngay (lapbt.js)
-  DAY_T = setTimeout(function () { if (!document.body.classList.contains('is-busy')) rerunCurrent(); }, 700);
+  DAY_T = setTimeout(function () { if (!busy()) rerunCurrent(); }, 700);
 }
 $('btnPrev').onclick = function () { shiftDay(-1); dayRerun(); };
 $('btnNext').onclick = function () { shiftDay(1); dayRerun(); };
@@ -818,9 +861,10 @@ const CUR_BTN = { ov: 'btnOv', trips: 'btnLoad', ebms: 'btnEbms', lvc: 'btnLvc',
 function syncView() {
   const co = $('out').children.length > 0;
   document.body.dataset.mode = MODE;   // CSS ẩn/hiện ô "Chỉ dòng cần xem" theo màn đang xem
-  $('toolbar').hidden = !co || MODE === 'ca2' || (MODE === 'bt' && !BT);
-  $('btnCopy').style.display = co && ((MODE === 'bt' && BT) || MODE === 'nv') ? '' : 'none';
-  $('btnXlsx').style.display = co && MODE === 'bt' && BT ? '' : 'none';
+  $('toolbar').hidden = !co || MODE === 'none' || MODE === 'ca2' || (MODE === 'bt' && !BT);
+  $('btnCopy').hidden = !co || !((MODE === 'bt' && BT) || MODE === 'nv');
+  $('btnXlsx').hidden = !co || MODE !== 'bt' || !BT;
+  $('btnEbFull').hidden = !co || MODE !== 'ebms';
   $('ndBox').hidden = MODE !== 'nv';
   $('lvcRules').hidden = !co || MODE !== 'lvc';
   document.querySelectorAll('#actions .act').forEach(function (b) { b.classList.toggle('cur', b.id === CUR_BTN[MODE]); });
@@ -830,7 +874,7 @@ function syncView() {
 new MutationObserver(syncView).observe($('out'), { childList: true });
 
 // ===== TỰ CHỈNH THEO LUẬT (gọi autoplan / autosave trong edit.gs) =====
-// Hiện cùng nút "✏️ Sửa lệnh" sau khi mở khoá. Ô "Biển số xe" trống = cả tuyến; có biển = chỉ xe đó.
+// Ô "Biển số" trống = cả tuyến; có biển = chỉ xe đó.
 // Luật: cặp chuyến (trước, sau), đến >= lịch - 1p = quay đầu: về bến = đến, điều xe = đi = đến + 1p;
 // ngược lại: về bến = đến + 1p, điều xe = lịch - 1p, đi = lịch. Đầu ngày: điều xe = lịch - 1p, đi = lịch.
 // Cuối ngày: về bến = đến + 1p. Về bến trống (chưa xác nhận) để nguyên. Giờ đến không bao giờ đổi.
@@ -842,7 +886,7 @@ function setFs(r) {
   // đổi / thoát tài khoản: không để lại màn ca của người trước (ca đang bật trên máy chủ vẫn chạy)
   if (!r || r.futa !== localStorage.getItem('futa_user')) {
     C2 = null; ca2Mini(); delete TAB_VIEW.ca;
-    if (MODE === 'ca2') { MODE = 'none'; $('out').innerHTML = ''; $('stats').innerHTML = ''; }
+    if (MODE === 'ca2') { MODE = 'none'; xoaMan(); }
   }
   if (r) { localStorage.setItem('futa_fs', r.fs); localStorage.setItem('futa_user', r.futa); localStorage.setItem('futa_het', r.het || ''); }
   else ['futa_fs', 'futa_user', 'futa_het'].forEach(function (k) { localStorage.removeItem(k); });
@@ -927,32 +971,30 @@ $('btnAuto').onclick = function () {
 function autoPlan(prefix) {
   const s = sel();
   if (thieuSel(s)) return Promise.resolve();
-  const plate = $('plate').value.trim().toUpperCase();
+  const plate = $('plate').value.trim().toUpperCase(), pre = prefix ? prefix + '\n' : '';
+  ++VIEW_ID; MODE = 'auto'; AU = null; xoaMan(); syncView();   // nhận màn ngay: kết quả đọc nền của màn trước (EBMS, lệnh...) về muộn không vẽ đè lên
   $('btnAuto').disabled = true;
-  msg((prefix ? prefix + '\n' : '') + 'Đang tính ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + ' theo luật (chưa ghi gì)...');
-  $('out').innerHTML = ''; $('stats').innerHTML = '';
+  msg(pre + 'Đang tính ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + ' theo luật (chưa ghi gì)...');
   return api({ action: 'autoplan', fs: getFs(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
     if (!res.stats) throw new Error('Server chưa có action "autoplan". Dán edit.gs mới, thêm router vào web.gs, rồi Deploy lại BẢN MỚI.');
-    AU = res; AU.sel = s; MODE = 'auto';
+    AU = res; AU.sel = s;
     renderAuto();
     const st = res.stats;
-    msg((prefix ? prefix + '\n' : '') + (st.sua ? 'Sẽ sửa ' + st.sua + ' chuyến, chưa ghi gì.' : '✅ Không còn gì cần sửa.') +
+    msg(pre + (st.sua ? 'Sẽ sửa ' + st.sua + ' chuyến, chưa ghi gì.' : '✅ Không còn gì cần sửa.') +
       (st.canXem ? ' ' + st.canXem + ' chuyến cần xem.' : '') + (st.loi ? ' ' + st.loi + ' lỗi.' : ''), st.canXem || st.loi ? 'warn' : 'ok');
   }).catch(function (e) {
     if (e.futaLogin) { setFs(null); futaForm(e.message, function () { autoPlan(prefix); }); return; }
     if (/Sai mã mở khoá/.test(e.message)) { msg('❌ ' + MAY_CHU_CU, 'err'); return; }
-    msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err');
+    msg(pre + '❌ ' + e.message, 'err');
   }).then(function () { $('btnAuto').disabled = false; });
 }
 
 function renderAuto() {
   const st = AU.stats;
-  $('stats').innerHTML = [['Xe', st.xe, ''], ['Sẽ sửa', st.sua, 'e-warn'], ['Đã đúng', st.dung, 'e-ok'],
-    ['Cần xem / lỗi', st.canXem + st.loi, 'e-nopc']]
-    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>'; }).join('');
+  $('stats').innerHTML = chipHtml([['Xe', st.xe, ''], ['Sẽ sửa', st.sua, 'e-warn'], ['Đã đúng', st.dung, 'e-ok'], ['Cần xem / lỗi', st.canXem + st.loi, 'e-nopc']]);
 
-  const q = $('q').value.trim().toLowerCase();
-  const hit = function (r) { return !q || (r.plate + ' ' + r.code + ' ' + r.sched).toLowerCase().indexOf(q) !== -1; };
+  const q = norm($('q').value);
+  const hit = function (r) { return !q || norm(r.plate + ' ' + r.code + ' ' + r.sched).indexOf(q) !== -1; };
   const cell = function (r, label) {
     const d = r.diff.filter(function (x) { return x.label === label; })[0];
     return d ? '<td class="green">' + esc(d.from) + ' → ' + esc(d.to) + '</td>' : '<td></td>';
@@ -995,7 +1037,7 @@ $('out').addEventListener('click', function (ev) {
   $('btnAuto').disabled = true;
   msg('Đang lưu ' + AU.stats.sua + ' chuyến (có thể mất 1-3 phút, đừng đóng trang)...');
   const au = AU;
-  api({ action: 'autosave', fs: getFs(), planId: au.planId, label: au.sel.code, date: String(au.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
+  api({ action: 'autosave', fs: getFs(), planId: au.planId, label: au.sel.code, date: isoNgay(au.ngay) }, 360000, 0).then(function (r) {
     napBo(['load', 'lvc']); ovNen();   // giờ đã đổi: cập nhật số trên các ô
     const bad = r.verifyBad.concat(r.failed, r.skipped);
     const line = (bad.length || r.stopped ? '⚠️ ' : '✔ ') + 'Đã lưu + kiểm khớp ' + r.saved + ' chuyến (' + r.elapsed + 's)' +
@@ -1028,25 +1070,24 @@ $('plate').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(
 function kyPlan(prefix) {
   const s = sel();
   if (thieuSel(s)) return Promise.resolve();
-  const plate = $('plate').value.trim().toUpperCase();
+  const plate = $('plate').value.trim().toUpperCase(), pre = prefix ? prefix + '\n' : '';
+  ++VIEW_ID; MODE = 'ky'; KY = null; xoaMan(); syncView();   // như autoPlan
   $('btnKy').disabled = true;
-  msg((prefix ? prefix + '\n' : '') + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + ' (chưa ký gì)...');
-  $('out').innerHTML = ''; $('stats').innerHTML = '';
+  msg(pre + 'Đang đọc lệnh ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + ' (chưa ký gì)...');
   return api({ action: 'kyplan', ekey: getEkey(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
     if (!res.stats) throw new Error('Server chưa có action "kyplan". Dán ky.gs + web.gs + user.gs mới, rồi Deploy lại BẢN MỚI.');
-    KY = res; KY.sel = s; MODE = 'ky';
+    KY = res; KY.sel = s;
     renderKy();
     const st = res.stats;
-    msg((prefix ? prefix + '\n' : '') + (st.kyDuoc ? st.kyDuoc + ' lệnh ký được' + (prefix ? '.' : ', chưa ký gì.') : 'Không còn lệnh nào ký được lúc này.'), st.chuaDuoc ? 'info' : 'ok');
-  }).catch(function (e) { msg((prefix ? prefix + '\n' : '') + '❌ ' + e.message, 'err'); })
+    msg(pre + (st.kyDuoc ? st.kyDuoc + ' lệnh ký được' + (prefix ? '.' : ', chưa ký gì.') : 'Không còn lệnh nào ký được lúc này.'), st.chuaDuoc ? 'info' : 'ok');
+  }).catch(function (e) { msg(pre + '❌ ' + e.message, 'err'); })
     .then(function () { $('btnKy').disabled = false; });
 }
 
 function renderKy() {
   const st = KY.stats;
-  $('stats').innerHTML = [['Lệnh', st.lenh, ''], ['Ký được', st.kyDuoc, 'e-ok'], ['Đã ký', st.daKy, ''], ['Chưa ký được', st.chuaDuoc, 'e-nopc']]
-    .map(function (x) { return '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>'; }).join('');
-  const q = $('q').value.trim().toLowerCase(), only = $('onlyWarn').checked;
+  $('stats').innerHTML = chipHtml([['Lệnh', st.lenh, ''], ['Ký được', st.kyDuoc, 'e-ok'], ['Đã ký', st.daKy, ''], ['Chưa ký được', st.chuaDuoc, 'e-nopc']]);
+  const q = norm($('q').value), only = $('onlyWarn').checked;
   let out = '';
   if (KY.result) {
     const r = KY.result, bad = r.failed.concat(r.verifyBad, r.skipped);
@@ -1063,7 +1104,7 @@ function renderKy() {
   KY.rows.forEach(function (v) {
     const state = v.daKy ? 'da' : v.ok ? 'ok' : 'chua';
     if (only && state !== 'chua') return;
-    if (q && [v.xe, v.code, v.lai, v.lyDo.join(' ')].join(' ').toLowerCase().indexOf(q) === -1) return;
+    if (q && norm([v.xe, v.code, v.lai, v.lyDo.join(' ')].join(' ')).indexOf(q) === -1) return;
     const tag = { da: '✔ Đã ký', ok: '✅ Ký được', chua: '🔴 Chưa ký được' }[state];
     const notes = (state === 'da' ? [] : v.lyDo.map(function (x) { return '<div>❌ ' + esc(x) + '</div>'; }))
       .concat(v.canhBao.map(function (x) { return '<div>⚠️ ' + esc(x) + '</div>'; })).join('');
@@ -1090,7 +1131,7 @@ $('out').addEventListener('click', function (ev) {
   $('btnKy').disabled = true;
   msg('Đang ký ' + ok.length + ' lệnh (mỗi lệnh kiểm lại trước khi ký, đừng đóng trang)...');
   const ky = KY;
-  api({ action: 'kysave', ekey: getEkey(), kyId: ky.kyId, label: ky.sel.code, date: String(ky.ngay || '').split('/').reverse().join('-') }, 360000, 0).then(function (r) {
+  api({ action: 'kysave', ekey: getEkey(), kyId: ky.kyId, label: ky.sel.code, date: isoNgay(ky.ngay) }, 360000, 0).then(function (r) {
     napBo(['lvc']); ovNen();
     const bad = r.failed.length + r.verifyBad.length + r.skipped.length;
     const line = (bad || r.stopped ? '⚠️ ' : '✔ ') + 'Đã ký ' + r.signed.length + ' lệnh (' + r.elapsed + 's)' +
@@ -1166,12 +1207,38 @@ document.addEventListener('input', function (ev) { if (ev.target.id === 'ca2Moc'
 function openCa() {
   if (TAB !== 'ca') return;
   if (C2 && getFs()) { MODE = 'ca2'; renderCa2(); ca2Call({}, true); vebenCall({}, true); return; }
-  ca2Call({});
+  if (getFs()) ca2Call({}); else caCanFuta(true);   // chưa đăng nhập FUTA: cho xem ai đang bật trước, không bật khung đăng nhập che mất
 }
-// Chưa đăng nhập FUTA mà đóng khung đăng nhập: để lại 1 nút cho khỏi bơ vơ
-function caCanFuta() {
+// AI ĐANG BẬT CA NÀO, TUYẾN NÀO (anh dặn 11/11/2026: hiện ngay trên thẻ ca cho mọi người cùng theo dõi).
+// ds = sổ tuyến chung của máy chủ (ca_chu_xem_ trong ca2.gs): [{ tuyen, ten = tài khoản FUTA, minh = của mình }]. Gộp theo người, mình đứng đầu.
+function caAi(ds) {
+  const g = {};
+  (ds || []).forEach(function (e) { const k = (e.minh ? '0' : '1') + e.ten; (g[k] = g[k] || { ten: e.ten, minh: e.minh, tuyen: [] }).tuyen.push(String(e.tuyen)); });
+  const ks = Object.keys(g).sort();
+  if (!ks.length) return '<div class="ca-ai none">Chưa ai bật</div>';
+  return '<div class="ca-ai"><small>Đang bật</small>' + ks.map(function (k) {
+    const x = g[k];
+    return '<div><span class="ca-ng' + (x.minh ? ' minh' : '') + '"' + (x.minh ? '' : ' title="Chỉ tài khoản này tắt được"') + '>' + (x.minh ? '🟢 ' : '🔒 ') + esc(x.ten) + (x.minh ? ' (bạn)' : '') + '</span>' +
+      x.tuyen.sort(function (a, b) { return a.localeCompare(b, 'vi', { numeric: true }); }).map(function (t) { return '<i>' + esc(t) + '</i>'; }).join('') + '</div>';
+  }).join('') + '</div>';
+}
+// Chưa đăng nhập FUTA: vẫn XEM được ai đang bật ca (action "cachu", chỉ đọc, chỉ cần mã truy cập) + 1 nút đăng nhập để bật / tắt.
+// Máy chủ chưa có "cachu" (web.gs cũ) thì chỉ hiện nút đăng nhập như trước. hoiLuon: vừa bấm vào thẻ — không xem được thì bật khung đăng nhập luôn như bản cũ.
+let CA_XEM = null;
+function caCanFuta(hoiLuon) {
   MODE = 'none'; $('stats').innerHTML = ''; msg('');
-  $('out').innerHTML = '<div class="cta"><button type="button" class="edit-btn big" data-fu="ca">🔑 Đăng nhập FUTA để dùng Tự động</button></div>';
+  const ve = function () {
+    $('out').innerHTML = (CA_XEM ? '<div class="ca-cards ca-xem">' + [['☀️ Ca 1', CA_XEM.ca1], ['🌙 Ca 2', CA_XEM.ca2]].map(function (x) {
+      return '<div class="ca-card"><div class="ca-h"><b>' + x[0] + '</b></div>' + caAi(x[1]) + '</div>';
+    }).join('') + '</div>' : '') + '<div class="cta"><button type="button" class="edit-btn big" data-fu="ca">🔑 Đăng nhập FUTA để ' + (CA_XEM ? 'bật / tắt ca' : 'dùng Tự động') + '</button></div>';
+  };
+  ve();
+  const conCho = function () { return TAB === 'ca' && MODE === 'none' && !getFs() && $('out').querySelector('button[data-fu="ca"]'); };   // vẫn đang ở màn chờ đăng nhập
+  apiOnce({ action: 'cachu' }, 30000).then(function (res) {
+    if (res.chu) CA_XEM = res.chu;
+    if (!conCho()) return;
+    if (res.chu) ve(); else if (hoiLuon && $('box').hidden) ca2Call({});
+  }).catch(function () { if (hoiLuon && conCho() && $('box').hidden) ca2Call({}); });   // không xem được thì thôi, đăng nhập vẫn dùng bình thường
 }
 $('out').addEventListener('click', function (ev) { if (ev.target.closest && ev.target.closest('button[data-fu="ca"]')) ca2Call({}); });
 
@@ -1191,7 +1258,7 @@ function ca2Call(extra, bg) {
       C2 = Object.assign(res, { pick: keep }); if (keepXem && !C2.xem) C2.xem = keepXem; if (keepXem1 && !C2.xem1) C2.xem1 = keepXem1;
       if (op === 'on') C2_MOC = null;
       if (op === 'on' || op === 'on1') C2_DOI = false;
-      if (bg && (MODE !== 'ca2' || (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rpInput))) { ca2Mini(); ca2Bao(); ca2Poll(); return; }   // đang ở màn khác / đang gõ thêm tuyến: chỉ cập nhật chấm báo + báo trễ
+      if (TAB !== 'ca' || (bg && (MODE !== 'ca2' || (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rpInput)))) { ca2Mini(); ca2Bao(); ca2Poll(); return; }   // đang ở mục khác / màn khác / đang gõ thêm tuyến: chỉ cập nhật chấm báo + báo trễ
       MODE = 'ca2';
       renderCa2(); ca2Mini(); ca2Bao(); ca2Poll();
       if (!VB && vebenCo()) vebenCall({}, true);
@@ -1264,25 +1331,27 @@ function renderCa2() {
   if (C2.stopKy === true) out += '<div class="panel-note err">⛔ FUTA từ chối ký nên ca 2 đã dừng ký cả buổi (vẫn về bến + chỉnh lệnh). Xem nhật ký, ký tay trên FUTA.</div>';
   else if (C2.stopKy && C2.stopKy.length) out += '<div class="panel-note err">⛔ FUTA từ chối ký 3 lần, ca 2 thôi ký: <b>' + esc(C2.stopKy.join(', ')) + '</b>. Ký tay trên FUTA, xe khác vẫn ký bình thường.</div>';
   if (nTre) out += '<div class="panel-note err">⏰ ' + nTre + ' xe quá lịch chưa xuất bến.</div>';
-  const khac = [['Ca 1', (C2.chu || {}).ca1 || []], ['Ca 2', (C2.chu || {}).ca2 || []]].map(function (x) {
-    const r = x[1].filter(function (e) { return !e.minh; });
-    return r.length ? x[0] + ': ' + r.map(function (e) { return esc(e.tuyen) + ' (' + esc(e.ten) + ')'; }).join(', ') : '';
-  }).filter(Boolean);
-  if (khac.length) out += '<div class="panel-note">🔒 Người khác đang chạy, bạn không bật tắt được: ' + khac.join(' · ') + '</div>';
 
   // Chọn tuyến dùng chung cho 2 ca, bên dưới là 2 công tắc
   out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(c1.tuyen, sel().code ? [sel().code] : []), 'Tuyến') + '</div>';
+  // Thẻ ca 1 / ca 2 có khung "Đang bật": mọi tài khoản đang chạy ca đó + tuyến của từng người (tuyến của người khác thì mình không bật tắt được).
+  // Ca của mình đang bật mà sổ tuyến chưa có tên mình (hiếm) thì tự thêm cho khỏi thiếu.
+  const ai = function (ca, on, tuyen) {
+    const ds = ((C2.chu || {})[ca] || []).slice();
+    if (on && !ds.some(function (e) { return e.minh; })) tuyen.forEach(function (t) { ds.push({ tuyen: t, ten: C2.futa || '', minh: true }); });
+    return caAi(ds);
+  };
   const caThe = function (o) {
     return '<div class="ca-card' + (o.on ? ' on' : '') + '"><div class="ca-h"><b>' + o.ten + '</b>' + swHtml(o.on, o.ns || 'c2', o.on ? o.tat : o.bat, '') + '</div>' +
-      '<p>' + o.mo + '</p>' + (o.on ? '<p class="ca-tt">' + o.tt + '</p>' : '') +
+      '<p>' + o.mo + '</p>' + (o.ai || '') + (o.on && o.tt ? '<p class="ca-tt">' + o.tt + '</p>' : '') +
       '<div class="ca-btns">' + (o.on && C2_DOI && !cungTuyen(o.tuyen, C2.pick) ? '<button type="button" class="edit-btn" data-' + (o.ns || 'c2') + '="' + o.bat + '">Lưu tuyến</button>' : '') +
       (o.xem ? '<button type="button" class="edit-btn soft" data-c2="' + o.xem + '">👀 Xem thử</button>' : '') + (o.them || '') + '</div></div>';
   };
   out += '<div class="ca-cards">' +
-    caThe({ ten: '☀️ Ca 1', on: c1.on, bat: 'on1', tat: 'off1', xem: 'xem1', tuyen: c1.tuyen,
-      mo: esc(c1.gio) + ' tự về bến và chỉnh lệnh ca 1. Không ký.', tt: 'Tuyến ' + esc(c1.tuyen.join(', ')) }) +
-    caThe({ ten: '🌙 Ca 2', on: C2.on, bat: 'on', tat: 'off', xem: 'xem', tuyen: C2.tuyen,
-      mo: 'Từ 22:00, xe về hết thì tự chỉnh lệnh rồi ký.', tt: 'Tuyến ' + esc(C2.tuyen.join(', ')) + ' · ' + (C2.sau ? 'quét tới ' + esc(C2.sau) : 'đang canh xe về'),
+    caThe({ ten: '☀️ Ca 1', on: c1.on, bat: 'on1', tat: 'off1', xem: 'xem1', tuyen: c1.tuyen, ai: ai('ca1', c1.on, c1.tuyen),
+      mo: esc(c1.gio) + ' tự về bến và chỉnh lệnh ca 1. Không ký.' }) +
+    caThe({ ten: '🌙 Ca 2', on: C2.on, bat: 'on', tat: 'off', xem: 'xem', tuyen: C2.tuyen, ai: ai('ca2', C2.on, C2.tuyen),
+      mo: 'Từ 22:00, xe về hết thì tự chỉnh lệnh rồi ký.', tt: 'Ca của bạn: ' + (C2.sau ? 'quét tới ' + esc(C2.sau) : 'đang canh xe về'),
       them: C2.on ? '<button type="button" class="edit-btn soft" data-c2="run">▶️ Chạy ngay</button>' : '' }) +
     (VB && vebenCo() ? caThe({ ten: '🅿️ Về bến', ns: 'vb', on: VB.on, bat: 'on', tat: 'off', tuyen: VB.tuyen,
       mo: 'Mỗi 1 giờ tự xác nhận chuyến đã kết thúc, có giờ đến.', tt: 'Tuyến ' + esc(VB.tuyen.join(', ')) + (VB.sau ? ' · lượt sau ' + esc(VB.sau) : '') }) : '') + '</div>';
@@ -1322,7 +1391,6 @@ $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-c2]');
   if (!b || MODE !== 'ca2' || !C2) return;
   const act = b.getAttribute('data-c2'), tuyen = Array.from(C2.pick || []).join(', '), moc = ($('ca2Moc') || {}).value || '';
-  if (act === 'reload') { C2.pick = null; ca2Call({}); return; }
   if (act === 'off') { if (confirm('Tắt ca 2?')) ca2Call({ op: 'off' }); return; }
   if (act === 'off1') { if (confirm('Tắt ca 1?')) ca2Call({ op: 'off1' }); return; }
   if (act === 'run') {
@@ -1353,7 +1421,7 @@ RP.bt = { set: () => BTR, change: function () {
   if (MODE !== 'bt') return;
   renderBt(); btHen();
 } };
-function btHen() { clearTimeout(BT_T); BT_T = setTimeout(function () { if (MODE !== 'bt') return; if (document.body.classList.contains('is-busy')) btHen(); else btRun(); }, 900); }
+function btHen() { clearTimeout(BT_T); BT_T = setTimeout(function () { if (MODE !== 'bt') return; if (busy()) btHen(); else btRun(); }, 900); }
 function openBt() {
   if (TAB !== 'bt' || (MODE === 'bt' && BT)) return;
   MODE = 'bt'; renderBt(); syncView();
@@ -1397,8 +1465,9 @@ function btBlocks() { // mỗi bến của mỗi tuyến = 1 khối 2 cột, the
 }
 
 // Lưới 2 chiều dùng chung cho màn hình, copy và Excel. Dòng 0: "161 · Văn Thánh", dòng 1: GIỜ XB | BKS, sau đó là dữ liệu.
-function btGrid() {
-  const bl = btBlocks(), n = Math.max(0, ...bl.map(b => b.rows.length));
+function btGrid(bl) {
+  bl = bl || btBlocks();
+  const n = Math.max(0, ...bl.map(b => b.rows.length));
   const row = f => { const a = []; bl.forEach(function (b, i) { if (i) a.push(''); a.push.apply(a, f(b)); }); return a; };
   const g = [row(b => [b.tuyen + ' · ' + b.ten + ' (' + b.nXe + ' xe)', '']), row(() => ['GIỜ XB', 'BKS'])];
   for (let k = 0; k < n; k++) g.push(row(b => b.rows[k] ? [b.rows[k].gio, b.rows[k].xe] : ['', '']));
@@ -1418,7 +1487,7 @@ function renderBt() {
     head2 += (i ? gap : '') + '<th>GIỜ XB</th><th>BKS</th>';
   });
   let body = '';
-  btGrid().slice(2).forEach(function (r, k) {
+  btGrid(bl).slice(2).forEach(function (r, k) {
     body += '<tr>' + r.map(function (v, j) {
       const c = j % 3; // 0 = giờ, 1 = BKS, 2 = cột trống
       if (c === 2) return gapd;
@@ -1454,7 +1523,7 @@ $('btnXlsx').onclick = function () {
   if (MODE !== 'bt' || !BT) return;
   $('btnXlsx').disabled = true; msg('Đang tạo file Excel...');
   loadExcelJS().then(function (ExcelJS) {
-    const g = btGrid(), bl = btBlocks(), nBlk = bl.length;
+    const bl = btBlocks(), g = btGrid(bl), nBlk = bl.length;
     const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Bảng tài', { views: [{ state: 'frozen', ySplit: 2 }] });
     const font = { name: 'Times New Roman', size: 12 }, mid = { horizontal: 'center', vertical: 'middle' };
     const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + argb } });
@@ -1562,7 +1631,7 @@ function gpsAuto() {   // đổi tuyến là tự tìm lại (đợi chút cho c
   clearTimeout(GPS_T);
   GPS_T = setTimeout(function () {
     if (MODE !== 'gps') return;
-    if (document.body.classList.contains('is-busy')) { gpsAuto(); return; }
+    if (busy()) { gpsAuto(); return; }
     if (GPSR.size) gpsFind(); else { GP = null; renderGps(); }
   }, 900);
 }
@@ -1573,13 +1642,13 @@ function gpsRoutes() { // tuyến đã chọn -> [{id, code}] (bỏ mã không c
 const gpsCodes = list => list.map(r => r.code).join(', ');
 
 $('btnGps').onclick = function () {
-  if (GPS_RUN) { GP = GPS_RUN; MODE = 'gps'; renderGps(); msg('🛰 Đang chụp GPS tuyến ' + GP.sent.codes + ', xong sẽ báo ở đây.', 'info'); return; }
+  if (GPS_RUN) { ++VIEW_ID; GP = GPS_RUN; MODE = 'gps'; renderGps(); msg('🛰 Đang chụp GPS tuyến ' + GP.sent.codes + ', xong sẽ báo ở đây.', 'info'); return; }
   if (!isoDate()) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
   if (!ROUTES.length) { msg('Danh sách tuyến đang tải, chờ vài giây rồi bấm lại.', 'info'); return; }
   const s = sel();
   if (s.code && !GPSR.has(s.code)) GPSR.add(s.code); // tuyến đang mở luôn được chọn thêm
   localStorage.setItem('gps_routes', JSON.stringify(Array.from(GPSR)));
-  MODE = 'gps';
+  ++VIEW_ID; MODE = 'gps';
   if (GP && GP.iso !== isoDate()) GP = null;
   if (!GPSR.size) { GP = null; renderGps(); msg('Chọn tuyến cần chụp GPS.', 'info'); return; }
   gpsFind();
@@ -1589,32 +1658,31 @@ function gpsFind() {
   const list = gpsRoutes(), iso = isoDate();
   if (!iso) { msg('❌ Ngày gõ dạng dd/mm/yyyy.', 'err'); return; }
   if (!list.length) { msg('❌ Chưa chọn tuyến nào để chụp GPS.', 'err'); return; }
-  MODE = 'gps';
+  const id = ++VIEW_ID; MODE = 'gps';
   if (!GP || GP.iso !== iso) { GP = null; $('stats').innerHTML = ''; }
-  GPS_FINDING = true; renderGps();
+  renderGps();
   msg('Đang tìm chuyến mất của ' + gpsCodes(list) + '...');
   gToken(50).then(function (gtok) { // xin token Google ngay lúc bấm (đủ dài cho cả lần chụp sau)
     return apiPost({ action: 'gps', dry: '1', gtok: gtok, routes: JSON.stringify(list), routeId: list[0].id, label: list.map(r => r.code).join('+'), date: iso }, 180000);
   }).then(function (res) {
     if (!res.trips) throw new Error('Server chưa có action "gps". Dán gps.gs, thêm router vào Web.gs, rồi Deploy lại BẢN MỚI.');
     if (!res.routes) throw new Error('Máy chủ chưa có bản chụp GPS nhiều tuyến. Dán gps.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
+    if (id !== VIEW_ID) return;   // đã sang màn khác (lúc chờ cửa sổ Google nút chưa khoá)
     const old = GP && GP.iso === iso ? GP : null;
     GP = res; GP.iso = iso; GP.list = list; GP.run = null; GP.filter = old ? old.filter : 'all';
     GP.pick = new Set(res.trips.filter(t => t.chup && !t.daCo && !t.matGps && !t.dangChup && !isDx(t)).map(t => t.key)); // tick sẵn: mất chuyến chưa có ảnh
-    const nDx = res.trips.filter(isDx).length;
     if (!res.trips.length) msg('✅ Không có chuyến mất nào.', 'ok');
     else msg('Đã tick sẵn ' + GP.pick.size + ' chuyến chưa có ảnh, bấm 🛰 Chụp.', 'ok');
-  }).catch(function (e) { msg('❌ ' + e.message, 'err'); })
-    .then(function () { GPS_FINDING = false; if (MODE === 'gps') renderGps(); });
+  }).catch(function (e) { if (id === VIEW_ID) msg('❌ ' + e.message, 'err'); })
+    .then(function () { if (id === VIEW_ID && MODE === 'gps') renderGps(); });
 }
-let GPS_FINDING = false;
 
 const MAT_CHUYEN_URL = 'https://docs.google.com/spreadsheets/d/1ysOVfyktQ5p-zlI0L2ZduG8uPneZkJZ3ZHoI7ZZ1KBg/edit?gid=1226700115#gid=1226700115'; // báo cáo mất chuyến
 function gpsVisible(t) {
-  const q = $('q').value.trim().toLowerCase();
+  const q = norm($('q').value);
   if (GP.filter === 'mat' && isDx(t)) return false;
   if (GP.filter === 'dexuat' && !isDx(t)) return false;
-  return !q || [t.tuyen, t.xe, t.lich, t.ben, t.ma, t.taiXe, t.tiepVien].join(' ').toLowerCase().indexOf(q) !== -1;
+  return !q || norm([t.tuyen, t.xe, t.lich, t.ben, t.ma, t.taiXe, t.tiepVien].join(' ')).indexOf(q) !== -1;
 }
 function renderGps() {
   // 1) ô chọn tuyến (đổi tuyến là tự tìm lại)
@@ -1623,8 +1691,7 @@ function renderGps() {
 
   // 2) số liệu: mất chuyến / đề xuất đã có ở nút lọc, ở đây chỉ thêm khi có
   const T = GP.trips, nDx = T.filter(isDx).length, daCo = T.filter(t => t.daCo).length, nMatGps = T.filter(t => t.matGps).length;
-  $('stats').innerHTML = [['Đã có ảnh', daCo, 'e-ok'], ['Mất GPS', nMatGps, 'e-noebms']].filter(x => x[1])
-    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
+  $('stats').innerHTML = chipHtml([['Đã có ảnh', daCo, 'e-ok'], ['Mất GPS', nMatGps, 'e-noebms']].filter(x => x[1]));
 
   // 3) thanh nút: link Sheet + lọc loại + nút Chụp
   const r = GP.run, sheet = GP.sheet || (r && r.sheet), other = GPS_RUN && GPS_RUN !== GP;
@@ -1691,7 +1758,7 @@ $('out').addEventListener('click', function (ev) {
     return apiPost({ action: 'gps', gtok: gtok, routes: JSON.stringify(routes), routeId: routes[0].id, label: routes.map(r => r.code).join('+'),
                      date: g.iso, keys: picked.map(t => t.key).join('\n') }, 180000);
   }).then(function (res) {
-    if (!res.started) { msg('⚠️ Không có chuyến nào để chụp (danh sách vừa đổi, bấm 🔎 Tìm lại).', 'err'); b.disabled = false; return; }
+    if (!res.started) { msg('⚠️ Không có chuyến nào để chụp (danh sách vừa đổi, bấm 🔄 Lấy mới).', 'err'); b.disabled = false; return; }
     g.sent = { n: res.nChup, codes: gpsCodes(routes), routes: routes, picked: picked };
     g.run = { status: 'queued', n: res.runs || 1 }; GPS_RUN = g;
     picked.forEach(t => { if (!t.daCo) t.dangChup = true; });
@@ -1728,6 +1795,7 @@ $('out').addEventListener('change', function (ev) {
 $('btnUndo').onclick = function () { undoList(); };
 
 function undoList(note, cls) {
+  ++VIEW_ID;   // như autoPlan: bỏ kết quả đọc nền của màn trước
   msg(note ? note + '\nĐang tải danh sách lần lưu...' : 'Đang tải danh sách lần lưu...');
   return api({ action: 'undo', op: 'list', ekey: getEkey(), fs: getFs() }, 60000).then(function (res) {
     if (!res.list) throw new Error('Server chưa có action "undo". Dán edit.gs + web.gs mới, rồi Deploy lại BẢN MỚI.');
@@ -1742,12 +1810,11 @@ function undoList(note, cls) {
 
 function renderUndo() {
   const L = UD.list, done = L.filter(x => x.done).length;
-  $('stats').innerHTML = [['Lần lưu', L.length, 'e-n'], ['Hoàn tác được', L.length - done, 'e-warn'], ['Đã hoàn tác', done, 'e-ok']]
-    .map(x => '<div class="stat ' + x[2] + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
-  const q = $('q').value.trim().toLowerCase();
+  $('stats').innerHTML = chipHtml([['Lần lưu', L.length, 'e-n'], ['Hoàn tác được', L.length - done, 'e-warn'], ['Đã hoàn tác', done, 'e-ok']]);
+  const q = norm($('q').value);
   let body = '';
   L.forEach(function (x) {
-    if (q && [x.who, x.kind, x.tuyen, x.ngay, x.xe, x.of].join(' ').toLowerCase().indexOf(q) === -1) return;
+    if (q && norm([x.who, x.kind, x.tuyen, x.ngay, x.xe, x.of].join(' ')).indexOf(q) === -1) return;
     const st = x.done ? '✅ Đã hoàn tác ' + x.done + (x.doneWho ? ' (' + x.doneWho + ')' : '') : x.of ? '↩️ Là lần hoàn tác của: ' + x.of : 'Có thể hoàn tác';
     body += '<tr class="' + (x.done ? 'e-ok' : '') + '"><td>' + esc(x.at) + '<br><small class="muted">hạn ' + esc(x.het || '23:55') + '</small></td><td class="left">' + esc(x.who) + '</td><td class="left">' + esc(x.kind) +
       '</td><td>' + esc(x.tuyen) + '</td><td>' + esc(x.ngay) + '</td><td class="left">' + esc(x.xe) + '</td><td>' + esc(x.nTrip) + ' chuyến · ' + esc(x.nField) + ' ô' +
@@ -1778,7 +1845,7 @@ $('out').addEventListener('click', function (ev) {
 // ↩️ Hoàn tác / ↪️ Làm lại (ở màn Hoàn tác hoặc thanh "Lỡ tay?" ngay sau khi lưu)
 document.addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('[data-undo]');
-  if (!b || document.body.classList.contains('is-busy')) return;
+  if (!b || busy()) return;
   undoRun(b.dataset.undo);
 });
 function undoRun(id) {
@@ -1825,7 +1892,7 @@ let LAST_BTN = null, LAST_RO = null, FRESH_UNTIL = 0, LAST_CHECK = null;
 const RO_BTN = { btnOv: 1, btnLoad: 1, btnEbms: 1, btnNv: 1, btnLvc: 1, btnGps: 1 };   // tác vụ chỉ đọc (máy chủ dùng chung kết quả 30–60 giây)
 const RO_ACT = { load: 1, ebms: 1, nv: 1, lvc: 1, bangtai: 1, gps: 1 };
 document.addEventListener('click', function (e) {
-  if (!e.target.closest || document.body.classList.contains('is-busy') || e.target.closest('#box')) return;
+  if (!e.target.closest || busy() || e.target.closest('#box')) return;
   const nb = e.target.closest('.act, .edit-btn.big, [data-undo]');
   if (nb) LAST_BTN = nb;
   const b = e.target.closest('.act');
@@ -1837,7 +1904,7 @@ document.addEventListener('click', function (e) {
   else LAST_RO = b.id;
 }, true);
 $('btnFresh').onclick = function () {
-  if (document.body.classList.contains('is-busy')) return;
+  if (busy()) return;
   FRESH_UNTIL = Date.now() + 3000; // các lượt gọi trong 3 giây tới bỏ cache (nocache=1)
   if (MODE === 'gps' && LAST_RO === 'btnGps') gpsFind();
   else if (MODE === 'bt') btRun();
@@ -1949,7 +2016,7 @@ $('authX').onclick = hideAuth;
 $('btnLogout').onclick = function () {
   apiPost({ action: 'logout' }, 30000).catch(function () {});
   localStorage.removeItem('web_sid'); setMe(null);
-  $('out').innerHTML = ''; $('stats').innerHTML = ''; msg('Đã đăng xuất');
+  xoaMan(); msg('Đã đăng xuất');
   showAuth('login');
 };
 
@@ -1978,7 +2045,7 @@ $('btnLogout').onclick = function () {
       if (params && params._nen) { args[0] = Object.assign({}, params); delete args[0]._nen; }
       if (params && RO_ACT[params.action] && Date.now() < FRESH_UNTIL) args[0] = Object.assign({}, args[0], { nocache: '1' }); // 🔄 Lấy mới
       return Promise.resolve(fn.apply(this, args)).then(function (res) {
-        if (res && res.at) showDataAt(res.at);
+        if (res && res.at && !(params && (params._nen || params.action === 'routes'))) showDataAt(res.at);   // đọc nền: màn nào vẽ thì màn đó tự ghi giờ
         return res;
       }).finally(function () { if (track) { n--; mark(); } });
     };
@@ -1987,7 +2054,7 @@ $('btnLogout').onclick = function () {
   // chặn cả bấm chuột lẫn Enter (Enter gọi .click() nên cũng đi qua đây)
   document.addEventListener('click', function (ev) {
     const b = ev.target.closest && ev.target.closest(BTN);
-    if (!b || b.hasAttribute('data-rp-act') || !document.body.classList.contains('is-busy')) return; // nút chọn tuyến chỉ đổi lựa chọn trên máy, không khoá
+    if (!b || b.hasAttribute('data-rp-act') || !busy()) return; // nút chọn tuyến chỉ đổi lựa chọn trên máy, không khoá
     ev.preventDefault(); ev.stopImmediatePropagation();
   }, true);
 })();
@@ -1996,7 +2063,7 @@ $('btnLogout').onclick = function () {
 function showDataAt(at) {
   const t = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(at));
   const ago = Math.round((Date.now() - at) / 1000);
-  $('dataAt').textContent = '🕒 Dữ liệu lúc ' + t + (ago >= 5 ? ' (' + ago + ' giây trước)' : '');
+  $('dataAt').textContent = t + (ago >= 5 ? ' (' + ago + ' giây trước)' : '');   // chữ "🕒 Dữ liệu lúc" nằm ở style.css (điện thoại chỉ hiện 🕒)
   $('btnFresh').hidden = !LAST_RO;
 }
 

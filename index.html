@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=52">
+<link rel="stylesheet" href="style.css?v=55">
 </head>
-<body>
+<body data-tab="xem">
 
 <header class="bar">
   <div class="bar-in">
@@ -31,7 +31,7 @@
     </div>
     <!-- 3 mục chính. Máy tính: trên thanh đầu trang; điện thoại: thanh dưới đáy màn hình -->
     <nav class="tabs" role="tablist" aria-label="Chức năng">
-      <button type="button" class="tab" data-tab="xem" role="tab"><i>🚌</i>Tuyến</button>
+      <button type="button" class="tab on" data-tab="xem" role="tab"><i>🚌</i>Tuyến</button>
       <button type="button" class="tab" data-tab="ca" role="tab"><i>🌙</i><span>Tự động<span class="tab-dot" id="caDot" hidden></span></span></button>
       <button type="button" class="tab" data-tab="bt" role="tab"><i>🗂</i>Bảng tài</button>
     </nav>
@@ -47,9 +47,9 @@
       <button id="btnOv" class="act card"><span>Tổng quan</span><b id="nOv">–</b><small id="sOv">xe cần xử lý</small></button>
       <button id="btnLoad" class="act card"><span>Giờ chạy</span><b id="nLoad">–</b><small id="sLoad">chuyến lỗi</small></button>
       <button id="btnGps" class="act card"><span>Mất chuyến</span><b id="nGps">–</b><small id="sGps">chụp GPS</small></button>
-      <button id="btnLvc" class="act card"><span>Lệnh</span><b id="nLvc">–</b><small id="sLvc">bấm để kiểm tra</small></button>
-      <button id="btnEbms" class="act card"><span>EBMS</span><b id="nEbms">–</b><small id="sEbms">bấm để so sánh</small></button>
-      <button id="btnNv" class="act card"><span>Nhân viên</span><b id="nNv">–</b><small id="sNv">bấm để trích xuất</small></button>
+      <button id="btnLvc" class="act card"><span>Lệnh</span><b id="nLvc">–</b><small id="sLvc">bấm kiểm tra</small></button>
+      <button id="btnEbms" class="act card"><span>EBMS</span><b id="nEbms">–</b><small id="sEbms">bấm so sánh</small></button>
+      <button id="btnNv" class="act card"><span>Nhân viên</span><b id="nNv">–</b><small id="sNv">bấm trích xuất</small></button>
     </div>
     <div class="doing">
       <div class="field"><div class="inbox"><input type="text" id="plate" aria-label="Biển số xe" placeholder="Biển số (trống = cả tuyến)" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div></div>
@@ -81,16 +81,17 @@
     <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..." autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="q" tabindex="-1" aria-label="Xoá">×</button></div>
     <label class="nd" id="ndBox" hidden>Người đo cồn <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam"></label>
     <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ dòng cần xem</label>
+    <button type="button" class="btn-soft" id="btnEbFull" hidden title="So sánh EBMS: đổi giữa bảng gọn (lịch chạy, đầu bến, giờ đi, giờ đến) và bảng đủ cột">📋 Chi tiết</button>
     <div class="tb-right">
       <span class="data-at" id="dataAt"></span>
-      <button class="btn-soft btn-fresh" id="btnFresh" hidden title="Bỏ dữ liệu dùng chung (máy chủ nhớ 30–60 giây), đọc mới từ hệ thống">🔄 Lấy mới</button>
-      <button class="btn-soft" id="btnCopy" style="display:none">📋 Copy</button>
-      <button class="btn-soft btn-solid" id="btnXlsx" style="display:none">⬇️ Excel</button>
+      <button class="btn-soft btn-fresh" id="btnFresh" hidden title="Bỏ dữ liệu dùng chung (máy chủ nhớ 30–60 giây), đọc mới từ hệ thống">🔄<span> Lấy mới</span></button>
+      <button class="btn-soft" id="btnCopy" hidden>📋 Copy</button>
+      <button class="btn-soft btn-solid" id="btnXlsx" hidden>⬇️ Excel</button>
     </div>
   </div>
 
   <details class="rules" id="lvcRules" hidden>
-    <summary><h4>📋 Tiêu chí kiểm tra lệnh vận chuyển <small>(bấm để xem / ẩn)</small></h4></summary>
+    <summary><h4>📋 Tiêu chí kiểm tra lệnh vận chuyển</h4></summary>
     <ol>
       <li><b>GPLX theo sức chứa:</b> xe 60 chỗ cần hạng <b>E hoặc D</b>; xe 30 chỗ cần <b>D2, E hoặc D</b>.</li>
       <li><b>Đăng kiểm:</b> hạn đăng kiểm phải <b>sau thời điểm hiện tại</b>.</li>
@@ -189,7 +190,7 @@
   </div>
 </div>
 
-<script src="app.js?v=52"></script>
+<script src="app.js?v=55"></script>
 <script src="lapbt.js?v=48"></script>
 </body>
 </html>
