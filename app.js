@@ -394,12 +394,56 @@ function moXem(mode, action, cho, ve, extra, ms) {
 }
 // Tải ngầm giờ chạy + lệnh để các ô có số và màn Tổng quan ghép được theo xe
 function ovNen() {
+  dayNen();
   const s = sel(); if (!s.id || !isoDate()) return;
   const xong = function (res) { ovCards(); if (MODE !== 'ov') return; if (res && res.at && res._key === curKey()) showDataAt(res.at); renderOv(); };
   LV_LOI = '';
   nap('load', s).then(xong, function (e) { ovCards(); if (MODE === 'ov') msg('❌ ' + e.message, 'err'); });
   nap('lvc', s, null, 180000).then(xong, function () { LV_LOI = s.id + '|' + isoDate(); xong(); });
 }
+// ===== ĐẨY LỆNH (anh dặn 18/11/2026): lệnh ngày D phải ĐẨY ("Đã xác nhận hoàn thành" trên trang Lệnh vận chuyển điện tử) trước 12:00 ngày D+2.
+// Chọn / đổi tuyến: đọc ngầm lệnh HÔM KIA (tính theo HÔM NAY, không theo ô ngày) rồi báo lệnh nào chưa đẩy. Chỉ đọc, không bấm gì trên FUTA.
+// Máy chủ cũ (chưa có lvcday) trả không có "ngay" -> ẩn dải, web vẫn chạy bình thường.
+const DAY = {}, DAY_TTL = 120000;
+let DAY_KEY = '';   // tuyến + hôm nay đang hiện trên dải: kết quả của tuyến cũ về muộn thì bỏ
+function vnTodayIso() { const t = vnToday(); return t.slice(6) + '-' + t.slice(3, 5) + '-' + t.slice(0, 2); }
+function dayNen() {
+  const s = sel(), bar = $('dayBar');
+  if (!s.id) { DAY_KEY = ''; bar.hidden = true; return; }
+  const hn = vnTodayIso(), key = DAY_KEY = s.id + '|' + hn, c = DAY[key];
+  if (c && c.res && Date.now() - c.at < DAY_TTL && Date.now() >= FRESH_UNTIL) { dayVe(c.res, s); return; }
+  bar.hidden = false; bar.className = 'day-bar busy'; bar.textContent = '📤 Đang xem lệnh hôm kia của tuyến ' + s.code + ' đã đẩy chưa...';
+  if (c && c.cho) return;   // đang đọc rồi: chờ lượt đó vẽ
+  const me = DAY[key] = { cho: true, at: Date.now() };
+  api({ _nen: 1, action: 'lvcday', routeId: s.id, label: s.code, date: hn }, 90000, 1).then(function (res) {
+    me.cho = false; me.at = Date.now();
+    if (!res.ngay) { delete DAY[key]; if (DAY_KEY === key) bar.hidden = true; return; }   // máy chủ cũ
+    me.res = res;
+    if (DAY_KEY === key) dayVe(res, s);
+  }).catch(function (e) {
+    if (DAY[key] === me) delete DAY[key];
+    if (DAY_KEY === key) { bar.className = 'day-bar err'; bar.textContent = '📤 Chưa xem được lệnh hôm kia đã đẩy chưa: ' + e.message; }
+  });
+}
+function dayVe(r, s) {
+  const bar = $('dayBar'), dau = '📤 Lệnh ngày <b>' + esc(r.ngay.slice(0, 5)) + '</b> · tuyến ' + esc(s.code) + ': ';
+  bar.hidden = false;
+  if (!r.total) { bar.className = 'day-bar'; bar.innerHTML = dau + 'không có lệnh'; return; }
+  if (!r.chua.length) { bar.className = 'day-bar ok'; bar.innerHTML = dau + '✅ đã đẩy đủ ' + r.total + ' lệnh'; return; }
+  const nhom = {};
+  r.chua.forEach(function (x) { (nhom[x.ten] = nhom[x.ten] || []).push(x); });
+  bar.className = 'day-bar ' + (r.qua ? 'err' : 'warn');
+  bar.innerHTML = '<details data-k="day"' + (DAY_MO ? ' open' : '') + '><summary>' + dau + '<b>' + r.chua.length + '/' + r.total + ' lệnh chưa đẩy</b> · ' +
+    (r.qua ? '⛔ đã quá hạn ' : '⏳ hạn ') + esc(r.han) + '</summary><div class="day-list">' +
+    Object.keys(nhom).map(function (t) {
+      return '<div><span class="day-tag">' + esc(t) + ' ' + nhom[t].length + '</span>' + nhom[t].map(function (x) {
+        const so = (String(x.code).split('-')[2] || '');
+        return '<span class="day-it" title="' + esc(x.code) + '">' + esc(x.xe) + (so ? ' <i>#' + esc(so) + '</i>' : '') + '</span>';
+      }).join('') + '</div>';
+    }).join('') + '<small>Đẩy trên FUTA: Lệnh vận chuyển điện tử → Xác nhận hoàn thành. Web chỉ xem, không bấm gì.</small></div></details>';
+}
+$('dayBar').addEventListener('toggle', function (ev) { if (ev.target.dataset && ev.target.dataset.k === 'day') DAY_MO = ev.target.open; }, true);
+let DAY_MO = false;
 function ovThe(id, n, sub, muc) { $('n' + id).textContent = n; $('s' + id).textContent = sub; $('btn' + id).dataset.m = muc || ''; }
 function ovCards() {
   const key = curKey(), co = x => x && x._key === key && key, cho = a => NAP[a] && NAP[a].key === key && NAP[a].cho;
@@ -909,10 +953,10 @@ function openBox(ten, khongDong) {
   $('boxX').hidden = !!khongDong;
   $('box').hidden = false;
 }
-function closeBox() { $('box').hidden = true; FU_NEXT = null; }
+function closeBox() { $('box').hidden = true; FU_NEXT = null; CP = null; }
 $('boxX').onclick = closeBox;
 $('box').addEventListener('mousedown', function (ev) { if (ev.target === $('box') && !$('boxX').hidden) closeBox(); });
-document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !$('box').hidden && !$('boxX').hidden) closeBox(); });
+document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !ev.defaultPrevented && !$('box').hidden && !$('boxX').hidden) closeBox(); });
 
 function openHello(loi) {
   $('hKey').value = getKey(); $('hWho').value = getWho(); $('hErr').textContent = loi ? '❌ ' + loi : '';
@@ -1146,7 +1190,6 @@ $('out').addEventListener('click', function (ev) {
 // Bật = quét + xác nhận ngay 1 lần, rồi máy chủ tự quét mỗi 1 giờ. Chỉ bấm chuyến đã Kết thúc + đã có giờ đến. Dùng chung ô chọn tuyến với ca.
 let VB = null, VB_XEM = null;
 const vebenCo = () => !$('tabLap').hidden && !!getEkey();
-function vebenHen() { clearTimeout(VB_XEM); if (vebenCo()) VB_XEM = setTimeout(function () { if (MODE === 'ca2' && C2) vebenCall({}, true); }, 1000); }
 function vebenCall(extra, bg) {
   if (!vebenCo()) return Promise.resolve();
   const xem = C2 && C2.pick ? Array.from(C2.pick).join(',') : '';
@@ -1165,7 +1208,6 @@ const VB_TEN = { xong: 'ĐÃ VỀ BẾN', veben: 'CHỜ XÁC NHẬN', chay: 'ĐA
 function swHtml(on, ns, act, ten) {
   return '<button type="button" class="sw' + (on ? ' on' : '') + '" role="switch" aria-checked="' + on + '" data-' + ns + '="' + act + '"><i></i><span>' + (ten ? ten + (on ? ' đang bật' : ' đang tắt') : (on ? 'Đang bật' : 'Đang tắt')) + '</span></button>';
 }
-const cungTuyen = (a, set) => a.length === set.size && a.every(c => set.has(c));
 // Phần về bến thu gọn dưới màn Tự động: xe chưa về + nhật ký
 function vebenChiTiet() {
   if (!VB || !vebenCo()) return '';
@@ -1188,10 +1230,7 @@ $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-vb]');
   if (!b || MODE !== 'ca2' || !C2) return;
   if (b.getAttribute('data-vb') === 'off') { if (confirm('Tắt tự xác nhận về bến?')) vebenCall({ set: 'off' }); return; }
-  const tuyen = Array.from(C2.pick || []).join(', ');
-  if (!tuyen) { msg('❌ Chọn ít nhất 1 tuyến', 'err'); return; }
-  if (!confirm('Bật tự xác nhận về bến cho tuyến ' + tuyen + '?\nĐã xác nhận thì không huỷ kết thúc chuyến được nữa.')) return;
-  vebenCall({ set: 'on', tuyen: tuyen });
+  caHoi('vb');
 });
 
 // ===== CA 2 TỰ ĐỘNG (gọi ca2 trong ca2.gs) — MỤC RIÊNG, không chung nhóm nút Sửa lệnh =====
@@ -1200,8 +1239,7 @@ $('out').addEventListener('click', function (ev) {
 // Mỗi lượt: xác nhận về bến -> XE NÀO VỀ HẾT thì edit lệnh ca 2 (+ lệnh ca 1 bị đỏ) rồi ký; xe đang chạy để yên. Ký hết thì tự tắt.
 const C2_NHOM = [['tre', 'c2-tre'], ['chay', 'c2-chay'], ['chua_chay', 'c2-chua'], ['veben', 'c2-veben'], ['xong', 'c2-xong'], ['seky', 'c2-xong'], ['loi', 'c2-loi'], ['ky', 'c2-ky']];
 const C2_TEN = { seky: 'SẼ KÝ (xem thử)', loi: 'ĐÃ VỀ BẾN, chưa ký được' };
-let C2_TIMER = null, C2_MOC = null, C2_DOI = false;   // C2_MOC: giờ quét đang sửa dở (màn tự cập nhật không làm mất); C2_DOI: người dùng vừa đổi tuyến, chưa lưu
-RP.ca2 = { set: () => C2.pick, change: function () { C2_DOI = true; if (MODE === 'ca2' && C2) { renderCa2(); vebenHen(); } } };
+let C2_TIMER = null, C2_MOC = null;   // C2_MOC: giờ quét đang sửa dở (màn tự cập nhật không làm mất)
 document.addEventListener('input', function (ev) { if (ev.target.id === 'ca2Moc') C2_MOC = ev.target.value; });
 // Bấm thẻ 🌙 Tự động: đã có màn thì hiện ngay rồi cập nhật ngầm, chưa có thì tải
 function openCa() {
@@ -1257,7 +1295,6 @@ function ca2Call(extra, bg) {
       const keep = C2 && C2.pick && op !== 'on' && op !== 'on1' ? C2.pick : null, keepXem = op === 'status' && C2 ? C2.xem : null, keepXem1 = op === 'status' && C2 ? C2.xem1 : null;
       C2 = Object.assign(res, { pick: keep }); if (keepXem && !C2.xem) C2.xem = keepXem; if (keepXem1 && !C2.xem1) C2.xem1 = keepXem1;
       if (op === 'on') C2_MOC = null;
-      if (op === 'on' || op === 'on1') C2_DOI = false;
       if (TAB !== 'ca' || (bg && (MODE !== 'ca2' || (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rpInput)))) { ca2Mini(); ca2Bao(); ca2Poll(); return; }   // đang ở mục khác / màn khác / đang gõ thêm tuyến: chỉ cập nhật chấm báo + báo trễ
       MODE = 'ca2';
       renderCa2(); ca2Mini(); ca2Bao(); ca2Poll();
@@ -1332,8 +1369,7 @@ function renderCa2() {
   else if (C2.stopKy && C2.stopKy.length) out += '<div class="panel-note err">⛔ FUTA từ chối ký 3 lần, ca 2 thôi ký: <b>' + esc(C2.stopKy.join(', ')) + '</b>. Ký tay trên FUTA, xe khác vẫn ký bình thường.</div>';
   if (nTre) out += '<div class="panel-note err">⏰ ' + nTre + ' xe quá lịch chưa xuất bến.</div>';
 
-  // Chọn tuyến dùng chung cho 2 ca, bên dưới là 2 công tắc
-  out += '<div class="gp-top">' + rpHtml('ca2', C2.pick, C2.tuyen.concat(c1.tuyen, sel().code ? [sel().code] : []), 'Tuyến') + '</div>';
+  // Tuyến chọn trong khung hỏi khi bấm bật (caHoi, tối đa CA_MAX tuyến) — không còn hàng chọn tuyến chung trên màn (18/11/2026)
   // Thẻ ca 1 / ca 2 có khung "Đang bật": mọi tài khoản đang chạy ca đó + tuyến của từng người (tuyến của người khác thì mình không bật tắt được).
   // Ca của mình đang bật mà sổ tuyến chưa có tên mình (hiếm) thì tự thêm cho khỏi thiếu.
   const ai = function (ca, on, tuyen) {
@@ -1344,7 +1380,7 @@ function renderCa2() {
   const caThe = function (o) {
     return '<div class="ca-card' + (o.on ? ' on' : '') + '"><div class="ca-h"><b>' + o.ten + '</b>' + swHtml(o.on, o.ns || 'c2', o.on ? o.tat : o.bat, '') + '</div>' +
       '<p>' + o.mo + '</p>' + (o.ai || '') + (o.on && o.tt ? '<p class="ca-tt">' + o.tt + '</p>' : '') +
-      '<div class="ca-btns">' + (o.on && C2_DOI && !cungTuyen(o.tuyen, C2.pick) ? '<button type="button" class="edit-btn" data-' + (o.ns || 'c2') + '="' + o.bat + '">Lưu tuyến</button>' : '') +
+      '<div class="ca-btns">' + (o.on ? '<button type="button" class="edit-btn soft" data-' + (o.ns || 'c2') + '="' + o.bat + '">✏️ Đổi tuyến</button>' : '') +
       (o.xem ? '<button type="button" class="edit-btn soft" data-c2="' + o.xem + '">👀 Xem thử</button>' : '') + (o.them || '') + '</div></div>';
   };
   out += '<div class="ca-cards">' +
@@ -1390,24 +1426,69 @@ function renderCa2() {
 $('out').addEventListener('click', function (ev) {
   const b = ev.target.closest && ev.target.closest('button[data-c2]');
   if (!b || MODE !== 'ca2' || !C2) return;
-  const act = b.getAttribute('data-c2'), tuyen = Array.from(C2.pick || []).join(', '), moc = ($('ca2Moc') || {}).value || '';
+  const act = b.getAttribute('data-c2');
   if (act === 'off') { if (confirm('Tắt ca 2?')) ca2Call({ op: 'off' }); return; }
   if (act === 'off1') { if (confirm('Tắt ca 1?')) ca2Call({ op: 'off1' }); return; }
   if (act === 'run') {
     if (!confirm('Chạy ngay 1 lượt ca 2 cho tuyến ' + C2.tuyen.join(', ') + '?\nXe về hết sẽ được chỉnh và KÝ. Ký rồi không gỡ được.')) return;
     ca2Call({ op: 'run' }); return;
   }
-  if (!tuyen) { msg('❌ Chọn ít nhất 1 tuyến', 'err'); return; }
-  if (act === 'xem1') { ca2Call({ op: 'xem1', tuyen: tuyen }); return; }
-  if (act === 'xem') { ca2Call({ op: 'xem', tuyen: tuyen, moc: moc }); return; }
-  askNotify();
-  if (act === 'on1') {
-    if (!confirm(((C2.ca1 || {}).on ? 'Đổi ca 1 sang tuyến ' : 'Bật ca 1 cho tuyến ') + tuyen + '?\n' + ((C2.ca1 || {}).gio || '14:00') + ' tự về bến và chỉnh lệnh ca 1. Không ký.')) return;
-    ca2Call({ op: 'on1', tuyen: tuyen }); return;
-  }
-  if (!confirm((C2.on ? 'Lưu ca 2 cho tuyến ' : 'Bật ca 2 cho tuyến ') + tuyen + '?\nTừ 22:00, xe về hết sẽ tự chỉnh lệnh và KÝ. Ký rồi không gỡ được.')) return;
-  ca2Call({ op: 'on', tuyen: tuyen, moc: moc });
+  if (act === 'on' && C2.on && b.closest('.c2-cfg')) { ca2Call({ op: 'on', tuyen: C2.tuyen.join(', '), moc: ($('ca2Moc') || {}).value || '' }); return; }   // Lưu giờ quét: giữ tuyến
+  caHoi(act);   // bật / đổi tuyến / xem thử: hiện khung hỏi + chọn tuyến
 });
+
+// KHUNG HỎI KHI BẬT CA (anh dặn 18/11/2026): bấm bật ca 1 / ca 2 / về bến (hoặc Đổi tuyến, Xem thử) -> khung nổi hỏi lại + chọn tuyến, TỐI ĐA CA_MAX tuyến.
+// Dùng lại ô chọn tuyến chung (RP 'cap': bấm số tuyến để chọn / bỏ, ô "+ Thêm tuyến" có gợi ý). Đủ CA_MAX thì các tuyến còn lại mờ đi, ô thêm ẩn.
+const CA_MAX = 3;
+let CP = null;   // { act, t, mo, ok, set, goi }
+RP.cap = { set: () => (CP ? CP.set : new Set()), change: function () { cpVe(); } };
+function caHoi(act) {
+  const c1 = C2.ca1 || { on: false, tuyen: [], gio: '14:00' }, vb = VB || { on: false, tuyen: [] };
+  const moc = function () { return ($('ca2Moc') || {}).value || ''; };
+  const cfg = {
+    on1: { t: '☀️ ' + (c1.on ? 'Đổi tuyến ca 1' : 'Bật ca 1'), tuyen: c1.tuyen, ok: c1.on ? 'Lưu tuyến ca 1' : 'Bật ca 1',
+           mo: (c1.gio || '14:00') + ' tự về bến và chỉnh lệnh ca 1 cho các tuyến dưới đây. Không ký.', goi: t => ca2Call({ op: 'on1', tuyen: t }) },
+    on:  { t: '🌙 ' + (C2.on ? 'Đổi tuyến ca 2' : 'Bật ca 2'), tuyen: C2.tuyen, ok: C2.on ? 'Lưu tuyến ca 2' : 'Bật ca 2',
+           mo: 'Từ 22:00, xe về hết sẽ tự chỉnh lệnh và <b>KÝ</b>. Ký rồi không gỡ được.', goi: t => ca2Call({ op: 'on', tuyen: t, moc: moc() }) },
+    xem1: { t: '👀 Xem thử ca 1', tuyen: c1.tuyen, ok: 'Xem thử', mo: 'Chỉ xem ca 1 sẽ làm gì, không ghi gì lên FUTA.', goi: t => ca2Call({ op: 'xem1', tuyen: t }) },
+    xem:  { t: '👀 Xem thử ca 2', tuyen: C2.tuyen, ok: 'Xem thử', mo: 'Chỉ xem ca 2 sẽ làm gì, không ghi gì (có thể mất 1 phút).', goi: t => ca2Call({ op: 'xem', tuyen: t, moc: moc() }) },
+    vb:   { t: '🅿️ ' + (vb.on ? 'Đổi tuyến về bến' : 'Bật tự xác nhận về bến'), tuyen: vb.tuyen, ok: vb.on ? 'Lưu tuyến' : 'Bật về bến',
+           mo: 'Mỗi 1 giờ tự xác nhận chuyến đã kết thúc, có giờ đến. Đã xác nhận thì không huỷ kết thúc chuyến được nữa.', goi: t => vebenCall({ set: 'on', tuyen: t }) }
+  }[act];
+  if (!cfg) return;
+  const dau = (cfg.tuyen && cfg.tuyen.length ? cfg.tuyen : C2.pick && C2.pick.size ? Array.from(C2.pick) : sel().code ? [sel().code] : []).slice(0, CA_MAX);
+  CP = Object.assign({ act: act, set: new Set(dau), loi: '' }, cfg);
+  $('cpT').textContent = cfg.t; $('cpMo').innerHTML = cfg.mo; $('cpOk').textContent = cfg.ok;
+  cpVe(); openBox('ca');
+}
+function cpVe() {
+  if (!CP) return;
+  const a = Array.from(CP.set);
+  if (a.length > CA_MAX) { a.slice(CA_MAX).forEach(c => CP.set.delete(c)); CP.loi = 'Chỉ chọn tối đa ' + CA_MAX + ' tuyến'; }
+  const seen = RP_SEEN.cap = RP_SEEN.cap || new Set();
+  CP.set.forEach(c => seen.add(c));
+  const c1 = (C2 && C2.ca1 && C2.ca1.tuyen) || [], all = FAV_CODES.concat((C2 && C2.tuyen) || [], c1, sel().code ? [sel().code] : [], Array.from(seen));
+  const du = CP.set.size >= CA_MAX;
+  const chips = all.filter((c, i) => c && all.indexOf(c) === i).map(function (c) {
+    const r = ROUTES.find(x => x.code === c), on = CP.set.has(c), tat = du && !on;
+    return '<label class="rp-chip' + (on ? ' on' : '') + (tat ? ' tat' : '') + '" title="' + esc(r ? routeText(r) : c) + '"><input type="checkbox" data-rp="cap" data-code="' + esc(c) + '"' +
+      (on ? ' checked' : '') + (tat ? ' disabled' : '') + '>' + esc(c) + '</label>';
+  }).join('');
+  $('cpChips').innerHTML = '<div class="rp cp-rp">' + chips +
+    (du ? '' : '<input type="text" class="rp-in" data-route="multi" data-rp-input="cap" placeholder="+ Thêm tuyến" aria-label="Thêm tuyến" autocomplete="off" spellcheck="false">' +
+      '<button type="button" data-rp-act="add" data-rp="cap" hidden></button>') + '</div>' +
+    '<small class="box-note">Đã chọn <b>' + CP.set.size + '/' + CA_MAX + '</b> tuyến' + (CP.set.size ? ': ' + esc(Array.from(CP.set).join(', ')) : '') + '</small>';
+  $('cpErr').textContent = CP.loi ? '❌ ' + CP.loi : ''; CP.loi = '';
+  $('cpOk').disabled = !CP.set.size;
+}
+$('cpOk').onclick = function () {
+  if (!CP || !CP.set.size) return;
+  const x = CP, tuyen = Array.from(x.set).join(', ');
+  closeBox(); CP = null;
+  if (C2) C2.pick = new Set(x.set);
+  if (x.act === 'on' || x.act === 'on1') askNotify();
+  x.goi(tuyen);
+};
 
 // ===== BẢNG TÀI GHÉP TUYẾN (gọi bangtai trong bangtai.gs) =====
 // Chọn 2-3 tuyến + ngày ở trên -> ghép ngang thành 1 bảng: mỗi bến 2 cột GIỜ XB | BKS, 1 cột trống giữa các bến.

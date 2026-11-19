@@ -589,3 +589,23 @@ table.lap-t td.lap-dim { opacity: .45; }
   .lap-in { min-width: 120px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: 2s !important; transition: none !important; } }
+
+/* ===== BẢN 56 (18/11/2026) ===== */
+/* Dải đẩy lệnh hôm kia (app.js dayVe) */
+.day-bar { margin-top: 8px; padding: 8px 14px; border-radius: 12px; font-size: 13.5px; color: var(--muted); background: var(--white); box-shadow: inset 0 0 0 1px var(--line); }
+.day-bar.busy { color: var(--blue-700); background: var(--blue-50); box-shadow: none; }
+.day-bar.ok { color: #0C6B3F; background: #EAF8F0; box-shadow: none; }
+.day-bar.warn { color: #8A5300; background: #FFF6E5; box-shadow: inset 0 0 0 1px #F5D9A6; }
+.day-bar.err { color: #A02634; background: #FDECEE; box-shadow: inset 0 0 0 1px #F3C2C8; }
+.day-bar summary { cursor: pointer; }
+.day-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.day-list > div { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.day-tag { font-weight: 700; margin-right: 4px; }
+.day-it { padding: 2px 8px; border-radius: 7px; background: rgba(255, 255, 255, .75); color: var(--ink); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.day-it i { font-style: normal; color: var(--muted); font-weight: 500; }
+.day-list small { color: var(--muted); }
+/* Khung chọn tuyến khi bật ca (app.js caHoi) */
+.cp-mo { text-align: left; font-size: 13.5px; line-height: 1.45; }
+.cp-rp { justify-content: center; }
+.rp-chip.tat { opacity: .4; cursor: not-allowed; }
+#cpOk:disabled { opacity: .5; cursor: not-allowed; }

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=56">
 </head>
 <body data-tab="xem">
 
@@ -51,6 +51,8 @@
       <button id="btnEbms" class="act card"><span>EBMS</span><b id="nEbms">–</b><small id="sEbms">bấm so sánh</small></button>
       <button id="btnNv" class="act card"><span>Nhân viên</span><b id="nNv">–</b><small id="sNv">bấm trích xuất</small></button>
     </div>
+    <!-- ĐẨY LỆNH: lệnh HÔM KIA của tuyến đã đẩy (Đã xác nhận hoàn thành) chưa — app.js: dayNen / dayVe, chỉ đọc -->
+    <div class="day-bar" id="dayBar" hidden></div>
     <div class="doing">
       <div class="field"><div class="inbox"><input type="text" id="plate" aria-label="Biển số xe" placeholder="Biển số (trống = cả tuyến)" autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="plate" tabindex="-1" aria-label="Xoá">×</button></div></div>
       <button id="btnAuto" class="act act-main">⚡ Chỉnh lệnh</button>
@@ -130,6 +132,15 @@
       <small class="box-note">Web không lưu mật khẩu. Đăng nhập giữ 6 giờ.</small>
     </form>
 
+    <!-- CHỌN TUYẾN KHI BẬT CA 1 / CA 2 / VỀ BẾN (app.js: caHoi), tối đa 3 tuyến -->
+    <div data-box="ca" hidden>
+      <div class="auth-logo"><b id="cpT"></b></div>
+      <small class="box-note cp-mo" id="cpMo"></small>
+      <div id="cpChips"></div>
+      <div class="auth-err" id="cpErr"></div>
+      <button type="button" class="act act-main" id="cpOk"></button>
+    </div>
+
     <div data-box="me" hidden>
       <div class="auth-logo">👤 <b id="meName"></b></div>
       <div class="me-row"><span id="meFuta"></span><button type="button" id="btnFutaIn" class="btn-soft">Đăng nhập</button><button type="button" id="btnFutaOut" class="btn-soft" hidden>Đăng xuất</button></div>
@@ -190,7 +201,7 @@
   </div>
 </div>
 
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 <script src="lapbt.js?v=48"></script>
 </body>
 </html>
