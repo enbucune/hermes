@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=56">
+<link rel="stylesheet" href="style.css?v=62">
 </head>
 <body data-tab="xem">
 
@@ -35,6 +35,8 @@
       <button type="button" class="tab" data-tab="ca" role="tab"><i>🌙</i><span>Tự động<span class="tab-dot" id="caDot" hidden></span></span></button>
       <button type="button" class="tab" data-tab="bt" role="tab"><i>🗂</i>Bảng tài</button>
     </nav>
+    <!-- Hướng dẫn sử dụng: trang riêng huongdan.html (dùng nhanh + chi tiết), mở tab mới -->
+    <a id="btnHelp" class="user help" href="huongdan.html" target="_blank" rel="noopener" title="Hướng dẫn sử dụng" aria-label="Hướng dẫn sử dụng">❓<span> Hướng dẫn</span></a>
     <button id="btnUser" class="user">👤 Đăng nhập</button>
   </div>
 </header>
@@ -141,6 +143,14 @@
       <button type="button" class="act act-main" id="cpOk"></button>
     </div>
 
+    <!-- ⚡ Chỉnh lệnh: bấm là hỏi ca trước rồi mới tính (app.js: auHoiCa) -->
+    <div data-box="auca" hidden>
+      <div class="auth-logo">⚡ <b>Chỉnh lệnh ca nào?</b></div>
+      <small class="box-note" id="auCaNote"></small>
+      <button type="button" class="act act-main" data-auca="1">☀️ Ca 1 · 04:00–13:59</button>
+      <button type="button" class="act act-main" data-auca="2">🌙 Ca 2 · 14:00–02:00</button>
+      <button type="button" class="act act-soft" data-auca="all">Cả ngày (cả 2 ca)</button>
+    </div>
     <div data-box="me" hidden>
       <div class="auth-logo">👤 <b id="meName"></b></div>
       <div class="me-row"><span id="meFuta"></span><button type="button" id="btnFutaIn" class="btn-soft">Đăng nhập</button><button type="button" id="btnFutaOut" class="btn-soft" hidden>Đăng xuất</button></div>
@@ -201,7 +211,7 @@
   </div>
 </div>
 
-<script src="app.js?v=56"></script>
+<script src="app.js?v=63"></script>
 <script src="lapbt.js?v=48"></script>
 </body>
 </html>

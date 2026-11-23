@@ -224,7 +224,7 @@ table.t-gon td.ben { text-align: left; }
 @media (min-width: 761px) { table.t-gon wbr { display: none; } }   /* lịch chạy chỉ xuống 2 dòng trên điện thoại */
 table.t-gon td.kq { min-width: 260px; }
 table.t-gon td.kq > b { white-space: nowrap; }
-table.t-gon .lg { display: inline-block; margin: -2px -6px; padding: 1px 6px; border-radius: 7px; background: #fff; color: #B0222F; font-weight: 800; box-shadow: inset 0 0 0 1.5px #E5484D; }
+table.t-ebms .lg { display: inline-block; margin: -2px -6px; padding: 1px 6px; border-radius: 7px; background: #fff; color: #B0222F; font-weight: 800; box-shadow: inset 0 0 0 1.5px #E5484D; }
 
 /* Tổng quan theo xe */
 table.ov tr.ov-r { cursor: pointer; }
@@ -524,6 +524,8 @@ table.lap-t td.lap-dim { opacity: .45; }
   .fields { display: contents; }
   .field-date { order: 2; flex: 1 1 0; }
   .user { order: 3; margin-left: auto; max-width: calc(100% - 222px); overflow: hidden; text-overflow: ellipsis; }
+  .user.help { margin-left: 0; padding: 0 8px; } .user.help span { display: none; }   /* điện thoại: chỉ còn ❓ */
+  .user.help + .user { margin-left: 0; max-width: calc(100% - 258px); }
   .field-route { order: 4; flex: 1 1 100%; }
   body[data-tab="ca"] .fields { display: none; }
   body[data-tab="bt"] .field-route { display: none; }
@@ -609,3 +611,7 @@ table.lap-t td.lap-dim { opacity: .45; }
 .cp-rp { justify-content: center; }
 .rp-chip.tat { opacity: .4; cursor: not-allowed; }
 #cpOk:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Nút ❓ Hướng dẫn (huongdan.html) */
+.user.help { display: inline-flex; align-items: center; text-decoration: none; background: var(--white); box-shadow: inset 0 0 0 1.5px var(--blue-100); }
+.user.help:hover { background: var(--blue-50); }

@@ -209,7 +209,7 @@ function rerunCurrent(doiTuyen) {
   if (TAB === 'bt') { if (!doiTuyen && BTR.size) btRun(); return; }   // Bảng tài có ô chọn tuyến riêng
   if (TAB !== 'xem' || !sel().id || !isoDate()) return;
   if (MODE === 'gps') { ovNen(); if (!doiTuyen && GPSR.size) gpsFind(); return; }   // GPS có ô chọn tuyến riêng
-  if (MODE === 'auto') { ovNen(); autoPlan(''); return; }
+  if (MODE === 'auto') { ovNen(); auHoiCa(); return; }   // đổi tuyến / ngày ở màn Chỉnh lệnh: hỏi lại ca
   if (MODE === 'ky') { ovNen(); kyPlan(''); return; }
   rerunCheck();
 }
@@ -622,7 +622,8 @@ function renderEbms() {
     if (q && norm(r.loai + ' ' + r.ghi + ' ' + v.join(' ')).indexOf(q) === -1) return;   // bảng gọn cũng tìm trên đủ cột: gõ biển số vẫn ra
     // Chi tiết: "Ghi chú" (lý do lệch) ngay sau cột Loại cho khỏi kéo ngang; mỗi ý 1 dòng, kết luận của GPS đóng khung
     html += '<tr class="e-' + c + '">' + (EB_FULL ? '<td class="loai">' + esc(r.loai) + '</td><td class="notes">' + ebGhi(r.ghi) + '</td>' +
-      v.map((t, i) => '<td' + cls(cols[i]) + '>' + esc(t) + '</td>').join('') : ebGon(r, coGps)) + '</tr>';
+      (function () { const to = ebToRow(r); return v.map(function (t, i) { const g = EB_COT_GIO[cols[i][0]];
+        return '<td' + cls(cols[i]) + '>' + (g && to[g[0]][g[1]] ? ebO(t === '-' ? '' : t, true) : esc(t)) + '</td>'; }).join(''); })() : ebGon(r, coGps)) + '</tr>';
   });
   const nGio = coGps ? 3 : 2, thGio = '<th class="g">CityBus</th><th>EBMS</th>' + (coGps ? '<th>GPS</th>' : '');
   $('btnEbFull').textContent = EB_FULL ? '📋 Thu gọn' : '📋 Chi tiết';
@@ -639,18 +640,34 @@ const EB_LECH = 7;   // phút, như EBMS_ACTUAL_TOL trong ebms.gs: 2 nguồn cá
 const EB_GIO = [['gioDiPC', 'thDi', 'gpsDi'], ['gioDenPC', 'thDen', 'gpsVe']];   // [CityBus, EBMS, GPS] của giờ đi, giờ đến
 const ebPhut = s => { const m = /^(\d{1,2}):(\d{2})/.exec(String(s || '')); return m ? m[1] * 60 + +m[2] : null; };
 const ebLech = (a, b) => { a = ebPhut(a); b = ebPhut(b); if (a == null || b == null) return false; const d = Math.abs(a - b); return Math.min(d, 1440 - d) >= EB_LECH; };
-// Tô ô giờ khi CityBus và EBMS lệch nhau: có giờ GPS thì chỉ tô bên cách GPS từ EB_LECH phút (bên sai), không có thì tô cả 2 bên.
-function ebTo(pc, eb, gps) {
-  if (!ebLech(pc, eb)) return [false, false];
-  const a = ebLech(pc, gps), b = ebLech(eb, gps);
-  return a || b ? [a, b] : [true, true];
+// TÔ ĐỎ Ô GIỜ SAI (24/11/2026: trước chỉ tô khi 2 bên đều có giờ, bên trống thì không tô; bảng Chi tiết không tô) -> [CityBus, EBMS]:
+//   - 2 bên đều có giờ, lệch từ EB_LECH phút: có giờ GPS thì tô bên cách GPS từ EB_LECH phút (bên sai), GPS không phân xử được thì tô cả 2.
+//   - 1 bên có giờ, bên kia TRỐNG, mà dòng không khớp (⚠️ LỆCH / 🔴 EBMS chưa xác nhận / 🟠...): tô ô TRỐNG (ghi "thiếu").
+//     Dòng ✅ KHỚP (vd xe vừa về, EBMS chưa kịp có giờ) và dòng thiếu hẳn 1 nguồn (THIẾU EBMS / KHÔNG CÓ PHÂN CÔNG) thì không tô ô trống.
+function ebTo(pc, eb, gps, r) {
+  const co = v => ebPhut(v) != null;
+  if (co(pc) && co(eb)) {
+    if (!ebLech(pc, eb)) return [false, false];
+    const a = co(gps) && ebLech(pc, gps), b = co(gps) && ebLech(eb, gps);
+    return a || b ? [a, b] : [true, true];
+  }
+  const loai = String((r && r.loai) || '');
+  if (co(pc) === co(eb) || catOf(loai) === 'ok' || /THIẾU EBMS|KHÔNG CÓ PHÂN CÔNG/.test(loai)) return [false, false];
+  return [!co(pc), !co(eb)];
+}
+// ô giờ đã tô: giờ in đỏ đóng khung; ô trống ghi "thiếu"
+const ebO = (t, to) => to ? '<b class="lg">' + esc(t || 'thiếu') + '</b>' : esc(t);
+// bảng Chi tiết: cột nào là giờ CityBus / EBMS của mốc nào ([mốc 0 = đi, 1 = đến], [0 = CityBus, 1 = EBMS])
+const EB_COT_GIO = { 'Đi PC': [0, 0], 'Đi EBMS': [0, 1], 'Về PC': [1, 0], 'Về EBMS': [1, 1] };
+function ebToRow(r) {
+  return EB_GIO.map(k => { const v = k.map(x => ebCo(r[x]) ? r[x] : ''); return ebTo(v[0], v[1], v[2], r); });
 }
 function ebGon(r, coGps) {
-  const o = function (t, to, c) { return '<td' + (c ? ' class="' + c + '"' : '') + '>' + (to ? '<b class="lg">' + esc(t) + '</b>' : esc(t)) + '</td>'; };
+  const o = function (t, to, c) { return '<td' + (c ? ' class="' + c + '"' : '') + '>' + ebO(t, to) + '</td>'; };
   // <wbr>: điện thoại cho lịch chạy xuống 2 dòng (06:00- / 07:00) để đủ chỗ cho 6 ô giờ; kq "tron": chuyến không có ghi chú
   return '<td>' + esc(ebCo(r.lichChayPC) ? r.lichChayPC : ebLichEb(r)).replace('-', '-<wbr>') + '</td><td class="ben">' + esc(ebCo(r.benDau) ? r.benDau : ebCo(r.benXuatPhatPC) ? r.benXuatPhatPC : '') + '</td>' +
     EB_GIO.map(function (k, i) {
-      const v = k.map(x => ebCo(r[x]) ? r[x] : ''), to = ebTo(v[0], v[1], v[2]), gv = i ? ' gv' : '';
+      const v = k.map(x => ebCo(r[x]) ? r[x] : ''), to = ebTo(v[0], v[1], v[2], r), gv = i ? ' gv' : '';
       return o(v[0], to[0], 'g' + gv) + o(v[1], to[1], gv.trim()) + (coGps ? o(v[2], false, gv.trim()) : '');
     }).join('') +
     '<td class="notes g kq' + (String(r.ghi || '').trim() ? '' : ' tron') + '"><b>' + esc(r.loai) + '</b>' + ebGhi(r.ghi) + '</td>';
@@ -762,7 +779,10 @@ $('btnLvc').onclick = function () {
 function renderLvc() {
   const c = { ok: 0, warn: 0, bad: 0 };
   LV.rows.forEach(function (r) { c[r.level]++; });
-  $('stats').innerHTML = statHtml([['Tất cả', LV.rows.length, '', 'all'], ['Lỗi', c.bad, 'e-nopc', 'bad'], ['Cảnh báo', c.warn, 'e-warn', 'warn'], ['Đạt', c.ok, 'e-ok', 'ok']].filter(x => x[1] || x[3] === 'all'));
+  // 🎫 Vé = 0 (24/11/2026): số CHUYẾN đã chạy mà sản lượng vé = 0 (máy chủ gửi r.ve0), bấm để chỉ xem các lệnh đó
+  const ve0 = r => (r.ve0 || []).length, nVe0 = LV.rows.reduce((s, r) => s + ve0(r), 0);
+  $('stats').innerHTML = statHtml([['Tất cả', LV.rows.length, '', 'all'], ['Lỗi', c.bad, 'e-nopc', 'bad'], ['Cảnh báo', c.warn, 'e-warn', 'warn'],
+    ['🎫 Chuyến vé = 0', nVe0, 'e-nopc', 've0'], ['Đạt', c.ok, 'e-ok', 'ok']].filter(x => x[1] || x[3] === 'all'));
 
   const q = norm($('q').value);
   const tag = { ok: '✅ ĐẠT', warn: '🟠 CẢNH BÁO', bad: '🔴 LỖI' }, cls = { ok: 'e-ok', warn: 'e-warn', bad: 'e-nopc' };
@@ -771,19 +791,23 @@ function renderLvc() {
   const ord = { bad: 0, warn: 1, ok: 2 };
   LV.rows.map((r, i) => [r, i]).sort((a, b) => (ord[a[0].level] - ord[b[0].level]) || (a[1] - b[1])).forEach(function (x) {
     const r = x[0];
-    if (FIL && FIL !== 'all' && FIL !== r.level) return;
+    if (FIL && FIL !== 'all' && (FIL === 've0' ? !ve0(r) : FIL !== r.level)) return;
     if (q && norm([r.xe, r.code, r.lai, r.loi.join(' '), r.cb.join(' ')].join(' ')).indexOf(q) === -1) return;
     const notes = r.loi.map(x => '<div>❌ ' + esc(x) + '</div>').concat(r.cb.map(x => '<div>⚠️ ' + esc(x) + '</div>')).join('');
     html += '<tr class="' + cls[r.level] + '"><td>' + esc(r.xe) + '</td><td>' + esc(r.code) + '</td><td class="left">' + esc(r.lai) +
       '</td><td>' + (r.soChuyen == null ? '' : r.soChuyen) + '</td><td>' + tag[r.level] + '</td><td class="notes">' + notes + '</td></tr>';
   });
-  $('out').innerHTML = '<table><thead><tr>' + ['Biển số', 'Mã lệnh', 'Lái xe', 'Số chuyến', 'Kết quả', 'Chi tiết'].map(x => '<th>' + x + '</th>').join('') +
+  // khung tóm tắt trên bảng: xe nào, lệnh nào, chuyến nào vé = 0 (theo biển số)
+  const dsVe0 = LV.rows.filter(ve0).slice().sort((a, b) => a.xe < b.xe ? -1 : a.xe > b.xe ? 1 : (a.code < b.code ? -1 : 1));
+  const tomVe0 = dsVe0.length ? '<div class="ord-warn"><div><b>🎫 ' + nVe0 + ' chuyến sản lượng vé = 0</b></div>' + dsVe0.map(r =>
+    '<div>Xe <b>' + esc(r.xe) + '</b> · lệnh ' + esc(r.code) + ' · ' + r.ve0.map(x => 'chuyến ' + x.stt + ' (' + esc(x.lich) + ')').join(', ') + '</div>').join('') + '</div>' : '';
+  $('out').innerHTML = tomVe0 + '<table><thead><tr>' + ['Biển số', 'Mã lệnh', 'Lái xe', 'Số chuyến', 'Kết quả', 'Chi tiết'].map(x => '<th>' + x + '</th>').join('') +
     '</tr></thead><tbody>' + (html || '<tr><td colspan="6">' + emptyText() + '</td></tr>') + '</tbody></table>';
 }
 
 // ===== LỌC NHANH (bảng xe / EBMS / lệnh): bấm ô thống kê hoặc chú thích màu = chỉ xem loại đó, bấm lại = bỏ lọc =====
 let FIL = '';
-const FIL_TEN = { warn: 'có cảnh báo', red: 'màu đỏ', yellow: 'màu vàng', green: 'màu xanh lá', purple: 'trùng giờ (tím)', ok: 'đạt / khớp', lech: 'lệch giờ', nopc: 'thiếu phân công', noebms: 'thiếu EBMS', bad: 'lỗi', canxem: 'cần xem', gps: 'đã hỏi GPS', gpssua: 'GPS bảo xem lại CityBus' };
+const FIL_TEN = { warn: 'có cảnh báo', red: 'màu đỏ', yellow: 'màu vàng', green: 'màu xanh lá', purple: 'trùng giờ (tím)', ok: 'đạt / khớp', lech: 'lệch giờ', nopc: 'thiếu phân công', noebms: 'thiếu EBMS', bad: 'lỗi', canxem: 'cần xem', gps: 'đã hỏi GPS', gpssua: 'GPS bảo xem lại CityBus', ve0: 'có chuyến vé = 0' };
 function statHtml(list) { // [tên, số, class màu, khoá lọc]
   return list.map(x => '<div class="stat st-f ' + (x[2] || '') + (FIL === x[3] || (!FIL && x[3] === 'all') ? ' on' : '') + '" data-f="' + x[3] + '" role="button" tabindex="0" title="' +
     (x[3] === 'mat' ? 'Bấm để mở màn Mất chuyến (chụp GPS)' : 'Bấm để chỉ xem loại này, bấm lại để bỏ lọc') + '"><b>' + x[1] + '</b>' + x[0] + '</div>').join('');
@@ -921,7 +945,8 @@ new MutationObserver(syncView).observe($('out'), { childList: true });
 // Ô "Biển số" trống = cả tuyến; có biển = chỉ xe đó.
 // Luật: cặp chuyến (trước, sau), đến >= lịch - 1p = quay đầu: về bến = đến, điều xe = đi = đến + 1p;
 // ngược lại: về bến = đến + 1p, điều xe = lịch - 1p, đi = lịch. Đầu ngày: điều xe = lịch - 1p, đi = lịch.
-// Cuối ngày: về bến = đến + 1p. Về bến trống (chưa xác nhận) để nguyên. Giờ đến không bao giờ đổi.
+// Cuối ngày: về bến = đến + 1p. Về bến trống (chưa xác nhận) để nguyên.
+// Đồng giờ (điều xe = đi = đến = về bến, lệnh đỏ): đến = về bến = đi + 1p — trường hợp duy nhất đổi Giờ đến (cột "Giờ đến").
 let AU = null;
 
 // ⚡ Tự chỉnh dùng TÀI KHOẢN FUTA CỦA NGƯỜI BẤM: đăng nhập 1 lần -> máy chủ giữ phiên 6 giờ (không lưu mật khẩu), web nhớ mã phiên.
@@ -1008,23 +1033,40 @@ if (getFs()) setTimeout(function () {   // phiên còn sống không (máy chủ
 }, 1200);
 
 $('btnAuto').onclick = function () {
-  if (!getFs()) { futaForm('', function () { autoPlan(''); }); return; }
-  autoPlan('');
+  if (!getFs()) { futaForm('', auHoiCa); return; }
+  auHoiCa();
 };
 
+// CHIA CA (24/11/2026): bấm ⚡ Chỉnh lệnh là HỎI CA TRƯỚC (khung "Chỉnh lệnh ca nào?"), chọn xong mới tính.
+// Ca 1 = lệnh mọi chuyến 04:00-13:59; Ca 2 = lệnh có chuyến 14:00-02:00 hôm sau; "Cả ngày" = cả 2 ca.
+// Xếp theo CẢ LỆNH, máy chủ lọc (auto_caLoc_ trong edit.gs). AU_CA giữ ca vừa chọn cho lượt tính lại sau khi lưu.
+const AU_CA_TEN = { '1': 'ca 1 (04:00–13:59)', '2': 'ca 2 (14:00–02:00)' };
+let AU_CA = '';
+function auHoiCa() {
+  const s = sel();
+  if (thieuSel(s)) return;
+  const plate = $('plate').value.trim().toUpperCase();
+  $('auCaNote').textContent = 'Tuyến ' + s.code + (plate ? ' · xe ' + plate : ' · cả tuyến') + ' · ngày ' + $('date').value + '. Chọn xong mới tính, chưa ghi gì.';
+  openBox('auca');
+}
+document.querySelectorAll('[data-auca]').forEach(function (b) {
+  b.onclick = function () { AU_CA = b.dataset.auca === 'all' ? '' : b.dataset.auca; closeBox(); autoPlan(''); };
+});
 function autoPlan(prefix) {
   const s = sel();
   if (thieuSel(s)) return Promise.resolve();
   const plate = $('plate').value.trim().toUpperCase(), pre = prefix ? prefix + '\n' : '';
+  const ca = AU_CA, caTen = AU_CA_TEN[ca] ? ', ' + AU_CA_TEN[ca] : ', cả ngày';
   ++VIEW_ID; MODE = 'auto'; AU = null; xoaMan(); syncView();   // nhận màn ngay: kết quả đọc nền của màn trước (EBMS, lệnh...) về muộn không vẽ đè lên
   $('btnAuto').disabled = true;
-  msg(pre + 'Đang tính ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + ' theo luật (chưa ghi gì)...');
-  return api({ action: 'autoplan', fs: getFs(), routeId: s.id, label: s.code, date: isoDate(), plate: plate }, 180000).then(function (res) {
+  msg(pre + 'Đang tính ' + (plate ? 'xe ' + plate : 'tuyến ' + s.code) + caTen + ' theo luật (chưa ghi gì)...');
+  return api({ action: 'autoplan', fs: getFs(), routeId: s.id, label: s.code, date: isoDate(), plate: plate, ca: ca }, 180000).then(function (res) {
     if (!res.stats) throw new Error('Server chưa có action "autoplan". Dán edit.gs mới, thêm router vào web.gs, rồi Deploy lại BẢN MỚI.');
-    AU = res; AU.sel = s;
+    AU = res; AU.sel = s; AU.caTen = AU_CA_TEN[ca] || 'cả ngày (cả 2 ca)';
     renderAuto();
     const st = res.stats;
-    msg(pre + (st.sua ? 'Sẽ sửa ' + st.sua + ' chuyến, chưa ghi gì.' : '✅ Không còn gì cần sửa.') +
+    if (ca && res.ca !== ca) throw new Error('Máy chủ chưa lên bản chia ca: dán đè edit.gs + ca2.gs rồi Triển khai phiên bản mới.');
+    msg(pre + (st.sua ? 'Sẽ sửa ' + st.sua + ' chuyến' + caTen + ', chưa ghi gì.' : '✅ Không còn gì cần sửa' + caTen + '.') +
       (st.canXem ? ' ' + st.canXem + ' chuyến cần xem.' : '') + (st.loi ? ' ' + st.loi + ' lỗi.' : ''), st.canXem || st.loi ? 'warn' : 'ok');
   }).catch(function (e) {
     if (e.futaLogin) { setFs(null); futaForm(e.message, function () { autoPlan(prefix); }); return; }
@@ -1044,7 +1086,7 @@ function renderAuto() {
     return d ? '<td class="green">' + esc(d.from) + ' → ' + esc(d.to) + '</td>' : '<td></td>';
   };
 
-  let out = '';
+  let out = '<div class="panel-note">⚡ Đang chỉnh: <b>' + esc(AU.caTen || 'cả ngày') + '</b> · bấm ⚡ Chỉnh lệnh để chọn ca khác</div>';
   if (AU.errors.length || AU.problems.length) {
     out += '<h3>⚠️ Cần xem / lỗi (không tự sửa)</h3><div class="ord-warn">' +
       AU.errors.map(function (e) { return '<div>❌ ' + esc(e) + '</div>'; }).join('') +
@@ -1064,12 +1106,12 @@ function renderAuto() {
     if (r.plate !== prev) { band = !band; prev = r.plate; }
     body += '<tr class="' + (band ? 'bandB' : '') + '"><td>' + esc(r.plate) + '</td><td>' + esc(r.lenh) + '</td><td>' + r.stt + '</td><td>' + esc(r.code) +
       '</td><td>' + esc(r.sched) + '</td><td class="left">' + esc(r.mode) + '</td>' +
-      cell(r, 'Giờ điều xe') + cell(r, 'Giờ đi') + cell(r, 'Giờ về bến') +
+      cell(r, 'Giờ điều xe') + cell(r, 'Giờ đi') + cell(r, 'Giờ đến') + cell(r, 'Giờ về bến') +
       '<td class="notes">' + esc([r.note, r.warn && '⚠️ ' + r.warn].filter(Boolean).join(' | ')) + '</td></tr>';
   });
-  out += '<table><thead><tr>' + ['Xe', 'Lệnh', 'STT', 'Mã chuyến', 'Lịch', 'Chế độ', 'Giờ điều xe', 'Giờ đi', 'Giờ về bến', 'Ghi chú']
+  out += '<table><thead><tr>' + ['Xe', 'Lệnh', 'STT', 'Mã chuyến', 'Lịch', 'Chế độ', 'Giờ điều xe', 'Giờ đi', 'Giờ đến', 'Giờ về bến', 'Ghi chú']
     .map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' +
-    (body || '<tr><td colspan="10">Không có chuyến nào cần sửa</td></tr>') + '</tbody></table>';
+    (body || '<tr><td colspan="11">Không có chuyến nào cần sửa</td></tr>') + '</tbody></table>';
   $('out').innerHTML = out;
 }
 
@@ -1234,7 +1276,7 @@ $('out').addEventListener('click', function (ev) {
 });
 
 // ===== CA 2 TỰ ĐỘNG (gọi ca2 trong ca2.gs) — MỤC RIÊNG, không chung nhóm nút Sửa lệnh =====
-// ☀️ Ca 1 (14:00): về bến + edit LỆNH CA 1 (mọi chuyến lịch trước 14:00) 1 lần, không ký. 🌙 Ca 2 ký từ 22:00: lệnh ca 1 không đỏ thì ký luôn, đỏ mới edit.
+// ☀️ Ca 1 (14:00): về bến + edit LỆNH CA 1 (mọi chuyến lịch 04:00-13:59) 1 lần, không ký. 🌙 Ca 2 ký từ 22:00: lệnh ca 1 không đỏ thì ký luôn, đỏ mới edit.
 // Bật ca 1 / ca 2 = bật luôn 🅿️ tự xác nhận về bến (1 giờ/lần). Máy chủ quét: từ 22:00 mỗi 20 phút, từ 23:00 mỗi 10 phút, từ 23:30 mỗi 5 phút, từ 23:50 canh mỗi phút.
 // Mỗi lượt: xác nhận về bến -> XE NÀO VỀ HẾT thì edit lệnh ca 2 (+ lệnh ca 1 bị đỏ) rồi ký; xe đang chạy để yên. Ký hết thì tự tắt.
 const C2_NHOM = [['tre', 'c2-tre'], ['chay', 'c2-chay'], ['chua_chay', 'c2-chua'], ['veben', 'c2-veben'], ['xong', 'c2-xong'], ['seky', 'c2-xong'], ['loi', 'c2-loi'], ['ky', 'c2-ky']];
@@ -1417,7 +1459,7 @@ function renderCa2() {
     '<li>Trong lúc bật: mỗi 1 giờ tự xác nhận về bến.</li>' +
     '<li><b>Ca 1:</b> ' + esc(c1.gio) + ' về bến rồi chỉnh các lệnh có mọi chuyến trước ' + esc(c1.gio) + '. Không ký, chạy 1 lần rồi tự tắt.</li>' +
     '<li><b>Ca 2:</b> từ 22:00, xe nào về hết thì chỉnh lệnh ca 2 rồi ký (sau về bến chuyến cuối ≥ 10 phút). Lệnh ca 1 không đỏ thì ký luôn, đỏ mới chỉnh.</li>' +
-    '<li><b>Từ 23:50:</b> xe chưa về thì chỉnh trước, canh mỗi phút, về là ký ngay (muộn nhất 06:00).</li>' +
+    '<li><b>Từ 23:50:</b> xe chưa về thì chỉnh trước, canh mỗi phút, về là ký ngay (muộn nhất 02:00).</li>' +
     '<li>Xe đang chạy, chưa chạy, lệnh không có xe đi, chuyến Mất Chuyến: bỏ qua. Không đẩy lệnh.</li>' +
     '<li>Ký hết thì tự tắt. Chỉnh lệnh có Hoàn tác, ký thì không gỡ được.</li></ul></details>';
   setOut(out);
