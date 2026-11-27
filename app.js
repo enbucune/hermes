@@ -1121,10 +1121,18 @@ $('out').addEventListener('click', function (ev) {
   // Không hỏi lại: bảng xem trước đã là bước xác nhận, lưu xong có thanh ↩️ Hoàn tác ngay bên trên
   $('out').querySelectorAll('button').forEach(function (x) { x.disabled = true; });
   $('btnAuto').disabled = true;
-  msg('Đang lưu ' + AU.stats.sua + ' chuyến (có thể mất 1-3 phút, đừng đóng trang)...');
+  msg('Đang lưu lệnh đầu (' + AU.stats.sua + ' chuyến cả tuyến; các lệnh sau máy chủ tự lưu dần, mỗi lệnh cách 1–2 phút)...');
   const au = AU;
   api({ action: 'autosave', fs: getFs(), planId: au.planId, label: au.sel.code, date: isoNgay(au.ngay) }, 360000, 0).then(function (r) {
     napBo(['load', 'lvc']); ovNen();   // giờ đã đổi: cập nhật số trên các ô
+    if (r.dang) {   // EDIT DẦN (edit.gs Phần 4): lệnh đầu đã lưu, các lệnh sau máy chủ tự lưu, đóng trang vẫn chạy
+      au.done = true; au.planId = ''; $('btnAuto').disabled = false;
+      if (MODE === 'auto' && AU === au) renderAuto();
+      msg('⏳ Tuyến ' + au.sel.code + ': đã lưu lệnh 1/' + r.nLenh + ' (' + r.saved + ' chuyến). Máy chủ ' + r.dang +
+        '. Đóng trang vẫn chạy; xong sẽ hiện kết quả + ↩️ Hoàn tác ở đây.', 'info');
+      auTheoDoi(au);
+      return;
+    }
     const bad = r.verifyBad.concat(r.failed, r.skipped);
     const line = (bad.length || r.stopped ? '⚠️ ' : '✔ ') + 'Đã lưu + kiểm khớp ' + r.saved + ' chuyến (' + r.elapsed + 's)' +
       (r.verifyBad.length ? ', VERIFY LỆCH ' + r.verifyBad.length : '') + (r.failed.length ? ', lỗi lưu ' + r.failed.length : '') +
@@ -1145,6 +1153,27 @@ $('out').addEventListener('click', function (ev) {
     msg('❌ ' + e.message, 'err');
   });
 });
+
+// Theo dõi edit dần (30 giây hỏi 1 lần) tới khi tuyến lưu xong hết lệnh; đổi màn / tuyến khác thì thôi theo dõi.
+let AU_Q_T = null;
+function auTheoDoi(au) {
+  clearTimeout(AU_Q_T);
+  AU_Q_T = setTimeout(function () {
+    if (MODE !== 'auto' || AU !== au) return;
+    api({ action: 'autoq', fs: getFs(), routeId: au.sel.id }, 60000).then(function (q) {
+      if (MODE !== 'auto' || AU !== au) return;
+      if (q.dang) { msg('⏳ Tuyến ' + au.sel.code + ': máy chủ ' + q.dang + '. Đóng trang vẫn chạy.', 'info'); auTheoDoi(au); return; }
+      napBo(['load', 'lvc']); ovNen();
+      const k = q.kq;
+      if (!k) { autoPlan('✔ Tuyến ' + au.sel.code + ': edit dần đã xong.'); return; }
+      const bad = k.verifyBad.concat(k.failed, k.skipped);
+      if (k.undoId) showUndo(k.undoId, 'Đã lưu ' + k.saved + ' chuyến theo luật (edit dần ' + k.nLenh + ' lệnh). Lỡ tay?');
+      autoPlan((bad.length ? '⚠️ ' : '✔ ') + 'Tuyến ' + au.sel.code + ': edit dần XONG lúc ' + k.at + ' — ' + k.nLenh + ' lệnh, lưu + kiểm khớp ' + k.saved + ' chuyến' +
+        (k.verifyBad.length ? ', VERIFY LỆCH ' + k.verifyBad.length : '') + (k.failed.length ? ', lỗi lưu ' + k.failed.length : '') +
+        (k.skipped.length ? ', bỏ qua ' + k.skipped.length : '') + (bad.length ? '\n' + bad.join('\n') : ''));
+    }).catch(function () { auTheoDoi(au); });   // mạng chập chờn: 30 giây sau hỏi lại
+  }, 30000);
+}
 
 // ===== ĐIỀU HÀNH KÝ XÁC NHẬN (gọi kyplan / kysave trong ky.gs) =====
 // = mở chi tiết lệnh trên FUTA, bấm "Điều hành ký xác nhận" rồi "Đồng ý". KHÔNG đẩy lệnh. Ký rồi KHÔNG gỡ được.
