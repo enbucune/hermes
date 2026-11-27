@@ -33,8 +33,15 @@ const typePill = m => isDx(m) ? '<span class="pill p-dx" title="Xe có chạy, b
 const GOOGLE_CLIENT_ID = '';
 
 // CÔNG TẮC TÀI KHOẢN: false = TẮT đăng ký / đăng nhập, dùng mã truy cập (WEB_KEY) như cũ.
-// Bật lại: đổi thành true VÀ thêm Script Property USER_MODE = on bên Apps Script (2 bên phải giống nhau).
-const USER_MODE = false;
+// KHOÁ 2 (27/11/2026): bấm xe buýt 5 lần + mã mở khoá Điều hành như cũ -> khung 👤 có nút "👤 Thử tài khoản"
+// (máy chủ USER_MODE = test) -> RIÊNG máy này vào chế độ tài khoản (két CityBus + EBMS + GPS3); người khác vẫn dùng mã truy cập.
+// Bật cho mọi người sau này: đổi USER_MODE_ALL = true + Script Property USER_MODE = on.
+const USER_MODE_ALL = false;
+const USER_MODE = USER_MODE_ALL || (function () { try { return localStorage.getItem('web_tk2') === '1'; } catch (e) { return false; } })();
+function tk2Thoat() {
+  ['web_tk2', 'web_tk2k', 'web_sid', 'web_vk'].forEach(function (k) { localStorage.removeItem(k); });
+  location.reload();
+}
 
 // ===== MÃ TRUY CẬP + TÊN (khi tắt tài khoản, mã khớp Script Property WEB_KEY): nhập 1 lần ở khung "Vào web", lưu trên máy này =====
 function getKey() { try { return localStorage.getItem('web_key') || ''; } catch (e) { return ''; } }
@@ -45,13 +52,57 @@ function authParam() { return USER_MODE ? { sid: getSid(), src: 'web' } : { key:
 function getSid() { try { return localStorage.getItem('web_sid') || ''; } catch (e) { return ''; } }
 let ME = null;
 
+// ===== KÉT TÀI KHOẢN (27/11/2026): mỗi người dùng CHÍNH tài khoản CityBus + EBMS + GPS3 của mình =====
+// Mật khẩu web không gửi lên máy chủ. Trình duyệt tính PBKDF2(mật khẩu, SĐT) ra 2 nửa:
+//   auth = "mã đăng nhập" gửi lên thay mật khẩu; key = CHÌA KÉT, chỉ nằm trên máy này (localStorage web_vk).
+// Tài khoản EBMS + GPS3 khoá bằng chìa (AES-GCM) rồi mới gửi lên -> máy chủ chỉ cất cục đã khoá (ME.v), không đọc được.
+// Máy khác: đăng nhập web -> tính lại chìa từ mật khẩu -> mở được két. Cần EBMS: mở két, gửi kèm yêu cầu (POST, cred).
+const KDF_N = 150000;
+function b64(buf) { let s = ''; new Uint8Array(buf).forEach(function (x) { s += String.fromCharCode(x); }); return btoa(s); }
+function unb64(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
+function sdt(s) { return String(s || '').replace(/[\s.\-]/g, ''); }
+function kdf(phone, pass) {
+  if (!(window.crypto && crypto.subtle)) return Promise.reject(new Error('Trình duyệt không hỗ trợ mã hoá — mở web bằng Chrome / Safari bản mới (địa chỉ https)'));
+  const enc = new TextEncoder();
+  return crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits'])
+    .then(function (k) { return crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('webedit-ket-v1|' + sdt(phone)), iterations: KDF_N }, k, 512); })
+    .then(function (bits) { const a = new Uint8Array(bits); return { auth: b64(a.slice(0, 32)), key: b64(a.slice(32)) }; });
+}
+function aesKey(k64) { return crypto.subtle.importKey('raw', unb64(k64), 'AES-GCM', false, ['encrypt', 'decrypt']); }
+function ketKhoa(k64, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  return aesKey(k64).then(function (k) { return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, k, new TextEncoder().encode(JSON.stringify(obj))); })
+    .then(function (ct) { return 'v1.' + b64(iv) + '.' + b64(ct); });
+}
+function ketMo(k64, v) {
+  const a = String(v || '').split('.');
+  if (a[0] !== 'v1' || a.length !== 3 || !k64) return Promise.reject(new Error('két'));
+  return aesKey(k64).then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(a[1]) }, k, unb64(a[2])); })
+    .then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); });
+}
+function getVk() { try { return localStorage.getItem('web_vk') || ''; } catch (e) { return ''; } }
+/** Tài khoản EBMS + GPS3 của người đang đăng nhập (mở két trên máy này). Thiếu -> lỗi e.cred, mở khung 🔐. */
+function getCred() {
+  return ketMo(getVk(), ME && ME.v).catch(function () {
+    const e = new Error(ME && ME.v ? 'Máy này chưa mở được két tài khoản — đăng xuất rồi đăng nhập lại' : 'Chưa có tài khoản EBMS / GPS3 của bạn — nhập ở 👤 Tài khoản → 🔐 EBMS & GPS3');
+    e.cred = 'eb'; showKet(e.message);
+    throw e;
+  });
+}
+function credTu(v) { return { eb: { u: v.ebUser, p: v.ebPass }, g3: { u: v.g3User, p: v.g3Pass } }; }
+function credThieu(v) { return !v.ebUser || !v.ebPass ? { field: 'cred_eb', message: 'Chưa nhập đủ tài khoản EBMS' } : !v.g3User || !v.g3Pass ? { field: 'cred_g3', message: 'Chưa nhập đủ tài khoản GPS3' } : null; }
+
 // ===== GỌI MÁY CHỦ (tự thử lại khi lỗi kết nối) =====
 // Gọi bằng fetch KHÔNG gửi cookie Google (credentials 'omit'): trình duyệt đăng nhập nhiều tài khoản Google /
 // cookie Google cũ làm script.google.com chuyển hướng vòng vèo -> trang chậm, đổi trình duyệt mới hết.
 // fetch lỗi mạng thì mới dùng JSONP (cách cũ) làm dự phòng.
 let _n = 0, NO_FETCH = false;
 function apiOnce(params, timeoutMs) {
-  if (NO_FETCH || !window.fetch) return apiJsonp(params, timeoutMs);
+  // Bật tài khoản: So sánh EBMS chạy bằng tài khoản EBMS + GPS3 trong két của chính người dùng
+  if (USER_MODE && params.action === 'ebms' && !params.cred) return getCred().then(function (c) { return apiOnce(Object.assign({}, params, { cred: c }), timeoutMs); });
+  const coMk = !!params.cred;   // có mật khẩu trong yêu cầu: KHÔNG BAO GIỜ rơi về JSONP (JSONP để mọi thứ trên URL)
+  const netErr = function () { const x = new Error('Không kết nối được tới máy chủ, thử lại sau ít giây.'); x.net = true; throw x; };
+  if (NO_FETCH || !window.fetch) return coMk ? Promise.resolve().then(netErr) : apiJsonp(params, timeoutMs);
   const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 120000);
   // BẢO MẬT (05/11/2026): gửi bằng POST, mã truy cập / mã mở khoá / phiên FUTA nằm trong thân yêu cầu, KHÔNG nằm trên URL
   // (URL hay bị lưu lại ở lịch sử, nhật ký proxy / máy chủ). doPost (Gps.gs) chuyển sang web_handle_ y như doGet.
@@ -59,6 +110,7 @@ function apiOnce(params, timeoutMs) {
     .then(function (r) { return r.json(); })
     .then(function (data) { if (!data || !data.ok) throw apiErr(data); return data; }, function (e) {
       if (e.name === 'AbortError') throw new Error('Hết thời gian chờ');
+      if (coMk) netErr();
       if (e instanceof SyntaxError) { NO_FETCH = true; return apiJsonp(params, timeoutMs); } // máy chủ không trả JSON
       return apiJsonp(params, timeoutMs); // lỗi mạng / CORS: thử lại bằng JSONP
     })
@@ -93,6 +145,7 @@ function apiErr(data) {
   if (data && data.futa) e.futa = true;
   if (data && data.futaLogin) e.futaLogin = true;   // ⚡ Tự chỉnh: chưa đăng nhập FUTA riêng / hết phiên
   if (data && data.field) e.field = data.field;
+  if (data && data.cred && USER_MODE) { e.cred = data.cred; showKet(e.message); }   // thiếu / sai tài khoản EBMS hoặc GPS3
   return e;
 }
 
@@ -882,7 +935,7 @@ function setUnlocked(on) {
 function tryUnlock(ekey, silent) {
   return api({ action: 'editauth', ekey: ekey }, 30000, 1).then(function () {
     localStorage.setItem('edit_key', ekey); setUnlocked(true);
-    if (!silent) msg('🔓 Đã mở: ✍️ Ký, 🅿️ Về bến, 📅 Lập bảng tài', 'ok');
+    if (!silent) msg('🔓 Đã mở: ✍️ Ký, 🅿️ Về bến, 📅 Lập bảng tài' + (USER_MODE ? '' : ' · 👤 Thử tài khoản ở khung 👤'), 'ok');
     else if (localStorage.getItem('web_tab') === 'lap') setTab('lap');
   }).catch(function (e) {
     if (silent) { if (!e.net && !e.login && !/tạm khoá/.test(e.message)) { localStorage.removeItem('edit_key'); setUnlocked(false); } return; } // chưa đăng nhập thì giữ mã
@@ -897,6 +950,12 @@ function tryUnlock(ekey, silent) {
     n = 0;
     const input = prompt('Nhập mã mở khoá:');
     if (input && input.trim()) tryUnlock(input.trim(), false);
+  };
+  // Khoá 2: đã mở khoá Điều hành -> thử chế độ tài khoản trên máy này (máy chủ kiểm lại mã + USER_MODE = test)
+  $('btnTk2').onclick = function () {
+    apiPost({ action: 'tk2auth', tk2: getEkey() }, 30000).then(function () {
+      localStorage.setItem('web_tk2', '1'); location.reload();
+    }).catch(function (e) { closeBox(); msg('❌ ' + e.message, 'err'); });
   };
   $('btnLock').onclick = function () { localStorage.removeItem('edit_key'); setUnlocked(false); closeBox(); msg('🔒 Đã khoá lại', 'ok'); };
   if (getEkey() && (getSid() || !USER_MODE)) setTimeout(function () { tryUnlock(getEkey(), true); }, 800); // mã cũ còn đúng thì tự mở lại
@@ -1066,6 +1125,11 @@ function autoPlan(prefix) {
     renderAuto();
     const st = res.stats;
     if (ca && res.ca !== ca) throw new Error('Máy chủ chưa lên bản chia ca: dán đè edit.gs + ca2.gs rồi Triển khai phiên bản mới.');
+    if (res.dang) {   // máy chủ đang edit dần tuyến này (mở lại trang / người khác vừa Lưu): chưa cho Lưu, theo dõi tới khi xong
+      msg(pre + '⏳ Tuyến ' + s.code + ': máy chủ ' + res.dang + '. Xong sẽ hiện kết quả + ↩️ Hoàn tác ở đây.', 'info');
+      auTheoDoi(AU);
+      return;
+    }
     msg(pre + (st.sua ? 'Sẽ sửa ' + st.sua + ' chuyến' + caTen + ', chưa ghi gì.' : '✅ Không còn gì cần sửa' + caTen + '.') +
       (st.canXem ? ' ' + st.canXem + ' chuyến cần xem.' : '') + (st.loi ? ' ' + st.loi + ' lỗi.' : ''), st.canXem || st.loi ? 'warn' : 'ok');
   }).catch(function (e) {
@@ -1094,7 +1158,9 @@ function renderAuto() {
       '</div>';
   }
   if (AU.warns.length) out += '<div class="ord-warn">' + AU.warns.map(function (w) { return '<div>⚠️ ' + esc(w) + '</div>'; }).join('') + '</div>';
-  if (AU.done) {
+  if (AU.dang) {
+    out += '<div class="panel-note">⏳ Máy chủ ' + esc(AU.dang) + '. Đóng trang vẫn chạy.</div>';
+  } else if (AU.done) {
     out += '<div class="panel-note ok">✅ Đã lưu lên FUTA và kiểm khớp.</div>';
   } else if (AU.planId) {
     out += '<div class="edit-bar"><button class="edit-btn big" data-auto="save">💾 Lưu ' + st.sua + ' chuyến</button>' +
@@ -1126,7 +1192,7 @@ $('out').addEventListener('click', function (ev) {
   api({ action: 'autosave', fs: getFs(), planId: au.planId, label: au.sel.code, date: isoNgay(au.ngay) }, 360000, 0).then(function (r) {
     napBo(['load', 'lvc']); ovNen();   // giờ đã đổi: cập nhật số trên các ô
     if (r.dang) {   // EDIT DẦN (edit.gs Phần 4): lệnh đầu đã lưu, các lệnh sau máy chủ tự lưu, đóng trang vẫn chạy
-      au.done = true; au.planId = ''; $('btnAuto').disabled = false;
+      au.done = true; au.planId = ''; au.dang = r.dang; $('btnAuto').disabled = false;
       if (MODE === 'auto' && AU === au) renderAuto();
       msg('⏳ Tuyến ' + au.sel.code + ': đã lưu lệnh 1/' + r.nLenh + ' (' + r.saved + ' chuyến). Máy chủ ' + r.dang +
         '. Đóng trang vẫn chạy; xong sẽ hiện kết quả + ↩️ Hoàn tác ở đây.', 'info');
@@ -1162,7 +1228,11 @@ function auTheoDoi(au) {
     if (MODE !== 'auto' || AU !== au) return;
     api({ action: 'autoq', fs: getFs(), routeId: au.sel.id }, 60000).then(function (q) {
       if (MODE !== 'auto' || AU !== au) return;
-      if (q.dang) { msg('⏳ Tuyến ' + au.sel.code + ': máy chủ ' + q.dang + '. Đóng trang vẫn chạy.', 'info'); auTheoDoi(au); return; }
+      if (q.dang) {
+        au.dang = q.dang; renderAuto();
+        msg('⏳ Tuyến ' + au.sel.code + ': máy chủ ' + q.dang + '. Đóng trang vẫn chạy.', 'info'); auTheoDoi(au); return;
+      }
+      au.dang = '';
       napBo(['load', 'lvc']); ovNen();
       const k = q.kq;
       if (!k) { autoPlan('✔ Tuyến ' + au.sel.code + ': edit dần đã xong.'); return; }
@@ -2101,9 +2171,20 @@ function showAuth(tab) {
   document.querySelectorAll('#auth [data-pane]').forEach(function (el) { el.hidden = el.dataset.pane !== tab; });
   $('authTabs').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
   document.querySelectorAll('#auth .fe, #auth .auth-err').forEach(function (el) { el.textContent = ''; el.classList.remove('ok'); });
-  if (tab === 'acc' && ME) $('accInfo').innerHTML = '<b>' + esc(ME.name) + '</b><span>SĐT: ' + esc(ME.phone) + '</span><span>Tài khoản FUTA đang dùng: ' + esc(ME.futa) + '</span>';
+  if (tab === 'acc' && ME) {
+    $('accInfo').innerHTML = '<b>' + esc(ME.name) + '</b><span>SĐT: ' + esc(ME.phone) + '</span><span>CityBus (FUTA): ' + esc(ME.futa) + '</span><span id="accKet">EBMS / GPS3: …</span>';
+    ketMo(getVk(), ME.v).then(function (c) { $('accKet').textContent = 'EBMS: ' + c.eb.u + ' · GPS3: ' + c.g3.u; },
+      function () { $('accKet').textContent = ME.v ? '🔐 EBMS / GPS3: máy này chưa mở được két (đăng nhập lại)' : '🔐 EBMS / GPS3: chưa nhập'; });
+  }
   const f = document.querySelector('#auth [data-pane="' + tab + '"] input');
   if (f) setTimeout(function () { f.focus(); }, 50);
+}
+/** Mở mục Tài khoản ở khung 🔐 EBMS & GPS3, kèm lý do. */
+function showKet(why) {
+  if (!USER_MODE || !ME) return;
+  showAuth('acc');
+  const f = $('fKet'); f.querySelector('.auth-err').textContent = why ? '⚠️ ' + why : '';
+  setTimeout(function () { f.scrollIntoView({ block: 'center' }); const i = f.querySelector('input'); if (i) i.focus(); }, 60);
 }
 function authOk(form, text) { const el = form.querySelector('.auth-err'); el.textContent = text; el.classList.add('ok'); }
 function hideAuth() { $('auth').hidden = true; }
@@ -2128,7 +2209,8 @@ function authForm(form, busyText, check, send, done) {
   };
 }
 function onLogin(res) {
-  localStorage.setItem('web_sid', res.sid); setMe(res.user); hideAuth();
+  localStorage.setItem('web_sid', res.sid); if (res._vk) localStorage.setItem('web_vk', res._vk);
+  setMe(res.user); hideAuth();
   msg('✅ Xin chào ' + res.user.name, 'ok'); loadRoutes();
   if (getEkey()) tryUnlock(getEkey(), true); // mở lại tính năng sửa lệnh nếu đã nhập mã trước đó
 }
@@ -2137,7 +2219,11 @@ authForm($('fLogin'), 'Đang đăng nhập...', function (v) {
   if (!v.phone) return { field: 'phone', message: 'Chưa nhập số điện thoại' };
   if (!v.pass) return { field: 'pass', message: 'Chưa nhập mật khẩu' };
   return null;
-}, function (v) { return apiPost({ action: 'login', phone: v.phone, pass: v.pass }, 60000); }, onLogin);
+}, function (v) {
+  return kdf(v.phone, v.pass).then(function (k) {
+    return apiPost({ action: 'login', phone: v.phone, pass: k.auth }, 60000).then(function (res) { res._vk = k.key; return res; });
+  });
+}, onLogin);
 
 authForm($('fReg'), 'Đang kiểm tra tài khoản FUTA...', function (v) {
   if (!/^0\d{9}$/.test(v.phone.replace(/[\s.\-]/g, ''))) return { field: 'phone', message: 'Số điện thoại phải gồm 10 số, bắt đầu bằng 0' };
@@ -2145,10 +2231,23 @@ authForm($('fReg'), 'Đang kiểm tra tài khoản FUTA...', function (v) {
   if (!okPass(v.pass)) return { field: 'pass', message: PASS_RULE };
   if (v.pass !== v.pass2) return { field: 'pass2', message: 'Nhập lại mật khẩu không khớp' };
   if (!v.futaUser || !v.futaPass) return { field: 'futa', message: 'Chưa nhập đủ tài khoản và mật khẩu FUTA' };
-  return null;
+  return credThieu(v);
 }, function (v) {
-  return apiPost({ action: 'register', phone: v.phone, name: v.name, pass: v.pass, futaUser: v.futaUser, futaPass: v.futaPass }, 90000);
+  const cred = credTu(v);
+  return kdf(v.phone, v.pass).then(function (k) {
+    return ketKhoa(k.key, cred).then(function (ket) {
+      return apiPost({ action: 'register', phone: v.phone, name: v.name, pass: k.auth, futaUser: v.futaUser, futaPass: v.futaPass, v: ket, cred: cred,
+        tk2: getEkey() }, 120000);   // máy chủ USER_MODE = test: đăng ký cần mã mở khoá Điều hành (khoá 2)
+    }).then(function (res) { res._vk = k.key; return res; });
+  });
 }, onLogin);
+
+// 🔐 Cập nhật tài khoản EBMS + GPS3 (đổi mật khẩu EBMS / GPS3, hoặc máy chủ báo sai): thử đăng nhập rồi mới cất két
+authForm($('fKet'), 'Đang thử đăng nhập EBMS + GPS3...', credThieu, function (v) {
+  if (!getVk()) return Promise.reject(new Error('Máy này chưa có chìa két — đăng xuất rồi đăng nhập lại'));
+  const cred = credTu(v);
+  return ketKhoa(getVk(), cred).then(function (ket) { return apiPost({ action: 'ket', v: ket, cred: cred }, 90000); });
+}, function (res) { setMe(res.user); showAuth('acc'); authOk($('fKet'), '✅ Đã lưu tài khoản EBMS + GPS3 (đã khoá bằng mật khẩu web của bạn)'); });
 
 authForm($('fFuta'), 'Đang kiểm tra tài khoản FUTA...', function (v) {
   return v.futaUser && v.futaPass ? null : { field: 'futa', message: 'Chưa nhập đủ tài khoản và mật khẩu FUTA' };
@@ -2160,14 +2259,23 @@ authForm($('fPw'), 'Đang đổi...', function (v) {
   if (!okPass(v.pass)) return { field: 'pass', message: PASS_RULE };
   if (v.pass !== v.pass2) return { field: 'pass2', message: 'Nhập lại mật khẩu không khớp' };
   return null;
-}, function (v) { return apiPost({ action: 'doimk', old: v.old, pass: v.pass }, 60000); },
-function () { authOk($('fPw'), '✅ Đã đổi mật khẩu'); });
+}, function (v) {
+  // chìa két đổi theo mật khẩu: mở két bằng chìa tính từ mật khẩu CŨ, khoá lại bằng chìa MỚI
+  return Promise.all([kdf(ME.phone, v.old), kdf(ME.phone, v.pass)]).then(function (k) {
+    const lai = ME.v ? ketMo(k[0].key, ME.v).then(function (c) { return ketKhoa(k[1].key, c); }, function () { return ''; }) : Promise.resolve('');
+    return lai.then(function (ket) {
+      return apiPost({ action: 'doimk', old: k[0].auth, pass: k[1].auth, v: ket }, 60000);
+    }).then(function (res) { localStorage.setItem('web_vk', k[1].key); return res; });
+  });
+}, function (res) { if (res.user) setMe(res.user); authOk($('fPw'), '✅ Đã đổi mật khẩu. Các máy khác đã bị đăng xuất.'); });
 
 $('authTabs').onclick = function (ev) { const b = ev.target.closest('button[data-tab]'); if (b) showAuth(b.dataset.tab); };
 $('authX').onclick = hideAuth;
+$('btnTk2Out').hidden = !USER_MODE || USER_MODE_ALL;   // đang thử tài khoản bằng khoá 2: luôn có đường quay về mã truy cập
+$('btnTk2Out').onclick = function () { if (confirm('Thoát chế độ thử tài khoản, quay về dùng mã truy cập?')) tk2Thoat(); };
 $('btnLogout').onclick = function () {
   apiPost({ action: 'logout' }, 30000).catch(function () {});
-  localStorage.removeItem('web_sid'); setMe(null);
+  localStorage.removeItem('web_sid'); localStorage.removeItem('web_vk'); setMe(null);
   xoaMan(); msg('Đã đăng xuất');
   showAuth('login');
 };

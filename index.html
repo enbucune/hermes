@@ -154,7 +154,7 @@
     <div data-box="me" hidden>
       <div class="auth-logo">👤 <b id="meName"></b></div>
       <div class="me-row"><span id="meFuta"></span><button type="button" id="btnFutaIn" class="btn-soft">Đăng nhập</button><button type="button" id="btnFutaOut" class="btn-soft" hidden>Đăng xuất</button></div>
-      <div class="me-row" id="meDh" hidden><span>🔓 Điều hành đang mở</span><button type="button" id="btnLock" class="btn-soft">Khoá lại</button></div>
+      <div class="me-row" id="meDh" hidden><span>🔓 Điều hành đang mở</span><button type="button" id="btnTk2" class="btn-soft">👤 Thử tài khoản</button><button type="button" id="btnLock" class="btn-soft">Khoá lại</button></div>
       <button type="button" id="btnChange" class="btn-soft">Đổi tên / mã truy cập</button>
     </div>
   </div>
@@ -185,6 +185,11 @@
       <div class="auth-sec">🔗 Tài khoản FUTA của bạn<small>Web sẽ dùng tài khoản này để chạy mọi thao tác thay cho bạn. Mật khẩu FUTA không được lưu lại.</small></div>
       <div class="field"><label>Tài khoản FUTA</label><input type="text" name="futaUser" autocomplete="off"></div>
       <div class="field"><label>Mật khẩu FUTA</label><input type="password" name="futaPass" autocomplete="off"><small class="fe" data-for="futa"></small></div>
+      <div class="auth-sec">🔐 Tài khoản EBMS + GPS3 của bạn<small>Được khoá bằng mật khẩu web ngay trên máy này rồi mới gửi đi. Máy chủ chỉ giữ bản đã khoá, không ai đọc được. Máy khác chỉ cần đăng nhập web.</small></div>
+      <div class="field"><label>Tài khoản EBMS</label><input type="text" name="ebUser" autocomplete="off"></div>
+      <div class="field"><label>Mật khẩu EBMS</label><input type="password" name="ebPass" autocomplete="off"><small class="fe" data-for="cred_eb"></small></div>
+      <div class="field"><label>Tài khoản GPS3 (Bình Anh)</label><input type="text" name="g3User" autocomplete="off"></div>
+      <div class="field"><label>Mật khẩu GPS3</label><input type="password" name="g3Pass" autocomplete="off"><small class="fe" data-for="cred_g3"></small></div>
       <div class="auth-err"></div>
       <button type="submit" class="act act-main">Tạo tài khoản</button>
     </form>
@@ -198,6 +203,15 @@
         <div class="auth-err"></div>
         <button type="submit" class="btn-soft">Cập nhật FUTA</button>
       </form>
+      <form id="fKet" autocomplete="off">
+        <div class="auth-sec">🔐 EBMS &amp; GPS3<small>Đổi mật khẩu EBMS / GPS3 thì nhập lại ở đây. Khoá bằng mật khẩu web của bạn, máy chủ không đọc được.</small></div>
+        <div class="field"><label>Tài khoản EBMS</label><input type="text" name="ebUser" autocomplete="off"></div>
+        <div class="field"><label>Mật khẩu EBMS</label><input type="password" name="ebPass" autocomplete="off"><small class="fe" data-for="cred_eb"></small></div>
+        <div class="field"><label>Tài khoản GPS3 (Bình Anh)</label><input type="text" name="g3User" autocomplete="off"></div>
+        <div class="field"><label>Mật khẩu GPS3</label><input type="password" name="g3Pass" autocomplete="off"><small class="fe" data-for="cred_g3"></small></div>
+        <div class="auth-err"></div>
+        <button type="submit" class="btn-soft">Lưu EBMS + GPS3</button>
+      </form>
       <form id="fPw" autocomplete="off">
         <div class="auth-sec">🔑 Đổi mật khẩu web</div>
         <div class="field"><label>Mật khẩu cũ</label><input type="password" name="old" autocomplete="current-password"><small class="fe" data-for="old"></small></div>
@@ -208,10 +222,11 @@
       </form>
       <button type="button" class="btn-out" id="btnLogout">🚪 Đăng xuất</button>
     </div>
+    <button type="button" class="btn-out" id="btnTk2Out" hidden>↩️ Thoát thử tài khoản (về mã truy cập)</button>
   </div>
 </div>
 
-<script src="app.js?v=63"></script>
+<script src="app.js?v=67"></script>
 <script src="lapbt.js?v=48"></script>
 </body>
 </html>
