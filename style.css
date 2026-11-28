@@ -798,3 +798,14 @@ html[data-theme="dark"] .c2-log .good, html[data-theme="dark"] .c2-ok-t, html[da
 .ie-ok { color: var(--ok, #138A55); } .ie-err { color: var(--err, #C9303F); } .ie-warn { color: var(--amber, #B26A00); }
 .ie-dot-red { color: #E5484D; } .ie-dot-amber { color: #F59E0B; } .ie-dot-yellow { color: #EAB308; } .ie-dot-green { color: #22A06B; } .ie-dot-gray { color: #9AA4B2; }
 #msg .ie, .panel-note.ok .ie-ok, .panel-note.err .ie-err, .panel-note.err .ie-warn { color: inherit; }
+
+/* ===== 28/11/2026: thanh "Có bản mới" (app.js verThanh) ===== */
+#verBar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px;
+  max-width: calc(100vw - 24px); padding: 10px 12px 10px 16px; border-radius: 12px; background: var(--blue-700, #1D3F9E); color: #fff;
+  font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px rgba(15, 30, 70, .25); }
+#verBar[hidden] { display: none; }
+#verBar .edit-btn { background: #fff; color: var(--blue-700, #1D3F9E); white-space: nowrap; flex-shrink: 0; }
+#verBar .ub-x { flex-shrink: 0; margin-left: 0; }
+#verBar .ub-x { background: none; border: 0; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; opacity: .8; padding: 0 4px; }
+#verBar .ie { color: inherit; }
+@media (max-width: 600px) { #verBar { bottom: 10px; font-size: 13px; } }

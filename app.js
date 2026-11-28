@@ -2430,3 +2430,62 @@ function gpsReport(g, st) {
     notifyDone(st.conclusion === 'success' ? '🛰 Chụp GPS xong' : '⚠️ Chụp GPS có chuyến lỗi', 'Tuyến ' + sent.codes);
   });
 }
+
+// ===== TỰ BIẾT CÓ BẢN MỚI (28/11/2026) =====
+// Trang đang mở không tự lấy code mới. Web tự đọc lại index.html trên GitHub (không qua bộ nhớ đệm) và so số ?v= của các file
+// (app.js, style.css, icons.js...) với bản đang chạy. KHÔNG cần sửa tay gì: đổi file nào thì tăng ?v= file đó như vẫn làm.
+// Mỗi 5 phút + mỗi lần quay lại tab: khác ->
+//   tab đang ẩn + không làm dở việc gì -> tự tải lại; còn lại -> hiện thanh "Có bản mới" để người dùng bấm.
+function verKy(html) {   // "app.js=73|icons.js=1|style.css=65|..." từ các thẻ <script src> / <link href> có ?v=
+  const o = {}, re = /(?:src|href)\s*=\s*["']([^"'?]+\.(?:js|css))\?v=([\w.-]+)["']/gi;
+  let m; while ((m = re.exec(html))) o[m[1].split('/').pop()] = m[2];
+  return Object.keys(o).sort().map(function (k) { return k + '=' + o[k]; }).join('|');
+}
+// đếm LÚC HỎI (không đếm ngay): app.js chạy khi các thẻ <script> phía dưới (lapbt.js) chưa được đọc tới
+let WEB_VER = '';
+function verNay() {
+  if (!WEB_VER) WEB_VER = verKy(Array.prototype.map.call(document.querySelectorAll('script[src],link[href]'), function (el) { return el.outerHTML; }).join('\n'));
+  return WEB_VER;
+}
+let VER_MOI = '';
+function verAnToan() {   // tải lại lúc này có làm mất gì không
+  return !busy() && $('box').hidden && TAB !== 'bt' && !(typeof GPS_RUN !== 'undefined' && GPS_RUN) &&
+    !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value);
+}
+function verTaiLai() {
+  try { sessionStorage.setItem('ver_reload', VER_MOI); } catch (e) { /* bỏ */ }
+  location.reload();
+}
+function verThanh() {
+  let bar = $('verBar');
+  if (!bar) {
+    bar = document.createElement('div'); bar.id = 'verBar'; bar.setAttribute('role', 'status');
+    bar.innerHTML = '<span>🔄 Web có bản mới. Cập nhật để dùng giao diện và chức năng mới nhất.</span>' +
+      '<button type="button" class="edit-btn" id="verOk">Cập nhật</button><button type="button" class="ub-x" id="verX" aria-label="Để sau">×</button>';
+    document.body.appendChild(bar);
+    $('verOk').onclick = verTaiLai;
+    $('verX').onclick = function () { bar.hidden = true; };
+  }
+  bar.hidden = false;
+}
+function verHoi() {
+  if (!verNay() || location.protocol === 'file:') return;
+  fetch(location.pathname + '?ver=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (html) {
+    const t = verKy(html);
+    if (!t || t === WEB_VER) return;   // đọc lỗi / trang lạ / chưa có gì mới
+    VER_MOI = t;
+    let daThu = '';
+    try { daThu = sessionStorage.getItem('ver_reload') || ''; } catch (e) { /* bỏ */ }
+    // tab ẩn: tự tải lại (mỗi bản chỉ tự tải 1 lần, lỡ GitHub còn trả trang cũ thì khỏi tải lại mãi)
+    if (document.hidden && daThu !== t && verAnToan()) verTaiLai(); else verThanh();
+  }).catch(function () { /* mất mạng: lần sau hỏi */ });
+}
+setInterval(verHoi, 5 * 60 * 1000);
+setTimeout(verHoi, 20000);
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) verHoi();
+  else if (VER_MOI && verAnToan()) {
+    let daThu = ''; try { daThu = sessionStorage.getItem('ver_reload') || ''; } catch (e) { /* bỏ */ }
+    if (daThu !== VER_MOI) verTaiLai();
+  }
+});
