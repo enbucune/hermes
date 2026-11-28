@@ -111,54 +111,62 @@
     .ic { flex-basis: 38px; height: 38px; font-size: 20px; }
     .detail { padding: 12px 13px; }
   }
+
+/* ===== 28/11/2026: emoji -> icon nét Lucide (thay sẵn trong trang) ===== */
+.ic-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+svg.ie { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -.17em; flex-shrink: 0; }
+.ic svg.ie { width: 22px; height: 22px; color: var(--blue, #2A5BD7); }
+.ie-ok { color: #138A55; } .ie-err { color: #C9303F; } .ie-warn { color: #B26A00; }
+.ie-dot-red { color: #E5484D; } .ie-dot-amber { color: #F59E0B; } .ie-dot-yellow { color: #EAB308; } .ie-dot-green { color: #22A06B; } .ie-dot-gray { color: #9AA4B2; }
 </style>
 </head>
 <body>
+<svg class="ic-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><symbol id="e-alarm-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-alarm-clock" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="13" r="8" /> <path d="M12 9v4l2 2" /> <path d="M5 3 2 6" /> <path d="m22 6-3-3" /> <path d="M6.38 18.7 4 21" /> <path d="M17.64 18.67 20 21" /></symbol><symbol id="e-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-ban" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></symbol><symbol id="e-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-book-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 5v16" /> <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" /></symbol><symbol id="e-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-bot" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 8V4H8" /> <rect width="16" height="12" x="4" y="8" rx="2" /> <path d="M2 14h2" /> <path d="M20 14h2" /> <path d="M15 13v2" /> <path d="M9 13v2" /></symbol><symbol id="e-bus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-bus" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M8 6v6" /> <path d="M15 6v6" /> <path d="M2 12h19.6" /> <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" /> <circle cx="7" cy="18" r="2" /> <path d="M9 18h5" /> <circle cx="16" cy="18" r="2" /></symbol><symbol id="e-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-calendar" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /></symbol><symbol id="e-chart-column" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-chart-column" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></symbol><symbol id="e-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-check" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M20 6 9 17l-5-5" /></symbol><symbol id="e-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-circle-check" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /></symbol><symbol id="e-circle-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-circle-help" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9 9.5a3 2.5 0 016 0c0 2-2 2-3 3.5" /> <path d="M12 17h.01" /></symbol><symbol id="e-circle-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-circle-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></symbol><symbol id="e-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-clipboard-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="e-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-clock" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol><symbol id="e-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor"/></symbol><symbol id="e-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-download" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></symbol><symbol id="e-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-eye" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></symbol><symbol id="e-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-file-text" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></symbol><symbol id="e-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-folder-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol><symbol id="e-hourglass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-hourglass" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></symbol><symbol id="e-key-round" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-key-round" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" /> <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></symbol><symbol id="e-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-link" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol><symbol id="e-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-lock" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="e-lock-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-lock-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 9.9-1" /></symbol><symbol id="e-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-log-out" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m16 17 5-5-5-5" /> <path d="M21 12H9" /> <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /></symbol><symbol id="e-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol><symbol id="e-notebook-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-notebook-pen" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" /> <path d="M2 6h4" /> <path d="M2 10h4" /> <path d="M2 14h4" /> <path d="M2 18h4" /> <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" /></symbol><symbol id="e-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-pencil" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="e-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-play" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol><symbol id="e-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-plus" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> <path d="M12 5v14" /></symbol><symbol id="e-radio-tower" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-radio-tower" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9" /> <path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5" /> <circle cx="12" cy="9" r="2" /> <path d="M16.2 4.8c2 2 2.26 5.11.8 7.47" /> <path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1" /> <path d="M9.5 18h5" /> <path d="m8 22 4-11 4 11" /></symbol><symbol id="e-redo-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-redo-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m15 14 5-5-5-5" /> <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" /></symbol><symbol id="e-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-refresh-cw" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="e-rotate-ccw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-rotate-ccw" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /></symbol><symbol id="e-rotate-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-rotate-cw" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /></symbol><symbol id="e-satellite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-satellite" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5" /> <path d="M16.5 7.5 19 5" /> <path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5" /> <path d="M9 21a6 6 0 0 0-6-6" /> <path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z" /></symbol><symbol id="e-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-save" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></symbol><symbol id="e-scroll-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-scroll-text" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 12h-5" /> <path d="M15 8h-5" /> <path d="M19 17V5a2 2 0 0 0-2-2H4" /> <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" /></symbol><symbol id="e-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-search" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol><symbol id="e-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-send" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></symbol><symbol id="e-signature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-signature" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284" /> <path d="M3 21h18" /></symbol><symbol id="e-skip-forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-skip-forward" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 4v16" /> <path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol><symbol id="e-sliders-horizontal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-sliders-horizontal" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></symbol><symbol id="e-smartphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-smartphone" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect x="6" y="2" width="12" height="20" rx="2" ry="2" /> <path d="M12 18h.01" /></symbol><symbol id="e-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-square" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" /></symbol><symbol id="e-square-parking" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-square-parking" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M9 12h4a2 2 0 0 0 0-4H9.5a.5.5 0 0 0-.5.5V16" /> <rect width="18" height="18" x="3" y="3" rx="2" /></symbol><symbol id="e-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol><symbol id="e-ticket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-ticket" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" /> <path d="M13 5v2" /> <path d="M13 17v2" /> <path d="M13 11v2" /></symbol><symbol id="e-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-timer" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="10" x2="14" y1="2" y2="2" /> <line x1="12" x2="15" y1="14" y2="11" /> <circle cx="12" cy="14" r="8" /></symbol><symbol id="e-triangle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-triangle-alert" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="e-undo-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-undo-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></symbol><symbol id="e-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-upload" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="e-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-user" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></symbol><symbol id="e-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-users" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol><symbol id="e-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-wrench" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></symbol><symbol id="e-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol><symbol id="e-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><svg class="lucide lucide-zap" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></symbol></svg>
 <div class="wrap">
 
 <div class="top">
-  <h1>📖 Hướng dẫn sử dụng<small>Check edit cụm 9 · mỗi chức năng có giải thích ngắn, cần thêm thì bấm <b>Xem chi tiết</b></small></h1>
+  <h1><svg class="ie" aria-hidden="true"><use href="#e-book-open"/></svg> Hướng dẫn sử dụng<small>Check edit cụm 9 · mỗi chức năng có giải thích ngắn, cần thêm thì bấm <b>Xem chi tiết</b></small></h1>
   <a class="back" href="index.html">← Về web</a>
 </div>
 
 <!-- ===================== DÙNG NHANH ===================== -->
 <section class="quick">
-  <h2>⚡ Dùng nhanh trong 1 phút</h2>
+  <h2><svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Dùng nhanh trong 1 phút</h2>
   <p>Làm theo 6 bước là dùng được hằng ngày.</p>
   <ol class="qs">
     <li><b>Vào web</b>Nhập mã truy cập và tên của bạn (chỉ lần đầu).</li>
     <li><b>Chọn tuyến + ngày</b>Ở trên cùng. Đổi là web tự tải lại.</li>
     <li><b>Nhìn 6 ô số</b>Số đỏ = có việc. Bấm ô để xem chi tiết.</li>
-    <li><b>Xem dải 📤</b>Lệnh hôm kia chưa đẩy thì đẩy trên FUTA trước 12:00.</li>
-    <li><b>Bấm ⚡ Chỉnh lệnh</b>Xem trước rồi 💾 Lưu. Sai thì ↩️ Hoàn tác.</li>
-    <li><b>Tối không trực?</b>Mục 🌙 Tự động: bật Ca 2, chọn tối đa 3 tuyến.</li>
+    <li><b>Xem dải <svg class="ie" aria-hidden="true"><use href="#e-send"/></svg></b>Lệnh hôm kia chưa đẩy thì đẩy trên FUTA trước 12:00.</li>
+    <li><b>Bấm <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh</b>Xem trước rồi <svg class="ie" aria-hidden="true"><use href="#e-save"/></svg> Lưu. Sai thì <svg class="ie" aria-hidden="true"><use href="#e-undo-2"/></svg> Hoàn tác.</li>
+    <li><b>Tối không trực?</b>Mục <svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Tự động: bật Ca 2, chọn tối đa 3 tuyến.</li>
   </ol>
-  <div class="qnote"><span>⛔ Ký rồi không gỡ được</span><span>🔄 Số chưa mới? Bấm Lấy mới</span><span>📱 Điện thoại: 3 mục nằm dưới đáy</span></div>
+  <div class="qnote"><span><svg class="ie ie-err" aria-hidden="true"><use href="#e-ban"/></svg> Ký rồi không gỡ được</span><span><svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Số chưa mới? Bấm Lấy mới</span><span><svg class="ie" aria-hidden="true"><use href="#e-smartphone"/></svg> Điện thoại: 3 mục nằm dưới đáy</span></div>
 </section>
 
 <div class="legend">Nhãn trên mỗi chức năng:
-  <span class="tag t-xem">👁 Chỉ xem</span>
-  <span class="tag t-sua">✏️ Sửa trên FUTA</span>
-  <span class="tag t-ky">✍️ Có ký · không gỡ được</span>
-  <span class="tag t-auto">🤖 Máy tự chạy</span>
+  <span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span>
+  <span class="tag t-sua"><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Sửa trên FUTA</span>
+  <span class="tag t-ky"><svg class="ie" aria-hidden="true"><use href="#e-signature"/></svg> Có ký · không gỡ được</span>
+  <span class="tag t-auto"><svg class="ie" aria-hidden="true"><use href="#e-bot"/></svg> Máy tự chạy</span>
 </div>
 <nav class="toc" aria-label="Mục lục">
-  <a href="#batdau">🔑 Bắt đầu</a><a href="#tongquan">📊 Tổng quan</a><a href="#giochay">⏱ Giờ chạy</a><a href="#matchuyen">🛰 Mất chuyến</a>
-  <a href="#lenh">📋 Lệnh</a><a href="#ebms">🔎 EBMS</a><a href="#nhanvien">👥 Nhân viên</a><a href="#daylenh">📤 Đẩy lệnh</a>
-  <a href="#chinhlenh">⚡ Chỉnh lệnh</a><a href="#hoantac">↩️ Hoàn tác</a><a href="#batca">🌙 Bật ca</a><a href="#ca1">☀️ Ca 1</a><a href="#ca2">🌙 Ca 2</a>
-  <a href="#veben">🅿️ Về bến</a><a href="#bangtai">🗂 Bảng tài</a><a href="#laymoi">🔄 Lấy mới</a><a href="#loi">❓ Gặp lỗi</a>
+  <a href="#batdau"><svg class="ie" aria-hidden="true"><use href="#e-key-round"/></svg> Bắt đầu</a><a href="#tongquan"><svg class="ie" aria-hidden="true"><use href="#e-chart-column"/></svg> Tổng quan</a><a href="#giochay"><svg class="ie" aria-hidden="true"><use href="#e-timer"/></svg> Giờ chạy</a><a href="#matchuyen"><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg> Mất chuyến</a>
+  <a href="#lenh"><svg class="ie" aria-hidden="true"><use href="#e-clipboard-list"/></svg> Lệnh</a><a href="#ebms"><svg class="ie" aria-hidden="true"><use href="#e-search"/></svg> EBMS</a><a href="#nhanvien"><svg class="ie" aria-hidden="true"><use href="#e-users"/></svg> Nhân viên</a><a href="#daylenh"><svg class="ie" aria-hidden="true"><use href="#e-send"/></svg> Đẩy lệnh</a>
+  <a href="#chinhlenh"><svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh</a><a href="#hoantac"><svg class="ie" aria-hidden="true"><use href="#e-undo-2"/></svg> Hoàn tác</a><a href="#batca"><svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Bật ca</a><a href="#ca1"><svg class="ie" aria-hidden="true"><use href="#e-sun"/></svg> Ca 1</a><a href="#ca2"><svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Ca 2</a>
+  <a href="#veben"><svg class="ie" aria-hidden="true"><use href="#e-square-parking"/></svg> Về bến</a><a href="#bangtai"><svg class="ie" aria-hidden="true"><use href="#e-folder-open"/></svg> Bảng tài</a><a href="#laymoi"><svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Lấy mới</a><a href="#loi"><svg class="ie" aria-hidden="true"><use href="#e-circle-help"/></svg> Gặp lỗi</a>
 </nav>
 
 <!-- ===================== BẮT ĐẦU ===================== -->
 <section class="sec">
-  <div class="sec-h"><h2>🔑 Bắt đầu</h2></div>
+  <div class="sec-h"><h2><svg class="ie" aria-hidden="true"><use href="#e-key-round"/></svg> Bắt đầu</h2></div>
 
   <article class="fn" id="batdau">
-    <div class="fn-h"><span class="ic">🔑</span><div><h3>Vào web và đăng nhập FUTA</h3></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-key-round"/></svg></span><div><h3>Vào web và đăng nhập FUTA</h3></div></div>
     <p class="short">Mã truy cập để vào web. Tài khoản FUTA của bạn để web sửa lệnh <b>thay bạn</b>.</p>
     <ul class="steps">
       <li>Lần đầu nhập <b>mã truy cập</b> (hỏi người quản lý) và <b>tên</b>.</li>
-      <li>Khi bấm ⚡ Chỉnh lệnh hoặc vào 🌙 Tự động, web hỏi tài khoản FUTA.</li>
+      <li>Khi bấm <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh hoặc vào <svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Tự động, web hỏi tài khoản FUTA.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -166,21 +174,21 @@
         <ul>
           <li>Máy nhớ, lần sau mở web là vào thẳng.</li>
           <li>Tên dùng để ghi <b>ai đã làm gì</b>: ai lưu, ai hoàn tác, ai bật ca.</li>
-          <li>Đổi tên / mã: nút <kbd>👤</kbd> góc phải → <b>Đổi tên / mã truy cập</b>.</li>
+          <li>Đổi tên / mã: nút <kbd><svg class="ie" aria-hidden="true"><use href="#e-user"/></svg></kbd> góc phải → <b>Đổi tên / mã truy cập</b>.</li>
         </ul>
         <h4>Tài khoản FUTA</h4>
         <ul>
-          <li>Web gửi tài khoản lên máy chủ để đăng nhập FUTA, <b>không lưu mật khẩu</b>. Phiên giữ <b>6 giờ</b>, hết thì web tự hỏi lại.</li>
+          <li>Web gửi tài khoản lên máy chủ để đăng nhập FUTA, <b>không lưu mật khẩu</b>. Đăng nhập <b>giữ mãi</b> tới khi bạn bấm Đăng xuất (hoặc đổi mật khẩu FUTA thì web hỏi lại).</li>
           <li>Mọi việc sửa / ký chạy bằng tài khoản của bạn, nên trên FUTA sẽ ghi tên bạn.</li>
-          <li>Chỉ cần cho: ⚡ Chỉnh lệnh và 🌙 Tự động. Các ô xem (Giờ chạy, Lệnh, EBMS...) không cần.</li>
-          <li>Dùng máy chung thì nhớ <kbd>👤</kbd> → <b>Đăng xuất</b>. Ca đã bật vẫn chạy tiếp.</li>
+          <li>Chỉ cần cho: <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh và <svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Tự động. Các ô xem (Giờ chạy, Lệnh, EBMS...) không cần.</li>
+          <li>Dùng máy chung thì nhớ <kbd><svg class="ie" aria-hidden="true"><use href="#e-user"/></svg></kbd> → <b>Đăng xuất</b>. Ca đã bật vẫn chạy tiếp.</li>
         </ul>
       </div>
     </details>
   </article>
 
   <article class="fn">
-    <div class="fn-h"><span class="ic">📅</span><div><h3>Chọn tuyến và ngày</h3></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-calendar"/></svg></span><div><h3>Chọn tuyến và ngày</h3></div></div>
     <p class="short">Mọi màn dùng chung tuyến + ngày ở thanh trên cùng. Đổi là màn đang mở tự tải lại.</p>
     <ul class="steps">
       <li>Tuyến: bấm vào chọn, hoặc gõ số / tên (gõ không dấu được, vd <kbd>31</kbd>, <kbd>cong vien</kbd>).</li>
@@ -191,10 +199,10 @@
 
 <!-- ===================== XEM & KIỂM TRA ===================== -->
 <section class="sec">
-  <div class="sec-h"><h2>🚌 Xem và kiểm tra</h2><span>6 ô số ở mục Tuyến</span></div>
+  <div class="sec-h"><h2><svg class="ie" aria-hidden="true"><use href="#e-bus"/></svg> Xem và kiểm tra</h2><span>6 ô số ở mục Tuyến</span></div>
 
   <article class="fn" id="tongquan">
-    <div class="fn-h"><span class="ic">📊</span><div><h3>Tổng quan</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-chart-column"/></svg></span><div><h3>Tổng quan</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">Gom mọi lỗi theo <b>từng xe</b>, xe nhiều việc nhất đứng đầu. Nhìn là biết xử lý xe nào trước.</p>
     <ul class="steps">
       <li>Bấm ô <b>Tổng quan</b> (web mở sẵn màn này khi vào).</li>
@@ -204,22 +212,22 @@
       <div class="detail">
         <h4>Cách hoạt động</h4>
         <p>Web ghép 3 nguồn theo biển số: <b>Giờ chạy</b> (ô màu), <b>Mất chuyến</b>, <b>Lệnh</b> (lỗi kiểm tra). Mỗi xe được chấm điểm việc cần làm:</p>
-        <div class="flow"><span>🔴 Lệnh lỗi</span><i>›</i><span>Mất chuyến</span><i>›</i><span>Giờ đỏ</span><i>›</i><span>🟠 Lệnh cảnh báo</span><i>›</i><span>Vàng / xanh / tím</span></div>
+        <div class="flow"><span><svg class="ie ie-dot-red" aria-hidden="true"><use href="#e-dot"/></svg> Lệnh lỗi</span><i>›</i><span>Mất chuyến</span><i>›</i><span>Giờ đỏ</span><i>›</i><span><svg class="ie ie-dot-amber" aria-hidden="true"><use href="#e-dot"/></svg> Lệnh cảnh báo</span><i>›</i><span>Vàng / xanh / tím</span></div>
         <ul>
-          <li>Xe nặng nhất lên đầu. Xe không có gì gom vào dòng <b>✅ n xe không có gì cần xử lý</b>.</li>
+          <li>Xe nặng nhất lên đầu. Xe không có gì gom vào dòng <b><svg class="ie ie-ok" aria-hidden="true"><use href="#e-circle-check"/></svg> n xe không có gì cần xử lý</b>.</li>
           <li>Cột <b>Lệnh</b> hiện lỗi đầu tiên, <b>+2</b> nghĩa là còn 2 lỗi khác.</li>
-          <li>Bấm biển số: web điền sẵn xe vào ô <b>Biển số</b> → bấm ⚡ Chỉnh lệnh là sửa riêng xe đó.</li>
+          <li>Bấm biển số: web điền sẵn xe vào ô <b>Biển số</b> → bấm <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh là sửa riêng xe đó.</li>
         </ul>
       </div>
     </details>
   </article>
 
   <article class="fn" id="giochay">
-    <div class="fn-h"><span class="ic">⏱</span><div><h3>Giờ chạy</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-timer"/></svg></span><div><h3>Giờ chạy</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">Soi 4 giờ của mỗi chuyến: <b>điều xe · đi · đến · về bến</b>, tô màu chỗ sai.</p>
     <ul class="steps">
       <li>Bấm ô <b>Giờ chạy</b>. Bấm chip màu phía trên để chỉ xem loại đó.</li>
-      <li>Thấy màu thì bấm ⚡ Chỉnh lệnh, đa số sẽ hết.</li>
+      <li>Thấy màu thì bấm <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh, đa số sẽ hết.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -238,11 +246,11 @@
   </article>
 
   <article class="fn" id="matchuyen">
-    <div class="fn-h"><span class="ic">🛰</span><div><h3>Mất chuyến · chụp GPS</h3><div class="tags"><span class="tag t-xem">👁 Không sửa FUTA</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg></span><div><h3>Mất chuyến · chụp GPS</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Không sửa FUTA</span></div></div></div>
     <p class="short">Liệt kê chuyến mất và <b>chụp ảnh GPS</b> làm bằng chứng.</p>
     <ul class="steps">
       <li>Bấm ô <b>Mất chuyến</b>, chọn 1 hoặc nhiều tuyến.</li>
-      <li>Tick chuyến → bấm <kbd>🛰 Chụp</kbd>. Xong web báo, link ảnh nằm trong Google Sheet.</li>
+      <li>Tick chuyến → bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg> Chụp</kbd>. Xong web báo, link ảnh nằm trong Google Sheet.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -264,11 +272,11 @@
   </article>
 
   <article class="fn" id="lenh">
-    <div class="fn-h"><span class="ic">📋</span><div><h3>Lệnh (kiểm tra lệnh vận chuyển)</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-clipboard-list"/></svg></span><div><h3>Lệnh (kiểm tra lệnh vận chuyển)</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">Soát từng lệnh theo <b>7 tiêu chí</b>: GPLX, đăng kiểm, tên lái xe, giờ ký...</p>
     <ul class="steps">
-      <li>Bấm ô <b>Lệnh</b>. ✅ Đạt · 🟠 Cảnh báo · 🔴 Lỗi.</li>
-      <li>Sửa xong trên FUTA thì bấm 🔄 Lấy mới để kiểm lại.</li>
+      <li>Bấm ô <b>Lệnh</b>. <svg class="ie ie-ok" aria-hidden="true"><use href="#e-circle-check"/></svg> Đạt · <svg class="ie ie-dot-amber" aria-hidden="true"><use href="#e-dot"/></svg> Cảnh báo · <svg class="ie ie-dot-red" aria-hidden="true"><use href="#e-dot"/></svg> Lỗi.</li>
+      <li>Sửa xong trên FUTA thì bấm <svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Lấy mới để kiểm lại.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -283,19 +291,19 @@
           <li><b>Điều hành</b> ký <b>sau</b> giờ xác nhận về bến của chuyến cuối.</li>
         </ol>
         <p>Cùng phút vẫn tính đạt (tiêu chí 4, 6, 7).</p>
-        <h4>Khi nào ra 🟠 cảnh báo?</h4>
-        <p>Thường do lệnh còn chuyến <b>đỏ chưa chỉnh</b> nên FUTA chưa trả đủ dữ liệu để kiểm. Bấm ⚡ Chỉnh lệnh xong kiểm lại là hết.</p>
+        <h4>Khi nào ra <svg class="ie ie-dot-amber" aria-hidden="true"><use href="#e-dot"/></svg> cảnh báo?</h4>
+        <p>Thường do lệnh còn chuyến <b>đỏ chưa chỉnh</b> nên FUTA chưa trả đủ dữ liệu để kiểm. Bấm <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh xong kiểm lại là hết.</p>
         <p>Lệnh đã ký xong máy chủ nhớ 6 giờ, nên lần kiểm sau nhanh hơn.</p>
       </div>
     </details>
   </article>
 
   <article class="fn" id="ebms">
-    <div class="fn-h"><span class="ic">🔎</span><div><h3>So sánh EBMS</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-search"/></svg></span><div><h3>So sánh EBMS</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">So giờ trên <b>CityBus</b> (tiếp viên bấm) với <b>EBMS</b> (giờ thực tế theo GPS) để biết giờ nào bấm sai.</p>
     <ul class="steps">
       <li>Bấm ô <b>EBMS</b> (chạy khoảng 20–40 giây).</li>
-      <li>Ô tô màu = lệch từ 7 phút. Đọc khung <b>🛰</b> để biết sửa hay không.</li>
+      <li>Bấm chip <b>Xem lại CityBus</b> để chỉ còn chuyến phải sửa. <b>Bấm 1 dòng</b> để xem đủ chi tiết chuyến đó.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -308,9 +316,9 @@
         <h4>Kết luận GPS</h4>
         <div class="tbl"><table>
           <tr><th>Khung</th><th>Nghĩa</th><th>Làm gì</th></tr>
-          <tr><td><b style="color:var(--err)">🛰 XEM LẠI CITYBUS</b></td><td>GPS cho thấy giờ CityBus sai từ 7 phút</td><td>Sửa giờ trên CityBus</td></tr>
-          <tr><td><b style="color:var(--ok)">🛰 CITYBUS ĐÚNG</b></td><td>GPS khớp CityBus</td><td>Không cần làm</td></tr>
-          <tr><td><b>🛰 CHƯA RÕ</b></td><td>GPS không ghi nhận / không khớp bên nào</td><td>Tra tay nếu cần</td></tr>
+          <tr><td><b style="color:var(--err)"><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg> XEM LẠI CITYBUS</b></td><td>GPS cho thấy giờ CityBus sai từ 7 phút</td><td>Sửa giờ trên CityBus</td></tr>
+          <tr><td><b style="color:var(--ok)"><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg> CITYBUS ĐÚNG</b></td><td>GPS khớp CityBus</td><td>Không cần làm</td></tr>
+          <tr><td><b><svg class="ie" aria-hidden="true"><use href="#e-satellite"/></svg> CHƯA RÕ</b></td><td>GPS không ghi nhận / không khớp bên nào</td><td>Tra tay nếu cần</td></tr>
         </table></div>
         <h4>Cần để ý nhất</h4>
         <ul>
@@ -318,17 +326,23 @@
           <li>Xuất bến lệch lịch <b>dưới 10 phút</b> là bình thường, không cần quan tâm.</li>
           <li>Đề xuất mất chuyến không liệt kê ở đây.</li>
         </ul>
-        <p>Bảng mặc định là bảng gọn. Cần đủ cột thì bấm <kbd>📋 Chi tiết</kbd>.</p>
+        <h4>Các chip đếm (xếp theo việc cần làm)</h4>
+        <ul>
+          <li><b>Cần xử lý</b>: mọi chuyến chưa khớp. Trong đó <b>Xem lại CityBus</b> (phải sửa), <b>CityBus đúng</b> (GPS xác nhận, khỏi sửa), <b>GPS chưa rõ</b> (tra tay).</li>
+          <li><b>Khớp EBMS</b>: không có gì phải làm. Bộ lọc bạn chọn được nhớ cho lần mở sau.</li>
+        </ul>
+        <p>Bảng mặc định là bảng gọn, cột <b>Chuyến</b> (giờ lịch + biển số) luôn đứng yên khi kéo ngang. Cần đủ cột thì bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-clipboard-list"/></svg> Chi tiết</kbd> (web nhớ lựa chọn này).
+          Mọi bảng xếp cùng thứ tự <b>CityBus · EBMS · GPS</b>.</p>
       </div>
     </details>
   </article>
 
   <article class="fn" id="nhanvien">
-    <div class="fn-h"><span class="ic">👥</span><div><h3>Nhân viên</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-users"/></svg></span><div><h3>Nhân viên</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">Lấy danh sách <b>lái xe + tiếp viên</b> đã chạy trong ngày để làm báo cáo <b>đo nồng độ cồn</b>.</p>
     <ul class="steps">
-      <li>Bấm ô <b>Nhân viên</b> → <kbd>📋 Copy</kbd> dán vào Google Sheet.</li>
-      <li>Bấm <kbd>📝 Nhập đo cồn tuyến ...</kbd> để mở thẳng file đo cồn của tuyến.</li>
+      <li>Bấm ô <b>Nhân viên</b> → <kbd><svg class="ie" aria-hidden="true"><use href="#e-clipboard-list"/></svg> Copy</kbd> dán vào Google Sheet.</li>
+      <li>Bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-notebook-pen"/></svg> Nhập đo cồn tuyến ...</kbd> để mở thẳng file đo cồn của tuyến.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -344,8 +358,8 @@
   </article>
 
   <article class="fn" id="daylenh">
-    <div class="fn-h"><span class="ic">📤</span><div><h3>Lệnh hôm kia đã đẩy chưa</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
-    <p class="short">Lệnh ngày <b>D</b> phải đẩy (FUTA ghi <b>"Đã xác nhận hoàn thành"</b>) trước <b>12:00 ngày D+2</b>. Dải 📤 dưới 6 ô số báo luôn khi bạn chọn tuyến.</p>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-send"/></svg></span><div><h3>Lệnh hôm kia đã đẩy chưa</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
+    <p class="short">Lệnh ngày <b>D</b> phải đẩy (FUTA ghi <b>"Đã xác nhận hoàn thành"</b>) trước <b>12:00 ngày D+2</b>. Dải <svg class="ie" aria-hidden="true"><use href="#e-send"/></svg> dưới 6 ô số báo luôn khi bạn chọn tuyến.</p>
     <ul class="steps">
       <li><b style="color:var(--ok)">Xanh</b>: đẩy đủ. <b style="color:var(--warn)">Vàng</b>: còn thiếu, chưa tới 12:00. <b style="color:var(--err)">Đỏ</b>: quá 12:00 vẫn thiếu.</li>
       <li>Bấm vào dải để xem xe nào, lệnh số mấy, rồi vào FUTA đẩy.</li>
@@ -357,7 +371,7 @@
           <li>Tính theo <b>ngày hôm nay</b>, không theo ô ngày: hôm nay 18 thì xem lệnh ngày 16.</li>
           <li><b>50E22170 #02</b> = lệnh thứ 2 của xe 50E22170.</li>
           <li>Nhóm lệnh chưa đẩy: <i>chưa đẩy</i> · <i>mới ký đầu ngày</i> · <i>đang đẩy</i> · <i>đẩy lỗi</i>.</li>
-          <li>Máy chủ nhớ kết quả 2 phút; vừa đẩy xong thì bấm 🔄 Lấy mới.</li>
+          <li>Máy chủ nhớ kết quả 2 phút; vừa đẩy xong thì bấm <svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Lấy mới.</li>
         </ul>
         <h4>Đẩy trên FUTA</h4>
         <div class="flow"><span>admin.futacitybus.vn</span><i>›</i><span>Lệnh vận chuyển điện tử</span><i>›</i><span>Tuyến + ngày hôm kia</span><i>›</i><span>Xác nhận hoàn thành</span></div>
@@ -369,14 +383,14 @@
 
 <!-- ===================== SỬA LỆNH ===================== -->
 <section class="sec">
-  <div class="sec-h"><h2>✏️ Sửa lệnh</h2><span>cần đăng nhập FUTA</span></div>
+  <div class="sec-h"><h2><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Sửa lệnh</h2><span>cần đăng nhập FUTA</span></div>
 
   <article class="fn" id="chinhlenh">
-    <div class="fn-h"><span class="ic">⚡</span><div><h3>Chỉnh lệnh</h3><div class="tags"><span class="tag t-sua">✏️ Sửa trên FUTA · hoàn tác được</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg></span><div><h3>Chỉnh lệnh</h3><div class="tags"><span class="tag t-sua"><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Sửa trên FUTA · hoàn tác được</span></div></div></div>
     <p class="short">Tự sửa giờ <b>điều xe · đi · về bến</b> theo luật cho hết đỏ. Luôn cho xem trước, bạn đồng ý mới lưu.</p>
     <ul class="steps">
       <li>Để trống ô Biển số = cả tuyến; gõ biển số = chỉ xe đó.</li>
-      <li>Bấm <kbd>⚡ Chỉnh lệnh</kbd> → xem bảng <b>cũ → mới</b> → <kbd>💾 Lưu</kbd>.</li>
+      <li>Bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh</kbd> → xem bảng <b>cũ → mới</b> → <kbd><svg class="ie" aria-hidden="true"><use href="#e-save"/></svg> Lưu</kbd>.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -397,29 +411,30 @@
         </ul>
         <h4>Khi bấm Lưu</h4>
         <ul>
-          <li>Lệnh đầu lưu ngay; <b>các lệnh sau máy chủ tự lưu dần, mỗi lệnh cách 1–2 phút</b> (giống người chỉnh tay). Đóng trang vẫn chạy, web hiện ⏳ tiến độ.</li>
+          <li>Có 2 nút lưu: <b><svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Lưu nhanh</b> = lưu hết các lệnh ngay; <b><svg class="ie" aria-hidden="true"><use href="#e-timer"/></svg> Lưu chậm</b> = lệnh đầu lưu ngay, <b>các lệnh sau máy chủ tự lưu dần, mỗi lệnh cách 1 phút – 1 phút 30</b> (giống người chỉnh tay), mỗi tuyến chạy riêng, không chờ nhau. Đóng trang vẫn chạy, web hiện <svg class="ie" aria-hidden="true"><use href="#e-hourglass"/></svg> tiến độ.</li>
+          <li>Ca 1 / ca 2 tự động luôn lưu chậm.</li>
           <li>Đang lưu dần thì chưa bấm Lưu lại tuyến đó được, ca tự động cũng chờ xong mới ký.</li>
           <li>Dòng FUTA từ chối thì tự thử lại; xong hết đọc lại để kiểm khớp, rồi ghi 1 lần vào <b>Hoàn tác</b> kèm tên bạn.</li>
-          <li>Dòng <b>⚠️ Cần xem / lỗi</b>: web không tự sửa được, bạn xem trên FUTA.</li>
+          <li>Dòng <b><svg class="ie ie-warn" aria-hidden="true"><use href="#e-triangle-alert"/></svg> Cần xem / lỗi</b>: web không tự sửa được, bạn xem trên FUTA.</li>
         </ul>
       </div>
     </details>
   </article>
 
   <article class="fn" id="hoantac">
-    <div class="fn-h"><span class="ic">↩️</span><div><h3>Hoàn tác</h3><div class="tags"><span class="tag t-sua">✏️ Sửa trên FUTA</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-undo-2"/></svg></span><div><h3>Hoàn tác</h3><div class="tags"><span class="tag t-sua"><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Sửa trên FUTA</span></div></div></div>
     <p class="short">Trả lại giờ cũ nếu lỡ lưu sai. Được tới <b>23:55</b> cùng ngày.</p>
     <ul class="steps">
       <li>Vừa lưu xong: bấm nút trên thanh <b>"Lỡ tay?"</b>.</li>
-      <li>Hoặc bấm <kbd>↩️ Hoàn tác</kbd> để chọn lần lưu cần trả lại.</li>
+      <li>Hoặc bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-undo-2"/></svg> Hoàn tác</kbd> để chọn lần lưu cần trả lại.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
         <ul>
-          <li>Mỗi lần lưu (⚡ Chỉnh lệnh, ca tự động) máy chủ nhớ <b>giá trị trước khi lưu</b>.</li>
+          <li>Mỗi lần lưu (<svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh, ca tự động) máy chủ nhớ <b>giá trị trước khi lưu</b>.</li>
           <li>Danh sách hiện lúc nào, sửa gì. Bạn thấy và hoàn tác được các lần lưu <b>bằng tài khoản FUTA của bạn</b> (kể cả ca tự động bạn bật).</li>
           <li>Hoàn tác chỉ ghi lại ô <b>chưa bị sửa tiếp</b> sau lần đó, không đè việc của người khác.</li>
-          <li>Hoàn tác nhầm: bấm <kbd>↪️ Làm lại</kbd>.</li>
+          <li>Hoàn tác nhầm: bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-redo-2"/></svg> Làm lại</kbd>.</li>
         </ul>
         <div class="stop">Không hoàn tác được: <b>chữ ký</b> và <b>xác nhận về bến</b>.</div>
       </div>
@@ -429,38 +444,38 @@
 
 <!-- ===================== TỰ ĐỘNG ===================== -->
 <section class="sec">
-  <div class="sec-h"><h2>🌙 Tự động</h2><span>máy chủ làm thay, đóng web vẫn chạy</span></div>
+  <div class="sec-h"><h2><svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg> Tự động</h2><span>máy chủ làm thay, đóng web vẫn chạy</span></div>
 
   <article class="fn" id="batca">
-    <div class="fn-h"><span class="ic">🎛</span><div><h3>Bật / tắt ca</h3><div class="tags"><span class="tag t-auto">🤖 Máy tự chạy</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-sliders-horizontal"/></svg></span><div><h3>Bật / tắt ca</h3><div class="tags"><span class="tag t-auto"><svg class="ie" aria-hidden="true"><use href="#e-bot"/></svg> Máy tự chạy</span></div></div></div>
     <p class="short">Bấm công tắc → khung hỏi hiện ra → chọn <b>tối đa 3 tuyến</b> → bấm nút bật.</p>
     <ul class="steps">
-      <li>Không chắc thì bấm <kbd>👀 Xem thử</kbd> trước: cho xem ca sẽ làm gì, <b>không ghi gì</b>.</li>
-      <li>Đổi tuyến: <kbd>✏️ Đổi tuyến</kbd>. Tắt: bấm lại công tắc.</li>
+      <li>Không chắc thì bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Xem thử</kbd> trước: cho xem ca sẽ làm gì, <b>không ghi gì</b>.</li>
+      <li>Đổi tuyến: <kbd><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Đổi tuyến</kbd>. Tắt: bấm lại công tắc.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
         <ul>
           <li>Ca chạy trên máy chủ bằng <b>tài khoản FUTA của người bật</b>.</li>
-          <li>Khung <b>Đang bật</b> trên mỗi thẻ: 🟢 là của bạn, 🔒 là của người khác. <b>Chỉ người bật mới tắt được</b> tuyến của họ.</li>
+          <li>Khung <b>Đang bật</b> trên mỗi thẻ: <svg class="ie ie-dot-green" aria-hidden="true"><use href="#e-dot"/></svg> là của bạn, <svg class="ie" aria-hidden="true"><use href="#e-lock"/></svg> là của người khác. <b>Chỉ người bật mới tắt được</b> tuyến của họ.</li>
           <li>Chọn tuyến: bấm số tuyến, hoặc gõ vào ô <b>+ Thêm tuyến</b>. Đủ 3 thì các tuyến khác mờ đi, bỏ bớt 1 mới chọn được tuyến khác.</li>
           <li>Chấm xanh cạnh chữ <b>Tự động</b> = bạn đang có ca bật.</li>
-          <li>Cuối màn có <b>📜 Nhật ký</b> (ca đã làm gì) và <b>⏱ Giờ quét ca 2</b>.</li>
+          <li>Cuối màn có <b><svg class="ie" aria-hidden="true"><use href="#e-scroll-text"/></svg> Nhật ký</b> (ca đã làm gì) và <b><svg class="ie" aria-hidden="true"><use href="#e-timer"/></svg> Giờ quét ca 2</b>.</li>
         </ul>
       </div>
     </details>
   </article>
 
   <article class="fn" id="ca1">
-    <div class="fn-h"><span class="ic">☀️</span><div><h3>Ca 1</h3><div class="tags"><span class="tag t-auto">🤖 14:00</span><span class="tag t-sua">✏️ Sửa · không ký</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-sun"/></svg></span><div><h3>Ca 1</h3><div class="tags"><span class="tag t-auto"><svg class="ie" aria-hidden="true"><use href="#e-bot"/></svg> 14:00</span><span class="tag t-sua"><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Sửa · không ký</span></div></div></div>
     <p class="short">Đúng <b>14:00</b> tự xác nhận về bến rồi chỉnh giờ <b>lệnh ca sáng</b>. Chạy 1 lần rồi tự tắt.</p>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
-        <div class="flow"><span>14:00</span><i>›</i><span>Xác nhận về bến chuyến đã kết thúc</span><i>›</i><span>Chỉnh lệnh ca 1 theo luật ⚡</span><i>›</i><span>Tự tắt</span></div>
+        <div class="flow"><span>14:00</span><i>›</i><span>Xác nhận về bến chuyến đã kết thúc</span><i>›</i><span>Chỉnh lệnh ca 1 theo luật <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg></span><i>›</i><span>Tự tắt</span></div>
         <ul>
           <li><b>Lệnh ca 1</b> = lệnh mà mọi chuyến có lịch <b>04:00–13:59</b>. Lệnh có chuyến 14:00–02:00 hôm sau là lệnh ca 2.</li>
           <li><b>Không ký</b>. Lệnh ca 1 được ký ở Ca 2 buổi tối (nếu bật Ca 2), hoặc ký tay.</li>
-          <li>Bật Ca 1 là bật luôn 🅿️ Về bến tự động.</li>
+          <li>Bật Ca 1 là bật luôn <svg class="ie" aria-hidden="true"><use href="#e-square-parking"/></svg> Về bến tự động.</li>
           <li>Các lần sửa vào Hoàn tác như khi bạn tự bấm.</li>
         </ul>
       </div>
@@ -468,9 +483,9 @@
   </article>
 
   <article class="fn" id="ca2">
-    <div class="fn-h"><span class="ic">🌙</span><div><h3>Ca 2</h3><div class="tags"><span class="tag t-auto">🤖 từ 22:00</span><span class="tag t-ky">✍️ Có ký · không gỡ được</span></div></div></div>
-    <p class="short">Từ <b>22:00</b>, xe nào về hết thì tự <b>chỉnh lệnh rồi ký điều hành</b>. Ký hết thì tự tắt.</p>
-    <div class="warn">Nên bấm <b>👀 Xem thử</b> trước khi bật lần đầu.</div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg></span><div><h3>Ca 2</h3><div class="tags"><span class="tag t-auto"><svg class="ie" aria-hidden="true"><use href="#e-bot"/></svg> chỉnh từ 14:00 · ký từ 22:00</span><span class="tag t-ky"><svg class="ie" aria-hidden="true"><use href="#e-signature"/></svg> Có ký · không gỡ được</span></div></div></div>
+    <p class="short">Từ <b>14:00</b>, cứ 10 phút, xe nào đã về bến và hết chuyến thì tự <b>chỉnh lệnh</b> xe đó (chưa ký). Từ <b>22:00</b> tự <b>ký điều hành</b> xe đã về hết. Ký hết thì tự tắt.</p>
+    <div class="warn">Nên bấm <b><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Xem thử</b> trước khi bật lần đầu.</div>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
         <h4>Mỗi lượt quét</h4>
@@ -501,13 +516,13 @@
   </article>
 
   <article class="fn" id="veben">
-    <div class="fn-h"><span class="ic">🅿️</span><div><h3>Về bến tự động</h3><div class="tags"><span class="tag t-auto">🤖 mỗi 1 giờ</span><span class="tag t-sua">✏️ Không hoàn tác được</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-square-parking"/></svg></span><div><h3>Về bến tự động</h3><div class="tags"><span class="tag t-auto"><svg class="ie" aria-hidden="true"><use href="#e-bot"/></svg> mỗi 1 giờ</span><span class="tag t-sua"><svg class="ie" aria-hidden="true"><use href="#e-pencil"/></svg> Không hoàn tác được</span></div></div></div>
     <p class="short">Mỗi giờ tự bấm <b>"xác nhận về bến"</b> cho chuyến <b>đã kết thúc</b>. Bật Ca 1 / Ca 2 là bật luôn.</p>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
         <ul>
           <li>Chỉ bấm chuyến <b>đã kết thúc + có giờ đến + chưa xác nhận</b>. Xe đang chạy không bao giờ bị bấm.</li>
-          <li>Giờ về bến FUTA ghi là <b>lúc bấm</b>. Muốn đúng luật thì sau đó ⚡ Chỉnh lệnh (ca 1 / ca 2 tự làm).</li>
+          <li>Giờ về bến FUTA ghi là <b>lúc bấm</b>. Muốn đúng luật thì sau đó <svg class="ie" aria-hidden="true"><use href="#e-zap"/></svg> Chỉnh lệnh (ca 1 / ca 2 tự làm).</li>
           <li>Hết xe chạy trong ca thì tự tắt.</li>
           <li>Thẻ về bến hiện số xe <b>đang chạy</b> / <b>chờ xác nhận</b> và nhật ký từng lần bấm.</li>
         </ul>
@@ -519,14 +534,14 @@
 
 <!-- ===================== KHÁC ===================== -->
 <section class="sec">
-  <div class="sec-h"><h2>🧰 Khác</h2></div>
+  <div class="sec-h"><h2><svg class="ie" aria-hidden="true"><use href="#e-wrench"/></svg> Khác</h2></div>
 
   <article class="fn" id="bangtai">
-    <div class="fn-h"><span class="ic">🗂</span><div><h3>Bảng tài · ghép tuyến</h3><div class="tags"><span class="tag t-xem">👁 Chỉ xem</span></div></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-folder-open"/></svg></span><div><h3>Bảng tài · ghép tuyến</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
     <p class="short">Ghép phân công <b>2–3 tuyến</b> thành 1 bảng để in hoặc gửi nhóm.</p>
     <ul class="steps">
-      <li>Mục <b>🗂 Bảng tài</b> → chọn tuyến (web nhớ cho lần sau) + ngày.</li>
-      <li><kbd>📋 Copy</kbd> dán Google Sheet, hoặc <kbd>⬇️ Excel</kbd>.</li>
+      <li>Mục <b><svg class="ie" aria-hidden="true"><use href="#e-folder-open"/></svg> Bảng tài</b> → chọn tuyến (web nhớ cho lần sau) + ngày.</li>
+      <li><kbd><svg class="ie" aria-hidden="true"><use href="#e-clipboard-list"/></svg> Copy</kbd> dán Google Sheet, hoặc <kbd><svg class="ie" aria-hidden="true"><use href="#e-download"/></svg> Excel</kbd>.</li>
     </ul>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
@@ -539,9 +554,15 @@
     </details>
   </article>
 
+  <article class="fn" id="giaodien">
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-moon"/></svg></span><div><h3>Giao diện sáng / tối</h3><div class="tags"><span class="tag t-xem"><svg class="ie" aria-hidden="true"><use href="#e-eye"/></svg> Chỉ xem</span></div></div></div>
+    <p class="short">Nút mặt trăng / mặt trời trên thanh đầu trang đổi giao diện tối cho ca đêm. Web nhớ lựa chọn trên máy đó; chưa chọn thì theo cài đặt của máy.</p>
+    <ul class="steps"><li>Nút <b>?</b> cạnh ô tìm mở đúng mục hướng dẫn của màn đang xem.</li></ul>
+  </article>
+
   <article class="fn" id="laymoi">
-    <div class="fn-h"><span class="ic">🔄</span><div><h3>Lấy mới và "Dữ liệu lúc"</h3></div></div>
-    <p class="short">Nhiều người xem cùng tuyến thì máy chủ dùng chung kết quả vài chục giây cho nhanh. Cần số mới ngay thì bấm <kbd>🔄 Lấy mới</kbd>.</p>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg></span><div><h3>Lấy mới và "Dữ liệu lúc"</h3></div></div>
+    <p class="short">Nhiều người xem cùng tuyến thì máy chủ dùng chung kết quả vài chục giây cho nhanh. Cần số mới ngay thì bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Lấy mới</kbd>.</p>
     <details class="more"><summary><span class="o">＋ Xem chi tiết</span><span class="c">－ Thu gọn</span></summary>
       <div class="detail">
         <div class="tbl"><table>
@@ -556,13 +577,13 @@
   </article>
 
   <article class="fn" id="loi">
-    <div class="fn-h"><span class="ic">❓</span><div><h3>Gặp lỗi thì làm gì</h3></div></div>
+    <div class="fn-h"><span class="ic"><svg class="ie" aria-hidden="true"><use href="#e-circle-help"/></svg></span><div><h3>Gặp lỗi thì làm gì</h3></div></div>
     <div class="tbl" style="margin-top:10px"><table>
       <tr><th>Web báo</th><th>Làm</th></tr>
-      <tr><td>Sai mã truy cập</td><td>Hỏi người quản lý mã mới → <kbd>👤</kbd> → Đổi tên / mã.</td></tr>
+      <tr><td>Sai mã truy cập</td><td>Hỏi người quản lý mã mới → <kbd><svg class="ie" aria-hidden="true"><use href="#e-user"/></svg></kbd> → Đổi tên / mã.</td></tr>
       <tr><td>Kết nối chập chờn / hết thời gian chờ</td><td>Chờ vài giây bấm lại. Vẫn lỗi: mở web bằng cửa sổ ẩn danh.</td></tr>
       <tr><td>Hết phiên FUTA</td><td>Đăng nhập FUTA lại. Ca đang bật vẫn chạy.</td></tr>
-      <tr><td>Số liệu không đổi</td><td>Bấm <kbd>🔄 Lấy mới</kbd>.</td></tr>
+      <tr><td>Số liệu không đổi</td><td>Bấm <kbd><svg class="ie" aria-hidden="true"><use href="#e-refresh-cw"/></svg> Lấy mới</kbd>.</td></tr>
       <tr><td>Web như chưa cập nhật</td><td>Tải lại trang (máy tính: Ctrl + Shift + R).</td></tr>
       <tr><td>Máy chủ chưa lên bản mới</td><td>Báo người quản lý cập nhật Apps Script.</td></tr>
     </table></div>

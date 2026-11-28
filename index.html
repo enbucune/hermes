@@ -9,13 +9,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=62">
+<link rel="stylesheet" href="style.css?v=64">
+<script src="theme.js?v=1"></script>
 </head>
 <body data-tab="xem">
+<!-- Bộ icon Lucide (ISC license, lucide.dev) dạng SVG: <svg class="ic"><use href="#i-..."/></svg> -->
+<svg class="ic-sprite" aria-hidden="true"><symbol id="i-bus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></symbol><symbol id="i-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol><symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></symbol><symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol><symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol><symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol><symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol><symbol id="i-cmp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></symbol><symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol><symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol><symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol><symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol><symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol></svg>
 
 <header class="bar">
   <div class="bar-in">
-    <div class="brand"><span class="brand-mark" id="brandMark">🚌</span><h1>Check edit cụm 9</h1></div>
+    <div class="brand"><span class="brand-mark" id="brandMark"><svg class="ic" aria-hidden="true"><use href="#i-bus"/></svg></span><h1>Check edit cụm 9</h1></div>
     <!-- Tuyến + ngày dùng chung, luôn ở trên cùng. Đổi là web tự xem lại (app.js: rerunCurrent) -->
     <div class="fields">
       <div class="field field-route">
@@ -31,12 +34,13 @@
     </div>
     <!-- 3 mục chính. Máy tính: trên thanh đầu trang; điện thoại: thanh dưới đáy màn hình -->
     <nav class="tabs" role="tablist" aria-label="Chức năng">
-      <button type="button" class="tab on" data-tab="xem" role="tab"><i>🚌</i>Tuyến</button>
-      <button type="button" class="tab" data-tab="ca" role="tab"><i>🌙</i><span>Tự động<span class="tab-dot" id="caDot" hidden></span></span></button>
-      <button type="button" class="tab" data-tab="bt" role="tab"><i>🗂</i>Bảng tài</button>
+      <button type="button" class="tab on" data-tab="xem" role="tab"><i><svg class="ic" aria-hidden="true"><use href="#i-bus"/></svg></i>Tuyến</button>
+      <button type="button" class="tab" data-tab="ca" role="tab"><i><svg class="ic" aria-hidden="true"><use href="#i-bot"/></svg></i><span>Tự động<span class="tab-dot" id="caDot" hidden></span></span></button>
+      <button type="button" class="tab" data-tab="bt" role="tab"><i><svg class="ic" aria-hidden="true"><use href="#i-cal"/></svg></i>Bảng tài</button>
     </nav>
     <!-- Hướng dẫn sử dụng: trang riêng huongdan.html (dùng nhanh + chi tiết), mở tab mới -->
-    <a id="btnHelp" class="user help" href="huongdan.html" target="_blank" rel="noopener" title="Hướng dẫn sử dụng" aria-label="Hướng dẫn sử dụng">❓<span> Hướng dẫn</span></a>
+    <a id="btnHelp" class="user help" href="huongdan.html" target="_blank" rel="noopener" title="Hướng dẫn sử dụng" aria-label="Hướng dẫn sử dụng"><svg class="ic" aria-hidden="true"><use href="#i-help"/></svg><span> Hướng dẫn</span></a>
+    <button type="button" id="btnTheme" class="user theme" title="Đổi giao diện sáng / tối" aria-label="Đổi giao diện sáng / tối"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
     <button id="btnUser" class="user">👤 Đăng nhập</button>
   </div>
 </header>
@@ -46,12 +50,12 @@
   <!-- TUYẾN: mỗi ô vừa là số liệu vừa là nút mở chi tiết; bên dưới là việc xử lý (Chỉnh lệnh, Ký, Hoàn tác) -->
   <section class="pane" data-pane="xem">
     <div class="cards" id="actions">
-      <button id="btnOv" class="act card"><span>Tổng quan</span><b id="nOv">–</b><small id="sOv">xe cần xử lý</small></button>
-      <button id="btnLoad" class="act card"><span>Giờ chạy</span><b id="nLoad">–</b><small id="sLoad">chuyến lỗi</small></button>
-      <button id="btnGps" class="act card"><span>Mất chuyến</span><b id="nGps">–</b><small id="sGps">chụp GPS</small></button>
-      <button id="btnLvc" class="act card"><span>Lệnh</span><b id="nLvc">–</b><small id="sLvc">bấm kiểm tra</small></button>
-      <button id="btnEbms" class="act card"><span>EBMS</span><b id="nEbms">–</b><small id="sEbms">bấm so sánh</small></button>
-      <button id="btnNv" class="act card"><span>Nhân viên</span><b id="nNv">–</b><small id="sNv">bấm trích xuất</small></button>
+      <button id="btnOv" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-dash"/></svg>Tổng quan</span><b id="nOv">–</b><small id="sOv">xe cần xử lý</small></button>
+      <button id="btnLoad" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>Giờ chạy</span><b id="nLoad">–</b><small id="sLoad">chuyến lỗi</small></button>
+      <button id="btnGps" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Mất chuyến</span><b id="nGps">–</b><small id="sGps">chụp GPS</small></button>
+      <button id="btnLvc" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg>Lệnh</span><b id="nLvc">–</b><small id="sLvc">bấm kiểm tra</small></button>
+      <button id="btnEbms" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-cmp"/></svg>EBMS</span><b id="nEbms">–</b><small id="sEbms">bấm so sánh</small></button>
+      <button id="btnNv" class="act card"><span><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>Nhân viên</span><b id="nNv">–</b><small id="sNv">bấm trích xuất</small></button>
     </div>
     <!-- ĐẨY LỆNH: lệnh HÔM KIA của tuyến đã đẩy (Đã xác nhận hoàn thành) chưa — app.js: dayNen / dayVe, chỉ đọc -->
     <div class="day-bar" id="dayBar" hidden></div>
@@ -85,6 +89,7 @@
     <div class="search"><span aria-hidden="true">🔍</span><input type="text" id="q" placeholder="Lọc theo xe, tên, bến..." autocomplete="off" spellcheck="false"><button type="button" class="clr" data-clr="q" tabindex="-1" aria-label="Xoá">×</button></div>
     <label class="nd" id="ndBox" hidden>Người đo cồn <input type="text" id="nguoiDo" value="Nguyễn Hoài Nam"></label>
     <label class="check"><input type="checkbox" id="onlyWarn"> Chỉ dòng cần xem</label>
+    <a id="btnQ" class="btn-q" target="_blank" rel="noopener" hidden title="Hướng dẫn màn này" aria-label="Hướng dẫn màn này"><svg class="ic" aria-hidden="true"><use href="#i-help"/></svg></a>
     <button type="button" class="btn-soft" id="btnEbFull" hidden title="So sánh EBMS: đổi giữa bảng gọn (lịch chạy, đầu bến, giờ đi, giờ đến) và bảng đủ cột">📋 Chi tiết</button>
     <div class="tb-right">
       <span class="data-at" id="dataAt"></span>
@@ -131,7 +136,7 @@
       <div class="field"><label for="fuPass">Mật khẩu FUTA</label><input type="password" id="fuPass" autocomplete="current-password"></div>
       <div class="auth-err" id="fuErr"></div>
       <button type="submit" class="act act-main" id="fuBtn">Đăng nhập</button>
-      <small class="box-note">Web không lưu mật khẩu. Đăng nhập giữ 6 giờ.</small>
+      <small class="box-note">Web không lưu mật khẩu. Đăng nhập giữ tới khi bạn đăng xuất.</small>
     </form>
 
     <!-- CHỌN TUYẾN KHI BẬT CA 1 / CA 2 / VỀ BẾN (app.js: caHoi), tối đa 3 tuyến -->
@@ -150,6 +155,11 @@
       <button type="button" class="act act-main" data-auca="1">☀️ Ca 1 · 04:00–13:59</button>
       <button type="button" class="act act-main" data-auca="2">🌙 Ca 2 · 14:00–02:00</button>
       <button type="button" class="act act-soft" data-auca="all">Cả ngày (cả 2 ca)</button>
+    </div>
+    <!-- Chi tiết 1 chuyến So sánh EBMS (app.js: ebChiTiet) -->
+    <div data-box="ebct" hidden>
+      <div class="auth-logo"><b id="ebctT"></b></div>
+      <div id="ebctB" class="ebct"></div>
     </div>
     <div data-box="me" hidden>
       <div class="auth-logo">👤 <b id="meName"></b></div>
@@ -226,7 +236,8 @@
   </div>
 </div>
 
-<script src="app.js?v=67"></script>
+<script src="icons.js?v=1"></script>
+<script src="app.js?v=72"></script>
 <script src="lapbt.js?v=48"></script>
 </body>
 </html>
